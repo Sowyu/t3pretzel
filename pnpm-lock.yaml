@@ -149,6 +149,9 @@ importers:
       '@react-navigation/native-stack':
         specifier: 7.17.6
         version: 7.17.6(patch_hash=e667c3cef8c78bb9ff4882ee5bd23a432247b843060a9499eb5f07e9e2295552)(ad1eff2c3e588b799b6541240bb21d97)
+      '@sbaiahmed1/react-native-blur':
+        specifier: ^6.0.1
+        version: 6.0.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       '@shikijs/core':
         specifier: 4.2.0
         version: 4.2.0
@@ -2698,6 +2701,12 @@ packages:
 
   '@rolldown/pluginutils@1.0.0-rc.17':
     resolution: {integrity: sha512-n8iosDOt6Ig1UhJ2AYqoIhHWh/isz0xpicHTzpKBeotdVsTEcxsSA/i3EVM7gQAj0rU27OLAxCjzlj15IWY7bg==}
+
+  '@sbaiahmed1/react-native-blur@6.0.1':
+    resolution: {integrity: sha512-RlO4LBE/Wj437LI7KI2oMVzF9IBiHvGe350TvHjEQhBGrHaZfdqzW8HjuoiMo6WIsGpkKSm0HTnhdrPQHl6e8Q==}
+    peerDependencies:
+      react: '>=18.2.0'
+      react-native: '>=0.80.0'
 
   '@shikijs/core@4.2.0':
     resolution: {integrity: sha512-Hc87Ab1Ld/vEbZRCbwx344I5v+4RU8CVToUTRkqXL1+TjbuOp9U5Xa0M23V4GEWHxVn+yO5otb+HkQVm3ptWQQ==}
@@ -8188,6 +8197,11 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.0-rc.17':
     optional: true
+
+  '@sbaiahmed1/react-native-blur@6.0.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)':
+    dependencies:
+      react: 19.2.3
+      react-native: 0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
 
   '@shikijs/core@4.2.0':
     dependencies:

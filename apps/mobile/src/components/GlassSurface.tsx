@@ -2,6 +2,7 @@ import { GlassView, isGlassEffectAPIAvailable } from "expo-glass-effect";
 import type { ReactNode, Ref, RefObject } from "react";
 import {
   Platform,
+  StyleSheet,
   useColorScheme,
   View,
   type ColorValue,
@@ -103,8 +104,17 @@ export function GlassSurface({
       )}
       style={[surfaceStyle, style]}
     >
-      <GlassBackdrop blurTarget={blurTarget} fallbackColor={fallbackColor} />
+      <GlassBackdrop
+        blurTarget={blurTarget}
+        borderRadius={resolveBorderRadius(StyleSheet.flatten([surfaceStyle, style]))}
+        fallbackColor={fallbackColor}
+      />
       {children}
     </View>
   );
+}
+
+function resolveBorderRadius(flattened: ViewStyle | undefined): number | undefined {
+  const radius = flattened?.borderRadius;
+  return typeof radius === "number" ? radius : undefined;
 }
