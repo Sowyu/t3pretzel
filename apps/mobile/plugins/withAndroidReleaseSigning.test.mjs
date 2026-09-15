@@ -49,13 +49,16 @@ describe("Android release signing", () => {
       /PASSWORD/,
     );
     expect(
-      readSigningFromEnv({ T3CODE_ANDROID_KEYSTORE_PATH: "/tmp/x", T3CODE_ANDROID_KEYSTORE_PASSWORD: "p" }),
+      readSigningFromEnv({
+        T3CODE_ANDROID_KEYSTORE_PATH: "/tmp/x",
+        T3CODE_ANDROID_KEYSTORE_PASSWORD: "p",
+      }),
     ).toEqual({ storeFile: "/tmp/x", password: "p", keyAlias: "nightly" });
   });
 
   it("refuses a build.gradle that drifted from the Expo template", () => {
-    expect(() => patchAppBuildGradle("android {}", { storeFile: "a", password: "b", keyAlias: "c" })).toThrow(
-      /template/,
-    );
+    expect(() =>
+      patchAppBuildGradle("android {}", { storeFile: "a", password: "b", keyAlias: "c" }),
+    ).toThrow(/template/);
   });
 });
