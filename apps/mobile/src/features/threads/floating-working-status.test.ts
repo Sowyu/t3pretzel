@@ -19,15 +19,12 @@ describe("connectionFloatingStatus", () => {
     expect(status("connected")).toBeNull();
   });
 
-  it("names the environment it is retrying, and says so only after a failure", () => {
+  it("names the environment it is retrying, and goes quiet after a failure", () => {
     expect(status("connecting")).toMatchObject({
       tone: "reconnecting",
       label: "Reconnecting to Mac mini...",
     });
-    expect(status("reconnecting", { connectionError: "ECONNREFUSED" })).toMatchObject({
-      tone: "reconnecting",
-      label: "Can't reach Mac mini. Retrying...",
-    });
+    expect(status("reconnecting", { connectionError: "ECONNREFUSED" })).toBeNull();
   });
 
   it("reports why the environment is unreachable", () => {

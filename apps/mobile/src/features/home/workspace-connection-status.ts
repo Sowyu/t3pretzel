@@ -19,7 +19,8 @@ function shouldShowWorkspaceConnectionStatus(state: WorkspaceState): boolean {
 /**
  * A reconnect that has already failed once, or has been trying for longer than
  * a reconnect takes, is an environment we cannot reach right now. The
- * supervisor keeps retrying underneath; the title just stops promising.
+ * supervisor keeps retrying underneath; the title shows nothing rather than
+ * promising a reconnect that is not coming.
  */
 function isUnreachable(state: WorkspaceState, stalled: boolean): boolean {
   return (
@@ -29,16 +30,13 @@ function isUnreachable(state: WorkspaceState, stalled: boolean): boolean {
   );
 }
 
-function workspaceConnectionStatusLabel(state: WorkspaceState, stalled: boolean): string {
+function workspaceConnectionStatusLabel(state: WorkspaceState): string {
   if (state.networkStatus === "offline") return "You are offline";
-  const unreachable = isUnreachable(state, stalled);
   if (state.connectingEnvironments.length === 1) {
-    const label = state.connectingEnvironments[0]!.environmentLabel;
-    return unreachable ? `Can't reach ${label}` : `Reconnecting to ${label}`;
+    return `Reconnecting to ${state.connectingEnvironments[0]!.environmentLabel}`;
   }
   if (state.connectingEnvironments.length > 1) {
-    const count = state.connectingEnvironments.length;
-    return unreachable ? `Can't reach ${count} environments` : `Reconnecting ${count} environments`;
+    return `Reconnecting ${state.connectingEnvironments.length} environments`;
   }
   if (state.connectionError !== null) return state.connectionError;
   if (state.hasPendingShellSnapshot) {
@@ -53,13 +51,14 @@ export function workspaceConnectionStatusPresentation(
   options: { readonly stalled?: boolean } = {},
 ): WorkspaceConnectionStatusPresentation | null {
   if (!shouldShowWorkspaceConnectionStatus(state)) return null;
-  const stalled = options.stalled === true;
+  if (state.networkStatus !== "offline" && isUnreachable(state, options.stalled === true)) {
+    return null;
+  }
   return {
-    label: workspaceConnectionStatusLabel(state, stalled),
+    label: workspaceConnectionStatusLabel(state),
     showsProgress:
       state.networkStatus !== "offline" &&
       state.connectionError === null &&
-      !isUnreachable(state, stalled) &&
       (state.connectingEnvironments.length > 0 || state.hasPendingShellSnapshot),
   };
 }

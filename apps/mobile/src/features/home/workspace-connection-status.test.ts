@@ -59,7 +59,7 @@ describe("workspace connection status", () => {
     });
   });
 
-  it("stops promising once the reconnect has failed", () => {
+  it("shows nothing once the reconnect has failed", () => {
     const state = workspaceState({
       hasConnectingEnvironment: true,
       hasReadyEnvironment: false,
@@ -77,13 +77,10 @@ describe("workspace connection status", () => {
       ],
     });
 
-    expect(workspaceConnectionStatusPresentation(state)).toEqual({
-      label: "Can't reach Julius’s Mac mini",
-      showsProgress: false,
-    });
+    expect(workspaceConnectionStatusPresentation(state)).toBeNull();
   });
 
-  it("stops promising once the reconnect has stalled", () => {
+  it("shows nothing once the reconnect has stalled", () => {
     const state = workspaceState({
       hasConnectingEnvironment: true,
       hasReadyEnvironment: false,
@@ -101,10 +98,7 @@ describe("workspace connection status", () => {
       ],
     });
 
-    expect(workspaceConnectionStatusPresentation(state, { stalled: true })).toEqual({
-      label: "Can't reach Julius’s Mac mini",
-      showsProgress: false,
-    });
+    expect(workspaceConnectionStatusPresentation(state, { stalled: true })).toBeNull();
   });
 
   it("surfaces connection errors before the generic disconnected fallback", () => {

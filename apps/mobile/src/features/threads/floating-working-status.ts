@@ -40,13 +40,13 @@ export function connectionFloatingStatus(input: {
   switch (input.connectionState) {
     case "connecting":
     case "reconnecting":
+      // A reconnect that already failed keeps retrying underneath; the pill
+      // stays away rather than announcing a machine that is off.
+      if (input.connectionError !== null) return null;
       return {
         kind: "connection",
         tone: "reconnecting",
-        label:
-          input.connectionError === null
-            ? `Reconnecting to ${environmentLabel}...`
-            : `Can't reach ${environmentLabel}. Retrying...`,
+        label: `Reconnecting to ${environmentLabel}...`,
         onPress: input.onReconnect,
       };
     case "offline":
