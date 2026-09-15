@@ -26,7 +26,7 @@ describe("connectionFloatingStatus", () => {
     });
     expect(status("reconnecting", { connectionError: "ECONNREFUSED" })).toMatchObject({
       tone: "reconnecting",
-      label: "Failed to connect. Retrying Mac mini...",
+      label: "Can't reach Mac mini. Retrying...",
     });
   });
 

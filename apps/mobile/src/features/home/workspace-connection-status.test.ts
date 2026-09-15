@@ -59,6 +59,54 @@ describe("workspace connection status", () => {
     });
   });
 
+  it("stops promising once the reconnect has failed", () => {
+    const state = workspaceState({
+      hasConnectingEnvironment: true,
+      hasReadyEnvironment: false,
+      connectingEnvironments: [
+        {
+          environmentId: "environment-1" as never,
+          environmentLabel: "Julius’s Mac mini",
+          displayUrl: "",
+          isRelayManaged: true,
+          isEnabled: true,
+          connectionState: "reconnecting",
+          connectionError: "Environment offline",
+          connectionErrorTraceId: null,
+        },
+      ],
+    });
+
+    expect(workspaceConnectionStatusPresentation(state)).toEqual({
+      label: "Can't reach Julius’s Mac mini",
+      showsProgress: false,
+    });
+  });
+
+  it("stops promising once the reconnect has stalled", () => {
+    const state = workspaceState({
+      hasConnectingEnvironment: true,
+      hasReadyEnvironment: false,
+      connectingEnvironments: [
+        {
+          environmentId: "environment-1" as never,
+          environmentLabel: "Julius’s Mac mini",
+          displayUrl: "",
+          isRelayManaged: true,
+          isEnabled: true,
+          connectionState: "reconnecting",
+          connectionError: null,
+          connectionErrorTraceId: null,
+        },
+      ],
+    });
+
+    expect(workspaceConnectionStatusPresentation(state, { stalled: true })).toEqual({
+      label: "Can't reach Julius’s Mac mini",
+      showsProgress: false,
+    });
+  });
+
   it("surfaces connection errors before the generic disconnected fallback", () => {
     const state = workspaceState({
       connectionError: "Could not reach Julius’s Mac mini",

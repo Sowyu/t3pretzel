@@ -21,6 +21,11 @@ import {
  */
 const STATUS_SHOW_DELAY_MS = 800;
 const FADE_IN_MS = 250;
+/**
+ * A reconnect that is still spinning after this long is not going to land on
+ * its own; the title switches to "Can't reach" while retries continue.
+ */
+const STALLED_RECONNECT_MS = 20_000;
 
 /**
  * Connection status presentation, debounced for display: null until the
@@ -29,8 +34,10 @@ const FADE_IN_MS = 250;
  */
 function useDelayedConnectionStatus(): WorkspaceConnectionStatusPresentation | null {
   const { state } = useWorkspaceState();
-  const presentation = workspaceConnectionStatusPresentation(state);
+  const [stalled, setStalled] = useState(false);
+  const presentation = workspaceConnectionStatusPresentation(state, { stalled });
   const hasStatus = presentation !== null;
+  const reconnecting = state.hasConnectingEnvironment;
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -41,6 +48,15 @@ function useDelayedConnectionStatus(): WorkspaceConnectionStatusPresentation | n
     const timer = setTimeout(() => setVisible(true), STATUS_SHOW_DELAY_MS);
     return () => clearTimeout(timer);
   }, [hasStatus]);
+
+  useEffect(() => {
+    if (!reconnecting) {
+      setStalled(false);
+      return;
+    }
+    const timer = setTimeout(() => setStalled(true), STALLED_RECONNECT_MS);
+    return () => clearTimeout(timer);
+  }, [reconnecting]);
 
   return visible ? presentation : null;
 }

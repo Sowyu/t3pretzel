@@ -46,7 +46,7 @@ export function connectionFloatingStatus(input: {
         label:
           input.connectionError === null
             ? `Reconnecting to ${environmentLabel}...`
-            : `Failed to connect. Retrying ${environmentLabel}...`,
+            : `Can't reach ${environmentLabel}. Retrying...`,
         onPress: input.onReconnect,
       };
     case "offline":
