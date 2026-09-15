@@ -228,6 +228,41 @@ export function ComposerSurface(props: {
     borderRadius: animatedBorderRadius.value,
   }));
   const layoutTransition = shouldAnimate ? COMPOSER_LAYOUT_TRANSITION : undefined;
+  // Android has no layout morph, and its liquid glass has to contain the
+  // content it sits under (see GlassSurface), so the surface wraps the content.
+  if (Platform.OS === "android") {
+    return (
+      <View
+        className={
+          materialYouStyleLayoutActive
+            ? undefined
+            : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
+        }
+        style={{
+          overflow: "hidden",
+          borderRadius: targetBorderRadius,
+          elevation: Platform.Version < 28 ? 10 : undefined,
+        }}
+      >
+        <GlassSurface
+          chrome="none"
+          fallbackColor={
+            materialYouStyleLayoutActive
+              ? colors["--color-composer-surface"]
+              : colors["--color-card"]
+          }
+          fallbackClassName={
+            materialYouStyleLayoutActive ? "border border-composer-border" : "border border-border"
+          }
+          glassEffectStyle="regular"
+          tintColor="transparent"
+          style={props.style}
+        >
+          {props.children}
+        </GlassSurface>
+      </View>
+    );
+  }
 
   // Each native frame follows the same transition. Animating only the outer
   // clip leaves the glass and content at their final height on the first frame.
@@ -243,8 +278,6 @@ export function ComposerSurface(props: {
         animatedShapeStyle,
         {
           overflow: "hidden",
-          // Android versions before 9 do not support outset box shadows.
-          elevation: Platform.OS === "android" && Platform.Version < 28 ? 10 : undefined,
         },
       ]}
     >

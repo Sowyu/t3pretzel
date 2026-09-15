@@ -1,3 +1,4 @@
+import { LiquidGlassView } from "@sbaiahmed1/react-native-blur";
 import { GlassView, isGlassEffectAPIAvailable } from "expo-glass-effect";
 import type { ReactNode, Ref, RefObject } from "react";
 import {
@@ -93,28 +94,60 @@ export function GlassSurface({
     );
   }
 
+  const borderClassName = cn(
+    chrome === "none" ? "border-0 border-transparent" : "border border-border",
+    fallbackClassName,
+    className,
+  );
+  if (supportsLiquidGlass) {
+    // The shader samples the whole screen and skips only glass views and their
+    // children, so the content has to live inside the glass view: as a sibling
+    // it would be captured and refracted back into its own backdrop.
+    const flattened = StyleSheet.flatten([surfaceStyle, style]);
+    return (
+      <View
+        {...props}
+        ref={ref}
+        className={borderClassName}
+        style={[surfaceStyle, shapeOf(flattened)]}
+      >
+        <LiquidGlassView
+          glassType="regular"
+          glassTintColor={fallbackColor === undefined ? undefined : String(fallbackColor)}
+          glassOpacity={isDarkMode ? 0.55 : 0.4}
+          isInteractive={false}
+          style={style}
+        >
+          {children}
+        </LiquidGlassView>
+      </View>
+    );
+  }
   return (
-    <View
-      {...props}
-      ref={ref}
-      className={cn(
-        chrome === "none" ? "border-0 border-transparent" : "border border-border",
-        fallbackClassName,
-        className,
-      )}
-      style={[surfaceStyle, style]}
-    >
-      <GlassBackdrop
-        blurTarget={blurTarget}
-        borderRadius={resolveBorderRadius(StyleSheet.flatten([surfaceStyle, style]))}
-        fallbackColor={fallbackColor}
-      />
+    <View {...props} ref={ref} className={borderClassName} style={[surfaceStyle, style]}>
+      <GlassBackdrop blurTarget={blurTarget} fallbackColor={fallbackColor} />
       {children}
     </View>
   );
 }
 
-function resolveBorderRadius(flattened: ViewStyle | undefined): number | undefined {
-  const radius = flattened?.borderRadius;
-  return typeof radius === "number" ? radius : undefined;
+// Android 13 can run the AGSL liquid glass shader: refraction, dispersion,
+// blur and tint from a live capture of the screen behind the view.
+const supportsLiquidGlass = Platform.OS === "android" && Platform.Version >= 33;
+
+/** The corner radii of a style, so the clipping wrapper matches the glass shape. */
+function shapeOf(flattened: ViewStyle | undefined): ViewStyle {
+  if (!flattened) return {};
+  const shape: ViewStyle = {};
+  for (const key of [
+    "borderRadius",
+    "borderTopLeftRadius",
+    "borderTopRightRadius",
+    "borderBottomLeftRadius",
+    "borderBottomRightRadius",
+  ] as const) {
+    const value = flattened[key];
+    if (value !== undefined) shape[key] = value;
+  }
+  return shape;
 }

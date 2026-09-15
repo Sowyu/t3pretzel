@@ -1,0 +1,35 @@
+diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
+index 304d49064f93f91eba1717adcfeb04cec203b1fe..e4e5b249ed18f45d5d0715bc930a06e1321f1afa 100644
+--- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
++++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
+@@ -263,7 +263,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+     if (shaderFailed || width <= 0 || height <= 0) return false
+     val node = glassNode ?: return false
+     val source = captureSource ?: return false
+-    val bitmap = SharedBackdropCapture.peek(source) ?: return false
++    if (SharedBackdropCapture.peek(source) == null) return false
+ 
+     source.getLocationInWindow(sourceLocation)
+     getLocationInWindow(ownLocation)
+@@ -280,6 +280,12 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+       SharedBackdropCapture.acquire(source, CAPTURE_DOWNSAMPLE, BACKDROP_REFRESH_MS)
+     }
+ 
++    // The refresh above may have replaced the shared bitmap and recycled the
++    // one peeked earlier (the capture source resized, e.g. the keyboard opened).
++    // Drawing a recycled bitmap throws and takes the app down.
++    val current = SharedBackdropCapture.peek(source) ?: return false
++    if (current.isRecycled) return false
++
+     val generation = SharedBackdropCapture.generationOf(source)
+     if (
+       generation == appliedGeneration &&
+@@ -303,7 +309,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+       // CAPTURE_DOWNSAMPLE-pixel steps, which reads as the glass "shaking"
+       // against smoothly-scrolling content.
+       recording.scale(downsample, downsample)
+-      recording.drawBitmap(bitmap, -offsetX / downsample, -offsetY / downsample, capturePaint)
++      recording.drawBitmap(current, -offsetX / downsample, -offsetY / downsample, capturePaint)
+     } finally {
+       node.endRecording()
+     }

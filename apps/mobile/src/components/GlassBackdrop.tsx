@@ -1,4 +1,3 @@
-import { LiquidGlassView } from "@sbaiahmed1/react-native-blur";
 import { BlurView } from "expo-blur";
 import { useContext, type RefObject } from "react";
 import { Platform, StyleSheet, View, type ColorValue } from "react-native";
@@ -8,41 +7,21 @@ import { GlassBlurTargetContext } from "../lib/glassBlurTarget";
 import { themeColorWithAlpha } from "../lib/mobileTheme";
 
 /** Frosted backdrop for containers that clip their children to their shape. */
-// Android 13 can run the AGSL liquid glass shader: refraction, dispersion,
-// blur and tint from a live capture of the screen behind the view.
-const supportsLiquidGlass = Platform.OS === "android" && Platform.Version >= 33;
-
 export function GlassBackdrop(props: {
   readonly fallbackColor?: ColorValue;
   readonly blurTarget?: RefObject<View | null>;
-  /** Corner radius of the clipping surface; the glass lens bevel follows it. */
-  readonly borderRadius?: number;
 }) {
   const { themeAppearance } = useAppearancePreferences();
   const inheritedBlurTarget = useContext(GlassBlurTargetContext);
   const target = props.blurTarget ?? inheritedBlurTarget;
+  const supportsBlur =
+    Platform.OS === "ios" ||
+    (Platform.OS === "android" && Platform.Version >= 31 && target !== undefined);
   const colorStyle =
     props.fallbackColor === undefined
       ? undefined
       : { backgroundColor: themeColorWithAlpha(String(props.fallbackColor), 1) };
-  if (supportsLiquidGlass) {
-    return (
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <LiquidGlassView
-          glassType="regular"
-          glassTintColor={
-            props.fallbackColor === undefined ? undefined : String(props.fallbackColor)
-          }
-          glassOpacity={themeAppearance === "dark" ? 0.55 : 0.4}
-          isInteractive={false}
-          style={[StyleSheet.absoluteFill, { borderRadius: props.borderRadius ?? 0 }]}
-        />
-      </View>
-    );
-  }
-  const supportsBlur =
-    Platform.OS === "ios" ||
-    (Platform.OS === "android" && Platform.Version >= 31 && target !== undefined);
+
   return (
     <>
       {/* Android samples a separate target. An opaque backing prevents any
