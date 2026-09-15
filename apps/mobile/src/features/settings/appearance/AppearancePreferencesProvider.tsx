@@ -39,6 +39,11 @@ import {
   type MobileThemeMode,
 } from "../../../lib/mobileTheme";
 import {
+  applyMobileToggleColor,
+  normalizeMobileToggleColorId,
+  type MobileToggleColorId,
+} from "../../../lib/toggleColor";
+import {
   createMobileThemeRuntimeOperations,
   getMobileUniwindThemeName,
   type MobileThemeRuntimeState,
@@ -54,6 +59,8 @@ interface AppearancePreferencesContextValue {
   readonly materialYouStyleLayoutEnabled: boolean;
   readonly materialYouStyleLayoutActive: boolean;
   readonly setMaterialYouStyleLayoutEnabled: (value: boolean) => void;
+  readonly toggleColorId: MobileToggleColorId;
+  readonly setToggleColorId: (value: MobileToggleColorId) => void;
   readonly systemColorsAvailable: boolean;
   readonly systemColorsActive: boolean;
   readonly themeVariables: MobileThemeVariables;
@@ -100,6 +107,7 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
   const materialYouStyleLayoutEnabled = storedPreferences?.materialYouStyleLayoutEnabled ?? false;
   const materialYouStyleLayoutActive = Platform.OS === "android" && materialYouStyleLayoutEnabled;
   const systemColorsActive = themeId === "material-you" && isSystemColorsAvailable;
+  const toggleColorId = normalizeMobileToggleColorId(storedPreferences?.toggleColorId);
   const [systemColorPalettes, setSystemColorPalettes] = useState(readSystemColorPalettes);
   useEffect(() => {
     if (!isSystemColorsAvailable) return;
@@ -121,16 +129,18 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
   const themeVariablesByAppearance = useMemo(() => {
     const resolve = (appearance: MobileThemeAppearance) => {
       const base = getMobileThemeRuntimeVariables(themeIds[appearance], appearance);
-      return themeIds[appearance] === "material-you" && systemColorPalettes
-        ? materialYouPaletteToMobileThemeVariables(
-            systemColorPalettes[appearance],
-            appearance,
-            base,
-          )
-        : base;
+      const themed =
+        themeIds[appearance] === "material-you" && systemColorPalettes
+          ? materialYouPaletteToMobileThemeVariables(
+              systemColorPalettes[appearance],
+              appearance,
+              base,
+            )
+          : base;
+      return applyMobileToggleColor(themed, appearance, toggleColorId);
     };
     return { light: resolve("light"), dark: resolve("dark") };
-  }, [themeIds, systemColorPalettes]);
+  }, [themeIds, systemColorPalettes, toggleColorId]);
   const themeVariables = themeVariablesByAppearance[themeAppearance];
   const activeThemeName = getMobileUniwindThemeName(themeId, themeAppearance);
   const { baseFontSize, codeFontSize, codeWordBreak, terminalFontSize } = preferences;
@@ -254,6 +264,15 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
     [updatePreferences],
   );
 
+  const setToggleColorId = useCallback(
+    (value: MobileToggleColorId) => {
+      // Same reasoning as theme selection: the swatch repaints every switch on
+      // screen, so the optimistic update must land in the next frame.
+      updateThemePreferences({ toggleColorId: value });
+    },
+    [updateThemePreferences],
+  );
+
   const setBaseFontSize = useCallback(
     (value: number) => {
       const current = appliedRuntimeStateRef.current ?? runtimeState;
@@ -296,6 +315,8 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       materialYouStyleLayoutEnabled,
       materialYouStyleLayoutActive,
       setMaterialYouStyleLayoutEnabled,
+      toggleColorId,
+      setToggleColorId,
       themeVariables,
       themeVariablesByAppearance,
       systemColorPalettes,
@@ -318,6 +339,8 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       materialYouStyleLayoutEnabled,
       materialYouStyleLayoutActive,
       setMaterialYouStyleLayoutEnabled,
+      toggleColorId,
+      setToggleColorId,
       themeVariables,
       themeVariablesByAppearance,
       systemColorPalettes,

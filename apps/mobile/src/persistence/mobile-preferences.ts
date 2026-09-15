@@ -7,6 +7,7 @@ import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import type { SidebarProjectGroupingMode } from "@t3tools/contracts";
 import { MOBILE_THEME_IDS, type MobileThemeId, type MobileThemeMode } from "../lib/mobileTheme";
+import { normalizeMobileToggleColorId, type MobileToggleColorId } from "../lib/toggleColor";
 
 import * as MobileDatabase from "./mobile-database";
 import * as MobileSecureStorage from "./mobile-secure-storage";
@@ -17,13 +18,15 @@ const PREFERENCES_FALLBACK_KEY = "t3code.preferences.fallback";
 
 export interface Preferences {
   readonly liveActivitiesEnabled?: boolean;
-  readonly themeId?: MobileThemeId;
   /** Periodic headless shell refresh. Unset means on; see `background-refresh.ts`. */
   readonly backgroundRefreshEnabled?: boolean;
+  readonly themeId?: MobileThemeId;
   readonly lightThemeId?: MobileThemeId;
   readonly darkThemeId?: MobileThemeId;
   readonly themeMode?: MobileThemeMode;
   readonly materialYouStyleLayoutEnabled?: boolean;
+  /** Colour a switch shows while it is on; `system` follows the theme accent. */
+  readonly toggleColorId?: MobileToggleColorId;
   readonly baseFontSize?: number;
   readonly terminalFontSize?: number | null;
   readonly markdownFontSize?: number;
@@ -89,12 +92,13 @@ export class MobilePreferencesStore extends Context.Service<
 function sanitizePreferences(parsed: Preferences): Preferences {
   const preferences: {
     liveActivitiesEnabled?: boolean;
+    backgroundRefreshEnabled?: boolean;
     themeId?: MobileThemeId;
     lightThemeId?: MobileThemeId;
     darkThemeId?: MobileThemeId;
-    backgroundRefreshEnabled?: boolean;
     themeMode?: MobileThemeMode;
     materialYouStyleLayoutEnabled?: boolean;
+    toggleColorId?: MobileToggleColorId;
     baseFontSize?: number;
     terminalFontSize?: number | null;
     markdownFontSize?: number;
@@ -113,13 +117,13 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   if (typeof parsed.liveActivitiesEnabled === "boolean") {
     preferences.liveActivitiesEnabled = parsed.liveActivitiesEnabled;
   }
+  if (typeof parsed.backgroundRefreshEnabled === "boolean") {
+    preferences.backgroundRefreshEnabled = parsed.backgroundRefreshEnabled;
+  }
   if (
     typeof parsed.themeId === "string" &&
     (MOBILE_THEME_IDS as readonly string[]).includes(parsed.themeId)
   ) {
-  if (typeof parsed.backgroundRefreshEnabled === "boolean") {
-    preferences.backgroundRefreshEnabled = parsed.backgroundRefreshEnabled;
-  }
     preferences.themeId = parsed.themeId as MobileThemeId;
   }
   if (
@@ -143,6 +147,12 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.materialYouStyleLayoutEnabled === "boolean") {
     preferences.materialYouStyleLayoutEnabled = parsed.materialYouStyleLayoutEnabled;
+  }
+  if (
+    typeof parsed.toggleColorId === "string" &&
+    normalizeMobileToggleColorId(parsed.toggleColorId) === parsed.toggleColorId
+  ) {
+    preferences.toggleColorId = parsed.toggleColorId;
   }
   if (typeof parsed.baseFontSize === "number") preferences.baseFontSize = parsed.baseFontSize;
   if (typeof parsed.terminalFontSize === "number" || parsed.terminalFontSize === null) {

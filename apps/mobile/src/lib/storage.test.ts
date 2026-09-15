@@ -221,6 +221,15 @@ describe("mobile connection storage", () => {
     });
   });
 
+  it("keeps a known toggle color and drops an unknown one", async () => {
+    await expect(savePreferencesPatch({ toggleColorId: "purple" })).resolves.toEqual({
+      toggleColorId: "purple",
+    });
+
+    mocks.setPreferencesJson(JSON.stringify({ toggleColorId: "chartreuse" }), 10);
+    await expect(loadPreferences()).resolves.toEqual({});
+  });
+
   it("drops the removed theme transition preference", async () => {
     mocks.setPreferencesJson(JSON.stringify({ themeTransition: "circle-bottom-left" }), 10);
 

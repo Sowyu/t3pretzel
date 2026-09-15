@@ -3,6 +3,9 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { Platform } from "react-native";
 
+/** Android channel both the native push handler and local alerts post to. */
+export const AGENT_ALERT_CHANNEL_ID = "agent-alerts";
+
 export type NotificationPermissionResult =
   | { readonly type: "unsupported" }
   | { readonly type: "granted" }
@@ -41,7 +44,7 @@ export const requestAgentNotificationPermission: Effect.Effect<
   if (Platform.OS === "android") {
     yield* Effect.tryPromise({
       try: () =>
-        Notifications.setNotificationChannelAsync("agent-alerts", {
+        Notifications.setNotificationChannelAsync(AGENT_ALERT_CHANNEL_ID, {
           name: "Agent alerts",
           importance: Notifications.AndroidImportance.HIGH,
         }),

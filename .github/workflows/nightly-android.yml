@@ -79,6 +79,21 @@ jobs:
           printf '%s' "$NIGHTLY_KEYSTORE_BASE64" | base64 -d > "$keystore"
           echo "T3CODE_ANDROID_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
 
+      # Optional. Firebase is what mints the FCM token the relay pushes to, so
+      # without it the app registers with no push token and never receives an
+      # agent notification. Local notifications for finished turns still work.
+      - name: Decode Firebase configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::notice::GOOGLE_SERVICES_JSON is not set; this nightly ships without Firebase and cannot receive push notifications. See README.md, Nightly builds."
+            exit 0
+          fi
+          services="$RUNNER_TEMP/google-services.json"
+          printf '%s' "$GOOGLE_SERVICES_JSON" | base64 -d > "$services"
+          echo "T3CODE_ANDROID_GOOGLE_SERVICES_FILE=$services" >> "$GITHUB_ENV"
+
       - name: Prebuild
         working-directory: apps/mobile
         env:
