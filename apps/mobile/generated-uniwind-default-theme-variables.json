@@ -83,7 +83,7 @@
     "--color-card": "#171717",
     "--color-card-alt": "#1c1c1c",
     "--color-card-translucent": "rgba(17, 17, 17, 0.8)",
-    "--color-thread-canvas": "#1c1c1c",
+    "--color-thread-canvas": "#0e0e0e",
     "--color-thread-selected": "#171717",
     "--color-thread-selected-foreground": "#f5f5f5",
     "--color-thread-selected-foreground-muted": "#8e8e93",
