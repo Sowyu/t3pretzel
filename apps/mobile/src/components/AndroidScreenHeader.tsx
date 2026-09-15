@@ -46,6 +46,9 @@ export function AndroidScreenHeader(props: {
   readonly subtitle?: string | null;
   readonly actions?: ReadonlyArray<AndroidHeaderAction>;
   readonly trailing?: ReactNode;
+  /** Sits on the header surface under the title row, above the bottom border.
+      The Files screen puts its search field here, matching the home header. */
+  readonly below?: ReactNode;
   readonly onBack?: () => void;
   readonly embedded?: boolean;
   readonly hideBottomBorder?: boolean;
@@ -54,7 +57,10 @@ export function AndroidScreenHeader(props: {
 
   return (
     <View
-      className="border-b border-header-border bg-header px-3 pb-2.5"
+      className={cn(
+        "border-b border-header-border bg-header px-3",
+        props.below ? "pb-3" : "pb-2.5",
+      )}
       style={{
         paddingTop: props.embedded ? 8 : Math.max(insets.top, 12),
         borderBottomWidth: props.hideBottomBorder ? 0 : undefined,
@@ -103,6 +109,8 @@ export function AndroidScreenHeader(props: {
         ))}
         {props.trailing}
       </View>
+
+      {props.below ? <View className="mt-3">{props.below}</View> : null}
     </View>
   );
 }

@@ -10,7 +10,12 @@ import {
   SearchBar,
 } from "react-native-screens";
 
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import {
+  AppText as Text,
+  AppTextInput as TextInput,
+  EMBEDDED_TEXT_INPUT,
+} from "../../components/AppText";
+import { cn } from "../../lib/cn";
 import { nativeHeaderScrollEdgeEffects } from "../../native/StackHeader";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -194,7 +199,7 @@ export function ThreadFileNavigatorPane(props: {
             autoCapitalize="none"
             autoCorrect={false}
             clearButtonMode="while-editing"
-            className="min-h-10 flex-1 rounded-xl py-2 text-sm"
+            className={cn(EMBEDDED_TEXT_INPUT, "min-h-10 flex-1 py-2 text-sm")}
             placeholder="Search files"
             value={searchQuery}
             onChangeText={setSearchQuery}

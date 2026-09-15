@@ -11,7 +11,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
 
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import {
+  AppText as Text,
+  AppTextInput as TextInput,
+  EMBEDDED_TEXT_INPUT,
+} from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { ControlPill } from "../../components/ControlPill";
@@ -276,7 +280,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
                         value={commentText}
                         onChangeText={setCommentText}
                         onFocus={markInputFocused}
-                        className="h-full min-h-0 flex-1 border-0 bg-transparent px-0 py-0 font-sans text-base"
+                        className={cn(EMBEDDED_TEXT_INPUT, "h-full flex-1 text-base")}
                       />
                     </TextInputWrapper>
                   </View>

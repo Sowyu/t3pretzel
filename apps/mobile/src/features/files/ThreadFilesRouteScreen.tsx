@@ -2,7 +2,7 @@ import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/Stac
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import type { MenuAction } from "@react-native-menu/menu";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { EnvironmentId, type ProjectReadFileResult, ThreadId } from "@t3tools/contracts";
@@ -16,13 +16,18 @@ import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
 
 import { AndroidHeaderIconButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { SymbolView } from "../../components/AppSymbol";
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import {
+  AppText as Text,
+  AppTextInput as TextInput,
+  EMBEDDED_TEXT_INPUT,
+} from "../../components/AppText";
 import { AudioFilePreview } from "../../components/AudioFilePreview";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { EmptyState } from "../../components/EmptyState";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { resolveFileSelectionNavigationAction } from "../../lib/adaptive-navigation";
+import { cn } from "../../lib/cn";
 import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import { isPdfFile } from "../../lib/filePreview";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
@@ -483,59 +488,70 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
         }}
       />
       {isAndroid ? (
-        <>
-          <AndroidScreenHeader
-            title="Files"
-            subtitle={projectName}
-            onBack={handleReturnToThread}
-            hideBottomBorder={materialYouStyleLayoutActive}
-            actions={[
-              ...(layout.usesSplitView
-                ? [
-                    {
-                      accessibilityLabel: panes.primarySidebarVisible
-                        ? "Maximize files"
-                        : "Show threads",
-                      icon: "sidebar.left" as const,
-                      onPress: togglePrimarySidebar,
-                    },
-                  ]
-                : []),
-              {
-                accessibilityLabel: "Refresh files",
-                icon: "arrow.clockwise",
-                onPress: entriesQuery.refresh,
-              },
-            ]}
-          />
-          <View
-            className={
-              materialYouStyleLayoutActive
-                ? "mx-4 my-2 min-h-12 flex-row items-center gap-2 rounded-full border border-input-border bg-input px-3.5"
-                : "flex-row items-center gap-2 border-b border-border px-3 py-2"
-            }
-          >
-            <SymbolView
-              name="magnifyingglass"
-              size={17}
-              tintColorClassName={"accent-icon-muted"}
-              type="monochrome"
-            />
-            <TextInput
-              accessibilityLabel="Search files"
-              autoCapitalize="none"
-              autoCorrect={false}
-              className={
-                materialYouStyleLayoutActive
-                  ? "min-h-10 flex-1 py-2 text-sm text-foreground"
-                  : "min-h-10 flex-1 rounded-xl py-2 text-sm"
-              }
-              placeholder="Search files"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-        </>
+        <AndroidScreenHeader
+          title="Files"
+          subtitle={projectName}
+          onBack={handleReturnToThread}
+          hideBottomBorder={materialYouStyleLayoutActive}
+          // Same field as the home header's "Search threads": the container
+          // is the pill, the input inside it draws nothing of its own.
+          below={
+            <View
+              className={cn(
+                "min-h-12 flex-row items-center gap-2.5 border border-input-border bg-input px-3.5",
+                materialYouStyleLayoutActive ? "rounded-full" : "rounded-2xl",
+              )}
+            >
+              <SymbolView
+                name="magnifyingglass"
+                size={17}
+                tintColorClassName={"accent-foreground-muted"}
+                type="monochrome"
+              />
+              <TextInput
+                accessibilityLabel="Search files"
+                autoCapitalize="none"
+                autoCorrect={false}
+                className={cn(EMBEDDED_TEXT_INPUT, "flex-1 py-2.5 text-base")}
+                placeholder="Search files"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable
+                  accessibilityLabel="Clear search"
+                  hitSlop={10}
+                  onPress={() => setSearchQuery("")}
+                >
+                  <SymbolView
+                    name="xmark.circle.fill"
+                    size={17}
+                    tintColorClassName={"accent-foreground-muted"}
+                    type="monochrome"
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+          }
+          actions={[
+            ...(layout.usesSplitView
+              ? [
+                  {
+                    accessibilityLabel: panes.primarySidebarVisible
+                      ? "Maximize files"
+                      : "Show threads",
+                    icon: "sidebar.left" as const,
+                    onPress: togglePrimarySidebar,
+                  },
+                ]
+              : []),
+            {
+              accessibilityLabel: "Refresh files",
+              icon: "arrow.clockwise",
+              onPress: entriesQuery.refresh,
+            },
+          ]}
+        />
       ) : (
         <>
           {layout.usesSplitView ? (

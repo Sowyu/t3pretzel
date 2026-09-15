@@ -24,6 +24,7 @@ import { ProjectFavicon } from "../../components/ProjectFavicon";
 import { ProviderInstanceIcon } from "../../components/ProviderIcon";
 import type { ThreadRowProviderInstance } from "./thread-provider-instance";
 import { cn } from "../../lib/cn";
+import { selectionHaptic } from "../../lib/haptics";
 import { relativeTime } from "../../lib/time";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
@@ -113,19 +114,56 @@ export const ThreadListV2SectionDivider = memo(function ThreadListV2SectionDivid
   );
 });
 
-export const ThreadListV2SnoozedShelfHeader = memo(function ThreadListV2SnoozedShelfHeader(props: {
+const SHELF_HEADERS = {
+  snoozed: {
+    label: "Snoozed",
+    noun: "snoozed",
+    labelClassName: "text-foreground-secondary",
+    ruleClassName: "bg-primary/20",
+    chevronTintClassName: "accent-icon-muted",
+  },
+  settled: {
+    label: "Settled",
+    noun: "settled",
+    labelClassName: "text-foreground-tertiary",
+    ruleClassName: "bg-border",
+    chevronTintClassName: "accent-foreground-muted",
+  },
+} as const;
+
+type ShelfKind = keyof typeof SHELF_HEADERS;
+
+interface ThreadListV2ShelfHeaderProps {
   readonly count: number;
   readonly disabled?: boolean;
   readonly expanded: boolean;
   readonly onToggle: () => void;
   readonly pane?: "screen" | "sidebar";
-}) {
+}
+
+/**
+ * The one shelf header both shelves render. `onToggle` writes the preference,
+ * which patches optimistically and re-renders in the same commit as the press,
+ * so the row needs no local copy of `expanded`.
+ *
+ * The tick fires on touch-down, where a tap feels confirmed, while the flip
+ * still waits for the release so a scroll that starts on the row cannot toggle
+ * it. A cancelled press therefore ticks without flipping, which is the usual
+ * Android trade and cheaper than a lag the user reads as a dropped tap.
+ */
+function ShelfHeader(props: ThreadListV2ShelfHeaderProps & { readonly shelf: ShelfKind }) {
+  const shelf = SHELF_HEADERS[props.shelf];
+
   return (
     <Pressable
       accessibilityHint={
-        props.expanded ? "Collapses the snoozed threads." : "Expands the snoozed threads."
+        props.expanded
+          ? `Collapses the ${shelf.noun} threads.`
+          : `Expands the ${shelf.noun} threads.`
       }
-      accessibilityLabel={props.count === 1 ? "1 snoozed thread" : `${props.count} snoozed threads`}
+      accessibilityLabel={
+        props.count === 1 ? `1 ${shelf.noun} thread` : `${props.count} ${shelf.noun} threads`
+      }
       accessibilityRole="button"
       accessibilityState={{ disabled: props.disabled, expanded: props.expanded }}
       className={cn(
@@ -133,60 +171,37 @@ export const ThreadListV2SnoozedShelfHeader = memo(function ThreadListV2SnoozedS
         props.pane === "sidebar" ? "px-3" : "px-5",
       )}
       disabled={props.disabled}
+      onPressIn={() => {
+        void selectionHaptic();
+      }}
       onPress={props.onToggle}
       style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
     >
-      <Text className="text-xs font-t3-medium text-foreground-secondary">
-        {props.expanded ? "Snoozed" : `Snoozed (${props.count})`}
+      <Text className={cn("text-xs font-t3-medium", shelf.labelClassName)}>
+        {props.expanded ? shelf.label : `${shelf.label} (${props.count})`}
       </Text>
-      <View className="h-px flex-1 bg-primary/20" />
+      <View className={cn("h-px flex-1", shelf.ruleClassName)} />
       <SymbolView
         name="chevron.down"
         size={10}
-        tintColorClassName="accent-icon-muted"
+        tintColorClassName={shelf.chevronTintClassName}
         type="monochrome"
         style={{ transform: [{ rotate: props.expanded ? "180deg" : "0deg" }] }}
       />
     </Pressable>
   );
+}
+
+export const ThreadListV2SnoozedShelfHeader = memo(function ThreadListV2SnoozedShelfHeader(
+  props: ThreadListV2ShelfHeaderProps,
+) {
+  return <ShelfHeader {...props} shelf="snoozed" />;
 });
 
-export const ThreadListV2SettledShelfHeader = memo(function ThreadListV2SettledShelfHeader(props: {
-  readonly count: number;
-  readonly disabled?: boolean;
-  readonly expanded: boolean;
-  readonly onToggle: () => void;
-  readonly pane?: "screen" | "sidebar";
-}) {
-  return (
-    <Pressable
-      accessibilityHint={
-        props.expanded ? "Collapses the settled threads." : "Expands the settled threads."
-      }
-      accessibilityLabel={props.count === 1 ? "1 settled thread" : `${props.count} settled threads`}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: props.disabled, expanded: props.expanded }}
-      className={cn(
-        "mb-1.5 mt-4 flex-row items-center gap-2.5",
-        props.pane === "sidebar" ? "px-3" : "px-5",
-      )}
-      disabled={props.disabled}
-      onPress={props.onToggle}
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      <Text className="text-xs font-t3-medium text-foreground-tertiary">
-        {props.expanded ? "Settled" : `Settled (${props.count})`}
-      </Text>
-      <View className="h-px flex-1 bg-border" />
-      <SymbolView
-        name="chevron.down"
-        size={10}
-        tintColorClassName={"accent-foreground-muted"}
-        type="monochrome"
-        style={{ transform: [{ rotate: props.expanded ? "180deg" : "0deg" }] }}
-      />
-    </Pressable>
-  );
+export const ThreadListV2SettledShelfHeader = memo(function ThreadListV2SettledShelfHeader(
+  props: ThreadListV2ShelfHeaderProps,
+) {
+  return <ShelfHeader {...props} shelf="settled" />;
 });
 
 const PENDING_TASK_MENU_ACTIONS: MenuAction[] = [

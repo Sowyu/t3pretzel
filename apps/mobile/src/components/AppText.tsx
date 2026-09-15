@@ -17,6 +17,14 @@ export function AppText({ className, ...props }: AppTextProps) {
   return <RNText className={cn("font-sans text-foreground", className)} {...props} />;
 }
 
+/**
+ * Strips the input's own pill so it can sit inside a container that already
+ * draws the field: search rows, composer sheets. Without it the input paints a
+ * second border, background and inset inside the outer one. Pass it first, then
+ * the layout classes the call site needs: `cn(EMBEDDED_TEXT_INPUT, "flex-1")`.
+ */
+export const EMBEDDED_TEXT_INPUT = "min-h-0 rounded-none border-0 bg-transparent px-0 py-0";
+
 export type AppTextInputProps = Omit<RNTextInputProps, "placeholderTextColor"> & {
   readonly className?: string;
   readonly ref?: React.Ref<RNTextInput>;
