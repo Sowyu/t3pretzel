@@ -23,6 +23,8 @@ import { withUniwind } from "uniwind";
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import { ControlPill } from "../../components/ControlPill";
+import { GlassControl } from "../../components/GlassControl";
+import { supportsLiquidGlass } from "../../components/GlassSurface";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import type { FloatingWorkingStatus } from "./floating-working-status";
 import { ShimmeringWorkContent } from "./thread-work-log";
@@ -189,10 +191,28 @@ export function FloatingWorkingControl(props: {
         <View pointerEvents="box-none" className="flex-row items-center gap-4">
           <Animated.View
             pointerEvents={statusInteractive ? "box-none" : "none"}
-            className="h-11 items-center justify-center overflow-hidden rounded-full border border-border bg-card shadow-md shadow-black/10"
+            className={
+              supportsLiquidGlass
+                ? "h-11 items-center justify-center overflow-hidden rounded-full"
+                : "h-11 items-center justify-center overflow-hidden rounded-full border border-border bg-card shadow-md shadow-black/10"
+            }
             style={capsuleStyle}
           >
-            {statusContent}
+            {supportsLiquidGlass ? (
+              // Same glass as the scroll-to-end button beside it: the capsule
+              // animates its width around the glass, the glass keeps the pill shape.
+              <GlassControl
+                className="h-11"
+                radius={22}
+                // The label host is absolute and wider than the capsule; it is
+                // centred by its parent's alignment, which is now the glass node.
+                style={{ alignItems: "center", justifyContent: "center" }}
+              >
+                {statusContent}
+              </GlassControl>
+            ) : (
+              statusContent
+            )}
           </Animated.View>
 
           <Animated.View
