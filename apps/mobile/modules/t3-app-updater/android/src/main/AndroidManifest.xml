@@ -1,15 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <application>
-    <!-- PackageInstaller status sink. Invisible and outside recents: it only
-         forwards the system confirmation dialog and reopens the launcher. -->
-    <activity
-      android:name="expo.modules.t3appupdater.T3AppUpdaterStatusActivity"
-      android:exported="false"
-      android:excludeFromRecents="true"
-      android:launchMode="singleTop"
-      android:taskAffinity=""
-      android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    <!-- PackageInstaller status sink. Forwards the system confirmation dialog,
+         and after a successful install posts a "tap to open" notification. -->
+    <receiver
+      android:name="expo.modules.t3appupdater.T3AppUpdaterStatusReceiver"
+      android:exported="false" />
   </application>
 </manifest>

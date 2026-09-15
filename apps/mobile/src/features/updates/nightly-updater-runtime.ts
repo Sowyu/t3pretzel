@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { requireOptionalNativeModule } from "expo";
 import Constants from "expo-constants";
 import { useCallback, useEffect } from "react";
-import { Alert, AppState, Linking, Platform } from "react-native";
+import { Alert, AppState, Linking, PermissionsAndroid, Platform } from "react-native";
 
 import {
   decodeNightlyRelease,
@@ -167,10 +167,25 @@ function installInfoAbis(module: AppUpdaterNativeModule): ReadonlyArray<string> 
 
 const DOWNLOAD_DIRECTORY = "nightly-updates";
 
+// Guards the flow independently of the state atom: two taps in one frame both
+// read the old state, and only one of them may own the download and the session.
+let updateInFlight = false;
+
 export async function startNightlyUpdate(update: NightlyUpdate): Promise<void> {
   const active = activeUpdater();
-  if (active === null || isNightlyUpdaterBusy(getNightlyUpdaterState())) return;
+  if (active === null || updateInFlight || isNightlyUpdaterBusy(getNightlyUpdaterState())) return;
+  updateInFlight = true;
+  try {
+    await runNightlyUpdate(active, update);
+  } finally {
+    updateInFlight = false;
+  }
+}
 
+async function runNightlyUpdate(
+  active: NonNullable<ReturnType<typeof activeUpdater>>,
+  update: NightlyUpdate,
+): Promise<void> {
   let info: NativeInstallInfo;
   try {
     info = active.native.getInstallInfo();
@@ -243,6 +258,10 @@ export async function startNightlyUpdate(update: NightlyUpdate): Promise<void> {
   }
 
   setNightlyUpdaterState({ kind: "installing", update });
+  // A finished install kills this process, and Android 14 will not let a
+  // process with no window relaunch itself. The "tap to open" notification the
+  // native side posts is the way back in, and it needs this permission.
+  await requestNotificationPermission();
   try {
     // Resolves as soon as the session is committed; a success then replaces this
     // process, so the outcome is read back on the next launch.
@@ -257,6 +276,15 @@ export async function startNightlyUpdate(update: NightlyUpdate): Promise<void> {
       message: failureMessage(error, "The install could not be started."),
       update,
     });
+  }
+}
+
+async function requestNotificationPermission(): Promise<void> {
+  if (Platform.OS !== "android" || Platform.Version < 33) return;
+  try {
+    await PermissionsAndroid.request("android.permission.POST_NOTIFICATIONS");
+  } catch {
+    // A refused or unavailable prompt only costs the notification; the install proceeds.
   }
 }
 

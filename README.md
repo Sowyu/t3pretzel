@@ -17,6 +17,8 @@ Every push to `main` builds the Android app and publishes it to the rolling [nig
 
 Its package id is `com.t3tools.t3code.preview`, the id of T3's internal preview build, because T3's Clerk instance only completes OAuth sign-in for the package ids it lists and this fork cannot add one. Every nightly is signed with one key kept in the `NIGHTLY_KEYSTORE_BASE64` and `NIGHTLY_KEYSTORE_PASSWORD` repository secrets, so each one updates the previous. A fork needs its own: generate a keystore with `keytool`, store it base64-encoded in those two secrets, and set the matching `T3CODE_ANDROID_KEYSTORE_*` variables from `.env.example` for local release builds.
 
+Once installed, the app updates itself: Settings → App shows the running commit with a Check button, the app checks the release every six hours, and an Update pill appears in the header when a newer nightly exists. Tapping it downloads the APK, checks its SHA-256 against the release digest plus the package name and signing key, installs it through Android's package installer, and reports the result on the next launch. After the first in-app update the app is its own installer of record, so later updates install without a confirmation dialog.
+
 Coming from the Play Store app: sign in to T3 Connect with the same account and your linked environments appear under Connections with a "Connect all" button. Directly paired environments (LAN, Tailscale) have to be paired again from the desktop app's Settings → Connections, since pairing tokens belong to one install.
 
 ## Setup

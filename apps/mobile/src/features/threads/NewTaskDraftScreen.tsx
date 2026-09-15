@@ -55,6 +55,7 @@ import {
 } from "../../components/ComposerToolbar";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { ComposerAttachmentButton } from "../../components/ComposerAttachmentButton";
+import { ComposerStashControl } from "./ComposerStashControl";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { composerStripAttachments } from "../../lib/composerImages";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
@@ -1674,14 +1675,23 @@ export function NewTaskDraftScreen(props: {
                 />
               ) : (
                 <>
-                  <ComposerAttachmentButton
-                    disabled={isComposerInteractionLocked}
-                    supportsFiles={Boolean(
-                      selectedEnvironmentServerConfig?.environment.capabilities.fileAttachments,
-                    )}
-                    onPickMedia={handlePickMedia}
-                    onPickFiles={handlePickFiles}
-                  />
+                  <View className="shrink-0 flex-row items-center gap-1">
+                    <ComposerAttachmentButton
+                      disabled={isComposerInteractionLocked}
+                      supportsFiles={Boolean(
+                        selectedEnvironmentServerConfig?.environment.capabilities.fileAttachments,
+                      )}
+                      onPickMedia={handlePickMedia}
+                      onPickFiles={handlePickFiles}
+                    />
+                    {flow.draftKey ? (
+                      <ComposerStashControl
+                        disabled={isComposerInteractionLocked}
+                        draftKey={flow.draftKey}
+                        hasContent={flow.prompt.trim().length > 0 || flow.attachments.length > 0}
+                      />
+                    ) : null}
+                  </View>
                   <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
                     <View className="min-w-0 shrink">
                       <ComposerInlineControl

@@ -1,6 +1,10 @@
 package expo.modules.t3appupdater
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -31,6 +35,9 @@ internal object AppUpdater {
   private const val WRITE_NAME = "t3code-update.apk"
   private const val BUFFER_BYTES = 1 shl 16
   private const val HEX_DIGITS = "0123456789abcdef"
+  private const val NOTIFICATION_CHANNEL = "t3-app-updater"
+  private const val NOTIFICATION_ID = 0x7431
+  private const val SHORT_COMMIT_LENGTH = 7
 
   /** GET_SIGNING_CERTIFICATES arrived in API 28; below it only GET_SIGNATURES exists. */
   private val signingFlags: Int
@@ -144,7 +151,7 @@ internal object AppUpdater {
     return result
   }
 
-  /** Called from the status activity, which may be the only survivor of a failed install. */
+  /** Called from the status receiver, which may run without the app's UI. */
   fun recordFailure(context: Context, status: Int, message: String?) {
     preferences(context).edit()
       .putInt(KEY_FAILURE_STATUS, status)
@@ -163,12 +170,67 @@ internal object AppUpdater {
     }
 
   private fun statusIntentSender(context: Context, sessionId: Int): IntentSender {
-    val intent = Intent(context, T3AppUpdaterStatusActivity::class.java)
-      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val intent = Intent(context, T3AppUpdaterStatusReceiver::class.java)
     // MUTABLE: the system fills in EXTRA_STATUS and the confirmation intent.
     val flags = PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-    return PendingIntent.getActivity(context, sessionId, intent, flags).intentSender
+    return PendingIntent.getBroadcast(context, sessionId, intent, flags).intentSender
   }
+
+  /** Best effort: Android 14 and later ignore this once the process has been replaced. */
+  fun relaunch(context: Context) {
+    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+    try {
+      context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: ActivityNotFoundException) {
+      // The launcher activity is always present; nothing sensible to do otherwise.
+    }
+  }
+
+  /** "Updated, tap to open" for the case where the relaunch above is blocked. */
+  fun notifyInstalled(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+    if (!canPostNotifications(context) || manager == null || launch == null) return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val channel = NotificationChannel(
+        NOTIFICATION_CHANNEL,
+        "App updates",
+        NotificationManager.IMPORTANCE_DEFAULT
+      )
+      manager.createNotificationChannel(channel)
+    }
+    val open = PendingIntent.getActivity(
+      context,
+      0,
+      launch,
+      PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+    val commit = preferences(context).getString(KEY_COMMIT, null)?.take(SHORT_COMMIT_LENGTH)
+    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      Notification.Builder(context, NOTIFICATION_CHANNEL)
+    } else {
+      @Suppress("DEPRECATION")
+      Notification.Builder(context)
+    }
+    val notification = builder
+      .setSmallIcon(android.R.drawable.stat_sys_download_done)
+      .setContentTitle(appLabel(context) + " updated")
+      .setContentText(if (commit == null) "Tap to open." else "Updated to $commit. Tap to open.")
+      .setContentIntent(open)
+      .setAutoCancel(true)
+      .build()
+    manager.notify(NOTIFICATION_ID, notification)
+  }
+
+  /** Android 13 made notifications a runtime permission; posting without it is a silent drop. */
+  private fun canPostNotifications(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+    val permission = android.Manifest.permission.POST_NOTIFICATIONS
+    return context.checkSelfPermission(permission) == PERMISSION_GRANTED
+  }
+
+  private fun appLabel(context: Context): String =
+    context.applicationInfo.loadLabel(context.packageManager).toString()
 
   private fun writePendingUpdate(context: Context, commit: String, sha256: String) {
     preferences(context).edit()

@@ -73,7 +73,6 @@ import { fileRoutePathSegments } from "../files/filePath";
 import {
   ComposerActionButton,
   ComposerInlineControl,
-  ComposerToolbarButton,
   ComposerToolbarRow,
 } from "../../components/ComposerToolbar";
 import { ProviderIcon } from "../../components/ProviderIcon";
@@ -91,14 +90,7 @@ import { useScaledTextRole } from "../settings/appearance/useScaledTextRole";
 import type { RemoteClientConnectionState } from "../../lib/connection";
 import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
-import { PromptStashSheet } from "./PromptStashSheet";
-import { usePromptStash, type PromptStashEntry } from "../../state/prompt-stash";
-import {
-  deletePromptStashEntry,
-  restorePromptStashEntry,
-  stashComposerDraft,
-} from "../../state/prompt-stash-actions";
-import { selectionHaptic } from "../../lib/haptics";
+import { ComposerStashControl } from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import {
   ComposerDictationCancelAction,
@@ -551,99 +543,6 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     voiceInput.blocksSubmission,
   ]);
 
-  // ── Prompt stash ─────────────────────────────────────────
-  const stashEntries = usePromptStash();
-  const [isStashSheetOpen, setIsStashSheetOpen] = useState(false);
-  // One quiet acknowledgement per stash: the pill says "Stashed", then goes
-  // back to the count. No repeating animation.
-  const [stashAcknowledged, setStashAcknowledged] = useState(false);
-  const stashAcknowledgementTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stashInFlightRef = useRef(false);
-  useEffect(
-    () => () => {
-      if (stashAcknowledgementTimeoutRef.current !== null) {
-        clearTimeout(stashAcknowledgementTimeoutRef.current);
-      }
-    },
-    [],
-  );
-
-  const restoreStashEntry = useCallback(
-    async (entry: PromptStashEntry) => {
-      setIsStashSheetOpen(false);
-      try {
-        const { skippedAttachmentCount } = await restorePromptStashEntry(
-          composerOwnerKey,
-          entry.id,
-        );
-        if (skippedAttachmentCount > 0) {
-          Alert.alert(
-            "Some attachments were not restored",
-            `A message can hold at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments. Remove one and restore again.`,
-          );
-        }
-      } catch {
-        Alert.alert(
-          "Could not restore this prompt",
-          "The stash could not be saved, so the prompt was left where it is. Try again.",
-        );
-      }
-    },
-    [composerOwnerKey],
-  );
-
-  const handleStash = useCallback(() => {
-    // An empty composer means the button restores instead: one entry goes
-    // straight back, anything else opens the list to choose from.
-    if (!hasContent) {
-      const onlyEntry = stashEntries.length === 1 ? stashEntries[0] : undefined;
-      if (onlyEntry) {
-        void restoreStashEntry(onlyEntry);
-        return;
-      }
-      setIsStashSheetOpen((open) => !open);
-      return;
-    }
-    // A second tap while the first write is in flight would stash the same
-    // draft twice: it is not cleared until the write lands.
-    if (stashInFlightRef.current) return;
-    stashInFlightRef.current = true;
-    void selectionHaptic();
-    void stashComposerDraft(composerOwnerKey).then(
-      () => {
-        stashInFlightRef.current = false;
-        setStashAcknowledged(true);
-        if (stashAcknowledgementTimeoutRef.current !== null) {
-          clearTimeout(stashAcknowledgementTimeoutRef.current);
-        }
-        stashAcknowledgementTimeoutRef.current = setTimeout(() => {
-          stashAcknowledgementTimeoutRef.current = null;
-          setStashAcknowledged(false);
-        }, 1400);
-      },
-      () => {
-        stashInFlightRef.current = false;
-        Alert.alert(
-          "Could not stash this prompt",
-          "Saving it failed, so the composer was left as it is. Free up storage and try again.",
-        );
-      },
-    );
-  }, [composerOwnerKey, hasContent, restoreStashEntry, stashEntries]);
-
-  const deleteStashEntry = useCallback(
-    (entry: PromptStashEntry) => {
-      if (stashEntries.length <= 1) setIsStashSheetOpen(false);
-      void deletePromptStashEntry(entry.id).catch(() => {
-        Alert.alert(
-          "Could not delete this stashed prompt",
-          "Saving the change failed, so it is still in the stash.",
-        );
-      });
-    },
-    [stashEntries.length],
-  );
-
   // ── Model menu ───────────────────────────────────────────
   const modelOptions = useMemo(
     () => buildModelOptions(props.serverConfig, currentModelSelection),
@@ -1071,25 +970,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                         onPickMedia={props.onPickDraftMedia}
                         onPickFiles={props.onPickDraftFiles}
                       />
-                      <ComposerToolbarButton
-                        accessibilityLabel={
-                          stashEntries.length > 0
-                            ? `Prompt stash, ${stashEntries.length} saved`
-                            : "Stash this prompt"
-                        }
-                        active={isStashSheetOpen}
-                        icon={stashEntries.length > 0 ? "bookmark.fill" : "bookmark"}
-                        label={
-                          stashAcknowledged
-                            ? "Stashed"
-                            : stashEntries.length > 0
-                              ? String(stashEntries.length)
-                              : undefined
-                        }
-                        onPress={handleStash}
-                        onLongPress={() => setIsStashSheetOpen(true)}
-                        showChevron={false}
-                      />
+                      <ComposerStashControl draftKey={composerOwnerKey} hasContent={hasContent} />
                     </View>
                     <View className="min-w-0 shrink">
                       <ComposerInlineControl
@@ -1139,14 +1020,6 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
 
       <VideoPreviewModal source={previewVideo} onRequestClose={closePreview} />
       <FilePreviewModal source={previewFile} onRequestClose={closePreview} />
-      {isStashSheetOpen ? (
-        <PromptStashSheet
-          entries={stashEntries}
-          onRestore={(entry) => void restoreStashEntry(entry)}
-          onDelete={deleteStashEntry}
-          onClose={() => setIsStashSheetOpen(false)}
-        />
-      ) : null}
     </Animated.View>
   );
 });
