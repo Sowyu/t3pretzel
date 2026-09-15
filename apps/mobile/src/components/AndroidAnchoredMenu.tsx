@@ -11,6 +11,7 @@ import { appBlurTargetRef } from "../lib/appBlurTarget";
 import { cn } from "../lib/cn";
 import { type AppSymbolName, SymbolView } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
+import { GlassSurface, supportsLiquidGlass } from "./GlassSurface";
 import { OverlayPortal } from "./OverlayPortal";
 import { GlassBackdrop } from "./GlassBackdrop";
 
@@ -79,6 +80,32 @@ export type AndroidAnchoredMenuProps = {
  * UIMenu. Styling follows the themed native popup (12dp radius, plain rows,
  * trailing check glyph); submenus drill in under a muted parent-title header.
  */
+/**
+ * The menu's surface. On liquid glass the rows live inside the glass node so
+ * the shader refracts the screen behind the menu; older Android keeps the
+ * blurred backdrop behind the rows.
+ */
+function MenuMaterial(props: { readonly children: ReactNode; readonly maxHeight: number }) {
+  if (!supportsLiquidGlass) {
+    return (
+      <>
+        <GlassBackdrop blurTarget={appBlurTargetRef} />
+        {props.children}
+      </>
+    );
+  }
+  return (
+    <GlassSurface
+      chrome="none"
+      glassEffectStyle="regular"
+      tintColor="transparent"
+      style={{ borderRadius: 12, maxHeight: props.maxHeight }}
+    >
+      {props.children}
+    </GlassSurface>
+  );
+}
+
 export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const [anchor, setAnchor] = useState<AnchorSnapshot | null>(null);
   const [path, setPath] = useState<readonly AndroidMenuAction[]>([]);
@@ -247,97 +274,98 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
                     : { bottom: (rootHeight ?? 0) - local.y + ANCHOR_GAP }),
                 }}
               >
-                <GlassBackdrop blurTarget={appBlurTargetRef} />
                 {/* keyboardShouldPersistTaps: the menu often opens over an
                   active editor; the first item tap must act, not just
                   dismiss the keyboard. */}
-                <ScrollView
-                  bounces={false}
-                  keyboardShouldPersistTaps="always"
-                  showsVerticalScrollIndicator={false}
-                >
-                  {parent !== null ? (
-                    // Muted parent title as the submenu header; tapping it
-                    // steps back, but it reads as a label, not a button.
-                    <Pressable
-                      className="px-3.5 pb-1 pt-2.5"
-                      onPress={() => setPath((current) => current.slice(0, -1))}
-                    >
-                      <Text className="text-xs font-t3-bold text-foreground-muted">
-                        {parent.title}
-                      </Text>
-                    </Pressable>
-                  ) : props.title ? (
-                    <>
-                      <View className="px-3.5 py-2">
-                        <Text className="text-center text-xs text-foreground-muted">
-                          {props.title}
-                        </Text>
-                      </View>
-                      <View className="h-px bg-border" />
-                    </>
-                  ) : null}
-                  {levelActions.map((action, index) => {
-                    const destructive = action.attributes?.destructive ?? false;
-                    const disabled = action.attributes?.disabled ?? false;
-                    const hasSubmenu = (action.subactions?.length ?? 0) > 0;
-                    return (
+                <MenuMaterial maxHeight={maxHeight}>
+                  <ScrollView
+                    bounces={false}
+                    keyboardShouldPersistTaps="always"
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {parent !== null ? (
+                      // Muted parent title as the submenu header; tapping it
+                      // steps back, but it reads as a label, not a button.
                       <Pressable
-                        key={action.id ?? `${index}-${action.title}`}
-                        disabled={disabled}
-                        className={cn(
-                          "min-h-11 flex-row items-center gap-2.5 px-3.5 py-2.5 active:bg-subtle",
-                          disabled && "opacity-45",
-                        )}
-                        onPress={() => onPressItem(action)}
+                        className="px-3.5 pb-1 pt-2.5"
+                        onPress={() => setPath((current) => current.slice(0, -1))}
                       >
-                        {action.leading ? (
-                          <View className="items-center justify-center">{action.leading}</View>
-                        ) : null}
-                        <View className="flex-1 gap-0.5">
-                          <Text
-                            className={cn(
-                              // Same face as the pill labels that open these menus.
-                              "text-sm font-t3-bold",
-                              destructive && "text-danger-foreground",
-                            )}
-                          >
-                            {action.title}
-                          </Text>
-                          {action.subtitle ? (
-                            <Text className="text-xs leading-snug text-foreground-muted">
-                              {action.subtitle}
-                            </Text>
-                          ) : null}
-                        </View>
-                        {hasSubmenu ? (
-                          <SymbolView
-                            name="chevron.right"
-                            size={13}
-                            tintColorClassName={"accent-icon-subtle"}
-                            type="monochrome"
-                          />
-                        ) : action.state === "on" ? (
-                          <SymbolView
-                            name="checkmark"
-                            size={15}
-                            tintColorClassName={"accent-icon"}
-                            type="monochrome"
-                          />
-                        ) : action.image ? (
-                          <SymbolView
-                            name={action.image as AppSymbolName}
-                            size={15}
-                            tintColorClassName={
-                              destructive ? "accent-danger-foreground" : "accent-icon"
-                            }
-                            type="monochrome"
-                          />
-                        ) : null}
+                        <Text className="text-xs font-t3-bold text-foreground-muted">
+                          {parent.title}
+                        </Text>
                       </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                    ) : props.title ? (
+                      <>
+                        <View className="px-3.5 py-2">
+                          <Text className="text-center text-xs text-foreground-muted">
+                            {props.title}
+                          </Text>
+                        </View>
+                        <View className="h-px bg-border" />
+                      </>
+                    ) : null}
+                    {levelActions.map((action, index) => {
+                      const destructive = action.attributes?.destructive ?? false;
+                      const disabled = action.attributes?.disabled ?? false;
+                      const hasSubmenu = (action.subactions?.length ?? 0) > 0;
+                      return (
+                        <Pressable
+                          key={action.id ?? `${index}-${action.title}`}
+                          disabled={disabled}
+                          className={cn(
+                            "min-h-11 flex-row items-center gap-2.5 px-3.5 py-2.5 active:bg-subtle",
+                            disabled && "opacity-45",
+                          )}
+                          onPress={() => onPressItem(action)}
+                        >
+                          {action.leading ? (
+                            <View className="items-center justify-center">{action.leading}</View>
+                          ) : null}
+                          <View className="flex-1 gap-0.5">
+                            <Text
+                              className={cn(
+                                // Same face as the pill labels that open these menus.
+                                "text-sm font-t3-bold",
+                                destructive && "text-danger-foreground",
+                              )}
+                            >
+                              {action.title}
+                            </Text>
+                            {action.subtitle ? (
+                              <Text className="text-xs leading-snug text-foreground-muted">
+                                {action.subtitle}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {hasSubmenu ? (
+                            <SymbolView
+                              name="chevron.right"
+                              size={13}
+                              tintColorClassName={"accent-icon-subtle"}
+                              type="monochrome"
+                            />
+                          ) : action.state === "on" ? (
+                            <SymbolView
+                              name="checkmark"
+                              size={15}
+                              tintColorClassName={"accent-icon"}
+                              type="monochrome"
+                            />
+                          ) : action.image ? (
+                            <SymbolView
+                              name={action.image as AppSymbolName}
+                              size={15}
+                              tintColorClassName={
+                                destructive ? "accent-danger-foreground" : "accent-icon"
+                              }
+                              type="monochrome"
+                            />
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </MenuMaterial>
               </Animated.View>
             )}
           </View>

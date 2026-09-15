@@ -148,7 +148,9 @@ export function GlassSurface({
           glassTintColor={fallbackColor === undefined ? undefined : hexColor(String(fallbackColor))}
           glassOpacity={isDarkMode ? 0.55 : 0.4}
           isInteractive={false}
-          style={contentOf(flattened)}
+          // Fills a wrapper that has its own size (a 44pt pill); in a wrapper
+          // sized by content it just takes the content's size.
+          style={[contentOf(flattened), { alignSelf: "stretch", flexGrow: 1 }]}
           {...shapeProps}
         >
           {children}
@@ -197,9 +199,18 @@ const LAYOUT_STYLE_KEYS = [
   "width",
   "minWidth",
   "maxWidth",
+  "height",
+  "minHeight",
+  "maxHeight",
   "flex",
   "flexGrow",
   "flexShrink",
+  "position",
+  "top",
+  "left",
+  "right",
+  "bottom",
+  "zIndex",
 ] as const;
 
 // The wrapper View is what the parent lays out, so the shape, margins and

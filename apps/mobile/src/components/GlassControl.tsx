@@ -37,7 +37,10 @@ export function GlassControl(props: {
       fallbackClassName={cn("border border-border-subtle", layoutClassName)}
       fallbackColor={colors["--color-card"]}
       glassEffectStyle="clear"
-      style={[{ borderRadius: props.radius }, props.style]}
+      style={[
+        { borderRadius: props.radius, alignItems: "center", justifyContent: "center" },
+        props.style,
+      ]}
     >
       {props.children}
     </GlassSurface>

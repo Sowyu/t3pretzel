@@ -126,7 +126,7 @@ function StashRow(props: {
   );
   const fileCount = props.entry.attachments.length - images.length;
   return (
-    <View className="flex-row items-center border-t border-border-subtle">
+    <View className="flex-row items-center">
       <Pressable
         accessibilityLabel={`Restore stashed prompt: ${snippet}`}
         accessibilityRole="button"
@@ -291,7 +291,7 @@ export function ComposerStashPanel(props: {
       </View>
       {listOpen ? (
         entries.length === 0 ? (
-          <Text className="border-t border-border-subtle px-4 py-3 text-sm text-foreground-muted">
+          <Text className="px-4 py-3 text-sm text-foreground-muted">
             Nothing stashed yet. Write a prompt, then tap the bookmark to set it aside.
           </Text>
         ) : (
