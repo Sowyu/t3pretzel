@@ -1,5 +1,18 @@
+diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeBlurView.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeBlurView.kt
+index a42dcc0d5f82927e1224d3156a6ca114c65b92a6..dc049f3e9343de76933433bac1b45628edd56678 100644
+--- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeBlurView.kt
++++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeBlurView.kt
+@@ -197,7 +197,7 @@ class ReactNativeBlurView : BlurViewGroup {
+   private fun findNearestReactRootView(): ViewGroup? {
+     var currentParent = this.parent
+     while (currentParent != null) {
+-      if (currentParent.javaClass.name == "com.facebook.react.ReactRootView") {
++      if (currentParent is com.facebook.react.ReactRootView) {
+         return currentParent as? ViewGroup
+       }
+       currentParent = currentParent.parent
 diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
-index 304d49064f93f91eba1717adcfeb04cec203b1fe..92163ce52cdca92351f8517eb867feb584745f4e 100644
+index 304d49064f93f91eba1717adcfeb04cec203b1fe..da4211770fbb8fb44477a126fa75a34114b9884b 100644
 --- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
 +++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
 @@ -59,6 +59,19 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
@@ -249,6 +262,15 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..92163ce52cdca92351f8517eb867feb5
      val shaderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content")
      val blurRadius =
        if (glassType.equals("regular", ignoreCase = true)) REGULAR_BLUR_RADIUS
+@@ -428,7 +437,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+   private fun findNearestReactRootView(): ViewGroup? {
+     var currentParent = this.parent
+     while (currentParent != null) {
+-      if (currentParent.javaClass.name == "com.facebook.react.ReactRootView") {
++      if (currentParent is com.facebook.react.ReactRootView) {
+         return currentParent as? ViewGroup
+       }
+       currentParent = currentParent.parent
 @@ -498,6 +507,40 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
      updateCornerRadius()
    }
