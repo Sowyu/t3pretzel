@@ -33,6 +33,9 @@ import expo.modules.t3markdowntext.T3ContextChip
 import org.json.JSONObject
 import kotlin.math.max
 
+// Soft halo the typed text casts onto liquid glass; see themeJson.textGlow.
+private const val TEXT_GLOW_RADIUS_DP = 8f
+
 class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
   context,
   appContext
@@ -239,6 +242,16 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
       val theme = JSONObject(themeJson)
       editor.setTextColor(parseColor(theme.optString("text"), Color.BLACK))
       editor.setHintTextColor(parseColor(theme.optString("placeholder"), Color.GRAY))
+      if (theme.isNull("textGlow") || theme.optString("textGlow").isEmpty()) {
+        editor.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+      } else {
+        editor.setShadowLayer(
+          TEXT_GLOW_RADIUS_DP * resources.displayMetrics.density,
+          0f,
+          0f,
+          parseColor(theme.optString("textGlow"), Color.TRANSPARENT),
+        )
+      }
       if (theme.isNull("selection")) {
         resetSelectionTheme()
       } else {

@@ -1,5 +1,15 @@
-import { useCallback, useRef } from "react";
-import { Alert, Image, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Image,
+  type LayoutChangeEvent,
+  type LayoutRectangle,
+  Pressable,
+  ScrollView,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import Svg, { Path } from "react-native-svg";
 
 import { PROVIDER_SEND_TURN_MAX_ATTACHMENTS } from "@t3tools/contracts";
 
@@ -7,6 +17,8 @@ import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
 import { useComposerImagePreviewUri } from "../../components/ComposerAttachmentStrip";
 import { GlassSurface } from "../../components/GlassSurface";
+import { useUniwindTheme } from "../../lib/useUniwindTheme";
+import { stashOutlinePath } from "./stash-outline-path";
 import { selectionHaptic } from "../../lib/haptics";
 import { relativeTime } from "../../lib/time";
 import type { DraftComposerImageAttachment } from "../../lib/composerImages";
@@ -168,20 +180,96 @@ function StashRow(props: {
   );
 }
 
+const STASH_TAB_RADIUS = 18;
+// Concave curve where the tab's left edge flows into the composer's top edge.
+const STASH_JOIN_FILLET = 12;
+
+export interface ComposerStashChrome {
+  /** A tab or the open list sits on the composer, so the two share one outline. */
+  readonly attached: boolean;
+  readonly open: boolean;
+  readonly tab: LayoutRectangle | null;
+  readonly surface: LayoutRectangle | null;
+  /** Corners the composer must square so the shared outline can run straight. */
+  readonly surfaceStyle: {
+    readonly borderTopLeftRadius?: number;
+    readonly borderTopRightRadius?: number;
+  };
+  readonly onTabLayout: (event: LayoutChangeEvent) => void;
+  readonly onSurfaceLayout: (event: LayoutChangeEvent) => void;
+}
+
+function sameLayout(a: LayoutRectangle | null, b: LayoutRectangle): boolean {
+  return a !== null && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
 /**
- * Corner overrides for the composer under the stash tab: the tab sits on the
- * composer's top-right corner, so that corner goes square; with the list open
- * the whole top edge is covered, so both top corners go square.
+ * Geometry shared by the stash tab, the composer and the outline drawn over
+ * both. The tab and the composer keep their own glass fills; neither draws a
+ * border, and `ComposerStashOutline` traces the union instead, so the pair
+ * reads as one piece with the tab growing out of the composer.
  */
-export function useComposerStashJoin(): {
-  readonly borderTopRightRadius?: number;
-  readonly borderTopLeftRadius?: number;
-} {
+export function useComposerStashChrome(): ComposerStashChrome {
   const entries = usePromptStash();
-  const listOpen = usePromptStashListOpen();
-  if (listOpen) return { borderTopLeftRadius: 0, borderTopRightRadius: 0 };
-  if (entries.length > 0) return { borderTopRightRadius: 0 };
-  return {};
+  const open = usePromptStashListOpen();
+  const [tab, setTab] = useState<LayoutRectangle | null>(null);
+  const [surface, setSurface] = useState<LayoutRectangle | null>(null);
+  const onTabLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout;
+    setTab((current) => (sameLayout(current, next) ? current : next));
+  }, []);
+  const onSurfaceLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout;
+    setSurface((current) => (sameLayout(current, next) ? current : next));
+  }, []);
+  const attached = open || entries.length > 0;
+  const surfaceStyle = useMemo(
+    () =>
+      open
+        ? { borderTopLeftRadius: 0, borderTopRightRadius: 0 }
+        : attached
+          ? { borderTopRightRadius: 0 }
+          : {},
+    [attached, open],
+  );
+  return useMemo(
+    () => ({ attached, open, tab, surface, surfaceStyle, onTabLayout, onSurfaceLayout }),
+    [attached, open, tab, surface, surfaceStyle, onTabLayout, onSurfaceLayout],
+  );
+}
+
+/** Rendered after the composer so it sits on top of both glass fills. */
+export function ComposerStashOutline(props: {
+  readonly chrome: ComposerStashChrome;
+  readonly surfaceRadius: number;
+}) {
+  const colors = useUniwindTheme();
+  const { tab, surface, open } = props.chrome;
+  if (!props.chrome.attached || tab === null || surface === null) return null;
+  const top = tab.height - 1; // the composer overlaps the tab by a pixel, no seam
+  const width = surface.width;
+  const height = top + surface.height;
+  const paths = stashOutlinePath({
+    width,
+    height,
+    top,
+    tabX: open ? 0 : tab.x,
+    tabWidth: open ? width : tab.width,
+    tabRadius: STASH_TAB_RADIUS,
+    surfaceRadius: props.surfaceRadius,
+    fillet: STASH_JOIN_FILLET,
+  });
+  return (
+    <Svg
+      height={height}
+      pointerEvents="none"
+      style={{ position: "absolute", left: surface.x, top: 0 }}
+      width={width}
+    >
+      {paths.fillet ? <Path d={paths.fillet} fill={colors["--color-card"]} opacity={0.6} /> : null}
+      <Path d={paths.outline} fill="none" stroke={colors["--color-border"]} strokeWidth={1} />
+    </Svg>
+  );
 }
 
 /**
@@ -189,7 +277,10 @@ export function useComposerStashJoin(): {
  * "Stash · N" row that opens the list of stashed prompts in place. Tap a row to
  * restore it, the cross to forget it.
  */
-export function ComposerStashPanel(props: { readonly draftKey: string }) {
+export function ComposerStashPanel(props: {
+  readonly draftKey: string;
+  readonly onLayout?: (event: LayoutChangeEvent) => void;
+}) {
   const { draftKey } = props;
   const entries = usePromptStash();
   const listOpen = usePromptStashListOpen();
@@ -228,20 +319,19 @@ export function ComposerStashPanel(props: { readonly draftKey: string }) {
   if (entries.length === 0 && !listOpen) return null;
 
   return (
-    <View className={listOpen ? "items-stretch" : "items-end px-2"}>
+    <View className={listOpen ? "items-stretch" : "items-end"} style={{ marginBottom: -1 }}>
       {/* Same material as the composer and its popover: native glass on iOS 26,
           a backdrop blur on Android 12 and later, a solid card below that. */}
+      {/* Same material as the composer so the two fills meet without a tone step. */}
       <GlassSurface
         chrome="none"
-        fallbackClassName="border border-b-0 border-border"
-        glassEffectStyle="clear"
+        glassEffectStyle="regular"
+        onLayout={props.onLayout}
         tintColorClassName="accent-glass-surface"
         style={{
-          borderRadius: 18,
+          borderRadius: STASH_TAB_RADIUS,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
-          marginBottom: -10,
-          paddingBottom: 10,
         }}
       >
         <Pressable

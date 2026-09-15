@@ -58,7 +58,8 @@ import { ComposerAttachmentButton } from "../../components/ComposerAttachmentBut
 import {
   ComposerStashButton,
   ComposerStashPanel,
-  useComposerStashJoin,
+  ComposerStashOutline,
+  useComposerStashChrome,
 } from "./ComposerStashControl";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { composerStripAttachments } from "../../lib/composerImages";
@@ -191,7 +192,7 @@ export function NewTaskDraftScreen(props: {
   readonly incomingShareId?: string;
 }) {
   const projects = useProjects();
-  const stashJoin = useComposerStashJoin();
+  const stashChrome = useComposerStashChrome();
   const flow = useNewTaskFlow();
   const navigation = useNavigation();
   const {
@@ -1613,10 +1614,14 @@ export function NewTaskDraftScreen(props: {
         </Pressable>
       ) : null}
 
-      {flow.draftKey ? <ComposerStashPanel draftKey={flow.draftKey} /> : null}
+      {flow.draftKey ? (
+        <ComposerStashPanel draftKey={flow.draftKey} onLayout={stashChrome.onTabLayout} />
+      ) : null}
       <ComposerSurface
+        chromeless={stashChrome.attached}
+        onLayout={stashChrome.onSurfaceLayout}
         style={{
-          ...stashJoin,
+          ...stashChrome.surfaceStyle,
           borderRadius: 26,
           minHeight: 140,
           overflow: "hidden",
@@ -1776,6 +1781,7 @@ export function NewTaskDraftScreen(props: {
           </ComposerDictationToolbar>
         </Animated.View>
       </ComposerSurface>
+      <ComposerStashOutline chrome={stashChrome} surfaceRadius={26} />
       <VideoPreviewModal source={previewVideo} onRequestClose={closeMediaPreview} />
       <FilePreviewModal source={previewFile} onRequestClose={closeMediaPreview} />
     </View>

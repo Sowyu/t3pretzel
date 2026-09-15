@@ -1,8 +1,102 @@
 diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
-index 304d49064f93f91eba1717adcfeb04cec203b1fe..e4e5b249ed18f45d5d0715bc930a06e1321f1afa 100644
+index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f7ab3307e 100644
 --- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
 +++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
-@@ -263,7 +263,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -83,6 +83,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+   // cheap no-op when neither the offset, the capture, nor the effect changed.
+   private val scrollTrackingListener = ViewTreeObserver.OnPreDrawListener {
+     if (isSupported) {
++      captureForFrame()
+       updateGlassNode()
+     }
+     true
+@@ -94,29 +95,16 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+   private val sourceLocation = IntArray(2)
+   private val ownLocation = IntArray(2)
+ 
+-  // Attach-scoped throttled backdrop refresh (~30 fps): live enough that
+-  // content scrolling behind the glass tracks smoothly, without re-capturing
+-  // at full display rate.
+-  private val backdropTicker = object : Runnable {
+-    override fun run() {
+-      refreshBackdrop()
+-      postDelayed(this, BACKDROP_REFRESH_MS)
+-    }
+-  }
+-
+   companion object {
+     private const val TAG = "RNLiquidGlassView"
+ 
+-    private const val BACKDROP_REFRESH_MS = 33L
+-
+-    // The full-screen software rasterization is the expensive step, so it
+-    // runs an order slower than the ticker; each tick only re-blits this
+-    // view's sub-rect from the shared bitmap. Both the capture and the
+-    // sub-rect are in window coordinates, so glass that scrolls WITH its
+-    // content stays pixel-correct against a stale capture (glass and
+-    // backdrop move together) — only glass fixed OVER scrolling content
+-    // sees the backdrop update at this cadence.
+-    private const val SHARED_CAPTURE_MAX_AGE_MS = 100L
++    // The backdrop is re-captured only on frames the window actually renders
++    // (the pre-draw pass runs once per rendered frame and not at all while
++    // the screen is idle), so the glass tracks content at the display's own
++    // refresh rate and costs nothing when nothing moves. The capture is
++    // shared per frame across every glass view on the screen and clipped to
++    // the bands they cover, so a frame's software raster only touches the
++    // pixels the glass can show.
+ 
+     // Capture at third linear resolution: ~9x fewer bytes and ~9x less
+     // software raster work than full-res; the shader's blur consumes the
+@@ -168,7 +156,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+       val source =
+         findNearestScreenAncestor() ?: findNearestReactRootView() ?: parent as? ViewGroup
+       captureSource = source
+-      source?.let { SharedBackdropCapture.register(it) }
++      source?.let { SharedBackdropCapture.register(it, this) }
+       refreshBackdrop()
+     }
+     initRunnable = runnable
+@@ -177,29 +165,6 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+     registeredTreeObserver = viewTreeObserver.also {
+       it.addOnPreDrawListener(scrollTrackingListener)
+     }
+-    restartTickerIfVisible()
+-  }
+-
+-  // The per-instance software capture is the main running cost, so the ticker
+-  // only runs while the view can actually be seen: it stops when the view or
+-  // its window is hidden (backgrounded app, covered screen, GONE subtree) and
+-  // restarts when visibility returns.
+-  private fun restartTickerIfVisible() {
+-    if (!constructed) return
+-    removeCallbacks(backdropTicker)
+-    if (isSupported && isAttachedToWindow && isShown && windowVisibility == VISIBLE) {
+-      postDelayed(backdropTicker, BACKDROP_REFRESH_MS)
+-    }
+-  }
+-
+-  override fun onWindowVisibilityChanged(visibility: Int) {
+-    super.onWindowVisibilityChanged(visibility)
+-    restartTickerIfVisible()
+-  }
+-
+-  override fun onVisibilityChanged(changedView: View, visibility: Int) {
+-    super.onVisibilityChanged(changedView, visibility)
+-    restartTickerIfVisible()
+   }
+ 
+   override fun onDetachedFromWindow() {
+@@ -210,8 +175,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+   fun cleanup() {
+     initRunnable?.let { removeCallbacks(it) }
+     initRunnable = null
+-    removeCallbacks(backdropTicker)
+-    captureSource?.let { SharedBackdropCapture.unregister(it) }
++    captureSource?.let { SharedBackdropCapture.unregister(it, this) }
+     captureSource = null
+     registeredTreeObserver?.let {
+       if (it.isAlive) it.removeOnPreDrawListener(scrollTrackingListener)
+@@ -263,22 +227,20 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
      if (shaderFailed || width <= 0 || height <= 0) return false
      val node = glassNode ?: return false
      val source = captureSource ?: return false
@@ -11,20 +105,29 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..e4e5b249ed18f45d5d0715bc930a06e1
  
      source.getLocationInWindow(sourceLocation)
      getLocationInWindow(ownLocation)
-@@ -280,6 +280,12 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
-       SharedBackdropCapture.acquire(source, CAPTURE_DOWNSAMPLE, BACKDROP_REFRESH_MS)
-     }
+     val offsetX = ownLocation[0] - sourceLocation[0]
+     val offsetY = ownLocation[1] - sourceLocation[1]
  
-+    // The refresh above may have replaced the shared bitmap and recycled the
-+    // one peeked earlier (the capture source resized, e.g. the keyboard opened).
-+    // Drawing a recycled bitmap throws and takes the app down.
+-    // While this view is moving across the source (scrolling), a stale
+-    // capture shows OTHER scrolling content at its old window position
+-    // swimming through the glass. Refresh the shared capture at frame
+-    // cadence during motion — still one rasterization per interval across
+-    // all glass views — and fall back to the relaxed idle cadence
+-    // (SHARED_CAPTURE_MAX_AGE_MS, driven by the ticker) once still.
+-    if (offsetX != appliedOffsetX || offsetY != appliedOffsetY) {
+-      SharedBackdropCapture.acquire(source, CAPTURE_DOWNSAMPLE, BACKDROP_REFRESH_MS)
+-    }
++    // The capture for this frame was taken in the pre-draw pass
++    // (captureForFrame); the node just re-blits its sub-rect. A resize of
++    // the capture source (keyboard) may have replaced and recycled the
++    // shared bitmap since it was peeked, and drawing a recycled bitmap
++    // throws and takes the app down.
 +    val current = SharedBackdropCapture.peek(source) ?: return false
 +    if (current.isRecycled) return false
-+
+ 
      val generation = SharedBackdropCapture.generationOf(source)
      if (
-       generation == appliedGeneration &&
-@@ -303,7 +309,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -303,7 +265,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
        // CAPTURE_DOWNSAMPLE-pixel steps, which reads as the glass "shaking"
        // against smoothly-scrolling content.
        recording.scale(downsample, downsample)
@@ -33,3 +136,225 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..e4e5b249ed18f45d5d0715bc930a06e1
      } finally {
        node.endRecording()
      }
+@@ -329,20 +291,29 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+     // dispatchDraw skips it entirely.
+     if (shaderFailed) return
+ 
+-    // One shared, downsampled capture of the source, re-rasterized at most
+-    // every SHARED_CAPTURE_MAX_AGE_MS across every glass view on the screen.
+-    // The node itself is re-recorded inside the draw pass (updateGlassNode),
+-    // so the ticker only has to trigger a draw when the capture or the
+-    // effect actually changed — a fully idle screen therefore stops
+-    // invalidating (and stops forcing the window to re-render 30x/s), while
+-    // scrolling gets per-frame backdrop tracking from dispatchDraw.
+-    SharedBackdropCapture.acquire(source, CAPTURE_DOWNSAMPLE, SHARED_CAPTURE_MAX_AGE_MS)
+-      ?: return
++    // Explicit capture outside the frame cadence: first attach and a resize
++    // of this view, where the next rendered frame must not show a stale or
++    // empty backdrop. The node is re-recorded in the draw pass.
++    SharedBackdropCapture.capture(source, CAPTURE_DOWNSAMPLE) ?: return
+     if (SharedBackdropCapture.generationOf(source) != appliedGeneration || effectDirty) {
+       invalidate()
+     }
+   }
+ 
++  /**
++   * Runs in the window's pre-draw pass, i.e. once per frame the window is
++   * about to render. The shared capture rasterizes the source at most once
++   * per frame no matter how many glass views ask, so this is the whole
++   * scheduling policy: content that moves re-renders the window, the glass
++   * follows on the same frame, and an idle screen never captures.
++   */
++  private fun captureForFrame() {
++    if (width <= 0 || height <= 0 || !isAttachedToWindow || shaderFailed) return
++    val source = captureSource ?: return
++    if (source.width <= 0 || source.height <= 0) return
++    SharedBackdropCapture.captureForFrame(source, CAPTURE_DOWNSAMPLE)
++  }
++
+   @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+   private fun ensureEngine() {
+     if (glassNode != null) return
+diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
+index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e4f1f8e9e 100644
+--- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
++++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
+@@ -2,8 +2,9 @@ package com.sbaiahmed1.reactnativeblur
+ 
+ import android.graphics.Bitmap
+ import android.graphics.Canvas
+-import android.os.SystemClock
++import android.graphics.Rect
+ import android.view.View
++import android.view.animation.AnimationUtils
+ 
+ /**
+  * Deduplicates the software backdrop captures behind ReactNativeLiquidGlassView.
+@@ -22,13 +23,25 @@ internal object SharedBackdropCapture {
+   private class Entry {
+     var bitmap: Bitmap? = null
+     var canvas: Canvas? = null
+-    var lastCaptureUptimeMs = 0L
+-    var refCount = 0
++    // Animation-clock time of the frame the last capture was taken for; every
++    // pre-draw listener in one frame sees the same value, so it dedupes the
++    // per-frame capture across glass views without a timer.
++    var lastFrameTimeMs = -1L
++    // The glass views bound to this source; the capture is clipped to the
++    // bands they cover.
++    val consumers = ArrayList<View>()
+     // Bumped on every successful capture so consumers can cheaply detect
+     // whether the shared bitmap changed since they last consumed it.
+     var generation = 0L
+   }
+ 
++  // Refraction and blur read this far outside a glass view's own rect.
++  private const val CAPTURE_MARGIN_PX = 64
++
++  private val sourceLocation = IntArray(2)
++  private val consumerLocation = IntArray(2)
++  private val bands = ArrayList<Rect>()
++
+   private val entries = HashMap<View, Entry>()
+ 
+   /**
+@@ -40,26 +53,45 @@ internal object SharedBackdropCapture {
+   var captureInProgress = false
+     private set
+ 
+-  fun register(source: View) {
++  fun register(source: View, consumer: View) {
+     val entry = entries.getOrPut(source) { Entry() }
+-    entry.refCount++
++    if (!entry.consumers.contains(consumer)) entry.consumers.add(consumer)
+   }
+ 
+-  fun unregister(source: View) {
++  fun unregister(source: View, consumer: View) {
+     val entry = entries[source] ?: return
+-    entry.refCount--
+-    if (entry.refCount <= 0) {
++    entry.consumers.remove(consumer)
++    if (entry.consumers.isEmpty()) {
+       entry.bitmap?.recycle()
+       entries.remove(source)
+     }
+   }
+ 
+   /**
+-   * Returns the shared downsampled capture of [source], re-rasterizing only
+-   * when the cached one is older than [maxAgeMs] — so any number of glass
+-   * views refreshing in the same interval share a single capture.
++   * The shared capture for the frame currently being prepared: rasterizes
++   * [source] once per frame however many glass views call this from their
++   * pre-draw listeners, and returns the cached bitmap for the rest.
++   */
++  fun captureForFrame(source: View, downsample: Int): Bitmap? {
++    val entry = entries[source] ?: return null
++    val frameTime = AnimationUtils.currentAnimationTimeMillis()
++    val bitmap = entry.bitmap
++    if (
++      bitmap != null &&
++      entry.lastFrameTimeMs == frameTime &&
++      bitmap.width == (source.width / downsample).coerceAtLeast(1) &&
++      bitmap.height == (source.height / downsample).coerceAtLeast(1)
++    ) {
++      return bitmap
++    }
++    return capture(source, downsample, frameTime)
++  }
++
++  /**
++   * Rasterizes [source] now into the shared downsampled bitmap, clipped to
++   * the bands the bound glass views cover (plus a margin for refraction).
+    */
+-  fun acquire(source: View, downsample: Int, maxAgeMs: Long): Bitmap? {
++  fun capture(source: View, downsample: Int, frameTimeMs: Long = -1L): Bitmap? {
+     val entry = entries[source] ?: return null
+     if (source.width <= 0 || source.height <= 0) return null
+ 
+@@ -72,39 +104,69 @@ internal object SharedBackdropCapture {
+       bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+       entry.bitmap = bitmap
+       entry.canvas = Canvas(bitmap)
+-      entry.lastCaptureUptimeMs = 0L
+-    }
+-
+-    val now = SystemClock.uptimeMillis()
+-    if (!sizeChanged && now - entry.lastCaptureUptimeMs < maxAgeMs) {
+-      return bitmap
+     }
+ 
+     val canvas = entry.canvas ?: return bitmap
+-    bitmap!!.eraseColor(0)
+-    val save = canvas.save()
+-    canvas.scale(1f / downsample, 1f / downsample)
++    collectBands(source, entry)
+     captureInProgress = true
+     var captured = true
+     try {
+-      source.draw(canvas)
++      for (band in bands) {
++        val save = canvas.save()
++        canvas.scale(1f / downsample, 1f / downsample)
++        canvas.clipRect(band)
++        // Only the band is redrawn; pixels outside it keep the previous
++        // frame's content, which is still correct there for the views that
++        // read it.
++        canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR)
++        source.draw(canvas)
++        canvas.restoreToCount(save)
++      }
+     } catch (_: Exception) {
+-      // A view that throws mid-draw leaves a partial backdrop for one tick.
++      // A view that throws mid-draw leaves a partial backdrop for one frame.
+       captured = false
+     } finally {
+       captureInProgress = false
+-      canvas.restoreToCount(save)
+     }
+     // Only a successful draw counts as fresh — a partial capture keeps the
+-    // stale timestamp so the very next acquire re-rasterizes instead of
+-    // serving the broken frame for the whole interval.
++    // stale frame stamp so the next request re-rasterizes instead of serving
++    // the broken frame.
+     if (captured) {
+-      entry.lastCaptureUptimeMs = now
++      entry.lastFrameTimeMs = frameTimeMs
+       entry.generation++
+     }
+     return bitmap
+   }
+ 
++  /**
++   * Full-width horizontal bands (in source pixels) covering every bound
++   * glass view plus the refraction margin, overlapping bands merged, so the
++   * software raster skips everything the glass cannot show. Header pills and
++   * a bottom composer are two thin bands instead of the whole screen.
++   */
++  private fun collectBands(source: View, entry: Entry) {
++    bands.clear()
++    source.getLocationInWindow(sourceLocation)
++    for (consumer in entry.consumers) {
++      if (consumer.width <= 0 || consumer.height <= 0 || !consumer.isShown) continue
++      consumer.getLocationInWindow(consumerLocation)
++      val top = consumerLocation[1] - sourceLocation[1] - CAPTURE_MARGIN_PX
++      val bottom = consumerLocation[1] - sourceLocation[1] + consumer.height + CAPTURE_MARGIN_PX
++      val band = Rect(0, top.coerceAtLeast(0), source.width, bottom.coerceAtMost(source.height))
++      if (band.isEmpty) continue
++      var merged = false
++      for (existing in bands) {
++        if (band.top <= existing.bottom && band.bottom >= existing.top) {
++          existing.union(band)
++          merged = true
++          break
++        }
++      }
++      if (!merged) bands.add(band)
++    }
++    if (bands.isEmpty()) bands.add(Rect(0, 0, source.width, source.height))
++  }
++
+   /** Generation of the last successful capture for [source]; consumers use it
+    * to skip re-recording when neither the bitmap nor their sub-rect moved. */
+   fun generationOf(source: View): Long = entries[source]?.generation ?: 0L

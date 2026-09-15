@@ -32,7 +32,16 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { Alert, AppState, Keyboard, Platform, Pressable, View, type ViewStyle } from "react-native";
+import {
+  Alert,
+  AppState,
+  Keyboard,
+  type LayoutChangeEvent,
+  Platform,
+  Pressable,
+  View,
+  type ViewStyle,
+} from "react-native";
 import { KeyboardEvents } from "react-native-keyboard-controller";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
 import {
@@ -93,7 +102,8 @@ import { ComposerCommandPopover } from "./ComposerCommandPopover";
 import {
   ComposerStashButton,
   ComposerStashPanel,
-  useComposerStashJoin,
+  ComposerStashOutline,
+  useComposerStashChrome,
 } from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import {
@@ -213,6 +223,9 @@ export function ComposerSurface(props: {
   readonly style: ViewStyle;
   /** Morphs between the compact and expanded composer layouts. */
   readonly animateLayout?: boolean;
+  /** No border of its own: the stash chrome draws one outline around both. */
+  readonly chromeless?: boolean;
+  readonly onLayout?: (event: LayoutChangeEvent) => void;
 }) {
   const { materialYouStyleLayoutActive } = useAppearancePreferences();
   const colors = useUniwindTheme();
@@ -242,6 +255,7 @@ export function ComposerSurface(props: {
             ? undefined
             : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
         }
+        onLayout={props.onLayout}
         style={{
           overflow: "hidden",
           borderRadius: targetBorderRadius,
@@ -258,7 +272,11 @@ export function ComposerSurface(props: {
               : colors["--color-card"]
           }
           fallbackClassName={
-            materialYouStyleLayoutActive ? "border border-composer-border" : "border border-border"
+            props.chromeless
+              ? undefined
+              : materialYouStyleLayoutActive
+                ? "border border-composer-border"
+                : "border border-border"
           }
           glassEffectStyle="regular"
           tintColor="transparent"
@@ -280,6 +298,7 @@ export function ComposerSurface(props: {
           : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
       }
       layout={layoutTransition}
+      onLayout={props.onLayout}
       style={[
         animatedShapeStyle,
         {
@@ -293,7 +312,11 @@ export function ComposerSurface(props: {
           materialYouStyleLayoutActive ? colors["--color-composer-surface"] : colors["--color-card"]
         }
         fallbackClassName={
-          materialYouStyleLayoutActive ? "border border-composer-border" : "border border-border"
+          props.chromeless
+            ? undefined
+            : materialYouStyleLayoutActive
+              ? "border border-composer-border"
+              : "border border-border"
         }
         glassEffectStyle="regular"
         // The composer is a passive material containing interactive controls.
@@ -345,7 +368,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   // Only media belongs above the composer; every other file reads as its inline chip.
   // Where the stash tab or its open list sits on the composer, the corners
   // under it go square so the two read as one piece of glass.
-  const stashJoin = useComposerStashJoin();
+  const stashChrome = useComposerStashChrome();
   const stripAttachments = useMemo(
     () => composerStripAttachments(props.draftAttachments),
     [props.draftAttachments],
@@ -731,8 +754,10 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
           </Pressable>
         ) : null}
 
-        <ComposerStashPanel draftKey={composerOwnerKey} />
+        <ComposerStashPanel draftKey={composerOwnerKey} onLayout={stashChrome.onTabLayout} />
         <ComposerSurface
+          chromeless={stashChrome.attached}
+          onLayout={stashChrome.onSurfaceLayout}
           style={{
             ...(isExpanded
               ? {
@@ -749,7 +774,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                   overflow: "hidden" as const,
                   paddingVertical: 2,
                 }),
-            ...stashJoin,
+            ...stashChrome.surfaceStyle,
           }}
         >
           <ComposerDictationDraftContent
@@ -1063,6 +1088,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
             </ComposerDictationToolbar>
           </Animated.View>
         </ComposerSurface>
+        <ComposerStashOutline chrome={stashChrome} surfaceRadius={isExpanded ? 26 : 27} />
       </Animated.View>
 
       <VideoPreviewModal source={previewVideo} onRequestClose={closePreview} />

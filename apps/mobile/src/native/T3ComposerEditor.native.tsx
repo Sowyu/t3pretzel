@@ -26,6 +26,7 @@ import { MOBILE_TYPOGRAPHY } from "../lib/typography";
 import { useNativePaste } from "../lib/useNativePaste";
 import { useFontFamily } from "../lib/useFontFamily";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
+import { supportsLiquidGlass } from "../components/GlassSurface";
 import { useUniwindTheme } from "../lib/useUniwindTheme";
 import { flattenThemeColor } from "../lib/mobileTheme";
 import {
@@ -257,9 +258,12 @@ export function ComposerEditor({
     },
     [],
   );
-  const { systemColorsActive } = useAppearancePreferences();
+  const { systemColorsActive, themeAppearance } = useAppearancePreferences();
   const themeJson = JSON.stringify({
     selection: systemColorsActive ? theme["--color-primary"] : null,
+    // On liquid glass the typed text casts a faint halo onto the material,
+    // the way content near real glass bleeds into it. Solid surfaces get none.
+    textGlow: supportsLiquidGlass ? (themeAppearance === "dark" ? "#FFFFFF4D" : "#0000002E") : null,
     text: theme["--color-foreground"],
     placeholder: theme["--color-placeholder"],
     chipBackground: theme["--color-subtle"],
