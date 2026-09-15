@@ -133,7 +133,7 @@ export function GlassSurface({
 
 // Android 13 can run the AGSL liquid glass shader: refraction, dispersion,
 // blur and tint from a live capture of the screen behind the view.
-const supportsLiquidGlass = Platform.OS === "android" && Platform.Version >= 33;
+export const supportsLiquidGlass = Platform.OS === "android" && Platform.Version >= 33;
 
 /** The corner radii of a style, so the clipping wrapper matches the glass shape. */
 function shapeOf(flattened: ViewStyle | undefined): ViewStyle {
