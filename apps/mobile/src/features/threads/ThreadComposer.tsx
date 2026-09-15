@@ -90,7 +90,7 @@ import { useScaledTextRole } from "../settings/appearance/useScaledTextRole";
 import type { RemoteClientConnectionState } from "../../lib/connection";
 import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
-import { ComposerStashControl } from "./ComposerStashControl";
+import { ComposerStashButton, ComposerStashPanel } from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import {
   ComposerDictationCancelAction,
@@ -686,6 +686,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
           </Pressable>
         ) : null}
 
+        <ComposerStashPanel draftKey={composerOwnerKey} />
         <ComposerSurface
           style={
             isExpanded
@@ -970,7 +971,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                         onPickMedia={props.onPickDraftMedia}
                         onPickFiles={props.onPickDraftFiles}
                       />
-                      <ComposerStashControl draftKey={composerOwnerKey} hasContent={hasContent} />
+                      <ComposerStashButton draftKey={composerOwnerKey} hasContent={hasContent} />
                     </View>
                     <View className="min-w-0 shrink">
                       <ComposerInlineControl

@@ -333,25 +333,48 @@ export function verifyNightlyApk(input: {
 
 export interface NightlyPendingUpdate {
   readonly commit: string;
+  /** Epoch millis when the session was committed. */
+  readonly startedAt: number;
+  /** Epoch millis of the package's last install, as the OS reports it now. */
+  readonly lastUpdateTime: number;
   readonly failureMessage?: string | null;
   readonly failureStatus?: number;
 }
 
+/** `PackageInstaller.STATUS_FAILURE_ABORTED`: the user dismissed the confirmation. */
+export const PACKAGE_INSTALLER_STATUS_FAILURE_ABORTED = 3;
+
+export type NightlyInstallOutcome =
+  | { readonly kind: "success"; readonly message: string }
+  | { readonly kind: "failure"; readonly message: string }
+  | { readonly kind: "cancelled" }
+  /** Nothing has been installed since the commit: the system is still at it, or the dialog is still up. */
+  | { readonly kind: "pending" };
+
 /**
- * What to tell the user about the install that ran before this launch. The
- * running commit is the only trustworthy signal: PackageInstaller's success
- * status arrives in a process that is about to be replaced.
+ * What to tell the user about the install that ran before this launch or
+ * foregrounding. The running commit is the only trustworthy success signal.
+ * A record with no failure and no package update since it was written is not
+ * a failure either: the confirmation path brings the app back to the
+ * foreground while the install is still running, and reporting then would
+ * announce a failure a second before the process is replaced.
  */
-export function describeNightlyInstallOutcome(
+export function resolveNightlyInstallOutcome(
   pending: NightlyPendingUpdate,
   currentCommit: string,
-): { readonly ok: boolean; readonly message: string } {
+): NightlyInstallOutcome {
   if (pending.commit === currentCommit) {
-    return { ok: true, message: `Updated to ${shortCommit(currentCommit)}` };
+    return { kind: "success", message: `Updated to ${shortCommit(currentCommit)}` };
+  }
+  if (pending.failureStatus === PACKAGE_INSTALLER_STATUS_FAILURE_ABORTED) {
+    return { kind: "cancelled" };
+  }
+  if (pending.failureStatus === undefined && pending.lastUpdateTime <= pending.startedAt) {
+    return { kind: "pending" };
   }
   const detail = pending.failureMessage?.trim();
   return {
-    ok: false,
+    kind: "failure",
     message: detail
       ? `The update to ${shortCommit(pending.commit)} did not install: ${detail}`
       : `The update to ${shortCommit(pending.commit)} did not install.`,

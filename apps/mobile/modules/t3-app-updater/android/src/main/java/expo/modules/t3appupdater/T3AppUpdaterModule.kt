@@ -26,8 +26,12 @@ class T3AppUpdaterModule : Module() {
       AppUpdater.install(context(), path, expected)
     }
 
-    Function("consumePendingUpdateResult") {
-      AppUpdater.consumePendingUpdateResult(context())
+    Function("readPendingUpdate") {
+      AppUpdater.readPendingUpdate(context())
+    }
+
+    Function("clearPendingUpdate") {
+      AppUpdater.clearPendingUpdate(context())
     }
   }
 

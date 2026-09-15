@@ -2,7 +2,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   decodeNightlyRelease,
-  describeNightlyInstallOutcome,
+  PACKAGE_INSTALLER_STATUS_FAILURE_ABORTED,
+  resolveNightlyInstallOutcome,
   getNightlyUpdaterState,
   NIGHTLY_AUTO_CHECK_INTERVAL_MS,
   nightlyUpdaterAction,
@@ -333,30 +334,58 @@ describe("state machine", () => {
   });
 });
 
-describe("describeNightlyInstallOutcome", () => {
+describe("resolveNightlyInstallOutcome", () => {
+  const a = "a".repeat(40);
+  const b = "b".repeat(40);
+
   it("reports success when the running commit is the one that was installed", () => {
-    expect(describeNightlyInstallOutcome({ commit: "a".repeat(40) }, "a".repeat(40))).toEqual({
-      ok: true,
-      message: "Updated to aaaaaaa",
-    });
+    expect(
+      resolveNightlyInstallOutcome({ commit: a, startedAt: 100, lastUpdateTime: 200 }, a),
+    ).toEqual({ kind: "success", message: "Updated to aaaaaaa" });
   });
 
-  it("reports the recorded failure when the commit did not change", () => {
+  it("reports the recorded failure with the installer's message", () => {
     expect(
-      describeNightlyInstallOutcome(
-        { commit: "a".repeat(40), failureStatus: 4, failureMessage: "INSTALL_FAILED_ABORTED" },
-        "b".repeat(40),
+      resolveNightlyInstallOutcome(
+        {
+          commit: a,
+          startedAt: 100,
+          lastUpdateTime: 50,
+          failureStatus: 4,
+          failureMessage: "INSTALL_FAILED_INVALID_APK",
+        },
+        b,
       ),
     ).toEqual({
-      ok: false,
-      message: "The update to aaaaaaa did not install: INSTALL_FAILED_ABORTED",
+      kind: "failure",
+      message: "The update to aaaaaaa did not install: INSTALL_FAILED_INVALID_APK",
     });
   });
 
-  it("reports a bare failure when the installer said nothing", () => {
-    expect(describeNightlyInstallOutcome({ commit: "a".repeat(40) }, "b".repeat(40))).toEqual({
-      ok: false,
-      message: "The update to aaaaaaa did not install.",
-    });
+  it("treats a dismissed confirmation as cancelled, not failed", () => {
+    expect(
+      resolveNightlyInstallOutcome(
+        {
+          commit: a,
+          startedAt: 100,
+          lastUpdateTime: 50,
+          failureStatus: PACKAGE_INSTALLER_STATUS_FAILURE_ABORTED,
+        },
+        b,
+      ),
+    ).toEqual({ kind: "cancelled" });
+  });
+
+  it("stays pending while nothing has been installed since the commit", () => {
+    // The confirmation path foregrounds the app before the install finishes.
+    expect(
+      resolveNightlyInstallOutcome({ commit: a, startedAt: 100, lastUpdateTime: 50 }, b),
+    ).toEqual({ kind: "pending" });
+  });
+
+  it("reports a bare failure when the package changed but not to the expected commit", () => {
+    expect(
+      resolveNightlyInstallOutcome({ commit: a, startedAt: 100, lastUpdateTime: 200 }, b),
+    ).toEqual({ kind: "failure", message: "The update to aaaaaaa did not install." });
   });
 });

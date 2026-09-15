@@ -135,20 +135,28 @@ internal object AppUpdater {
     }
   }
 
-  fun consumePendingUpdateResult(context: Context): Map<String, Any?>? {
+  /**
+   * The install this app last set out to do, if any, plus when the package was
+   * last updated so the caller can tell "still installing" from "installed
+   * something else". Reading does not clear: only a concluded record is dropped.
+   */
+  fun readPendingUpdate(context: Context): Map<String, Any?>? {
     val preferences = preferences(context)
     val commit = preferences.getString(KEY_COMMIT, null) ?: return null
-    val result = buildMap<String, Any?> {
+    return buildMap<String, Any?> {
       put("commit", commit)
       put("sha256", preferences.getString(KEY_SHA256, null))
       put("startedAt", preferences.getLong(KEY_STARTED_AT, 0L))
+      put("lastUpdateTime", installedPackageInfo(context)?.lastUpdateTime ?: 0L)
       if (preferences.contains(KEY_FAILURE_STATUS)) {
         put("failureStatus", preferences.getInt(KEY_FAILURE_STATUS, 0))
         put("failureMessage", preferences.getString(KEY_FAILURE_MESSAGE, null))
       }
     }
-    preferences.edit().clear().apply()
-    return result
+  }
+
+  fun clearPendingUpdate(context: Context) {
+    preferences(context).edit().clear().apply()
   }
 
   /** Called from the status receiver, which may run without the app's UI. */
@@ -239,10 +247,6 @@ internal object AppUpdater {
       .putString(KEY_SHA256, sha256)
       .putLong(KEY_STARTED_AT, System.currentTimeMillis())
       .commit()
-  }
-
-  private fun clearPendingUpdate(context: Context) {
-    preferences(context).edit().clear().apply()
   }
 
   private fun preferences(context: Context): SharedPreferences =

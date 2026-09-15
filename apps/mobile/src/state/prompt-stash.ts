@@ -50,6 +50,16 @@ export const promptStashAtom = Atom.make<ReadonlyArray<PromptStashEntry>>([]).pi
   Atom.withLabel("mobile:prompt-stash"),
 );
 
+/** Whether the list above the composer is open. Shared by the tab and the toolbar button. */
+export const promptStashListOpenAtom = Atom.make(false).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("mobile:prompt-stash-list-open"),
+);
+
+export function setPromptStashListOpen(open: boolean): void {
+  appAtomRegistry.set(promptStashListOpenAtom, open);
+}
+
 async function getPromptStashFile() {
   const { Directory, File, Paths } = await import("expo-file-system");
   const directory = new Directory(Paths.document, PROMPT_STASH_DIRECTORY);
@@ -189,6 +199,10 @@ export function promptStashEntrySnippet(entry: PromptStashEntry): string {
   const images = entry.attachments.filter((attachment) => attachment.type === "image").length;
   const label = images === 0 ? "file" : images === count ? "image" : "attachment";
   return `(${count} ${label}${count === 1 ? "" : "s"})`;
+}
+
+export function usePromptStashListOpen(): boolean {
+  return useAtomValue(promptStashListOpenAtom);
 }
 
 export function usePromptStash(): ReadonlyArray<PromptStashEntry> {

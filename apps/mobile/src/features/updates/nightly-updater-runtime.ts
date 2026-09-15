@@ -6,7 +6,7 @@ import { Alert, AppState, Linking, PermissionsAndroid, Platform } from "react-na
 
 import {
   decodeNightlyRelease,
-  describeNightlyInstallOutcome,
+  resolveNightlyInstallOutcome,
   getNightlyUpdaterState,
   isNightlyUpdaterBusy,
   nightlyUpdaterStateAtom,
@@ -46,6 +46,7 @@ interface NativePendingUpdate {
   readonly commit: string;
   readonly sha256: string | null;
   readonly startedAt: number;
+  readonly lastUpdateTime: number;
   readonly failureStatus?: number;
   readonly failureMessage?: string | null;
 }
@@ -55,7 +56,8 @@ interface AppUpdaterNativeModule {
   inspectApk(path: string): Promise<NativeApkInspection>;
   openInstallPermissionSettings(): boolean;
   install(path: string, expected: { commit: string; sha256: string }): Promise<void>;
-  consumePendingUpdateResult(): NativePendingUpdate | null;
+  readPendingUpdate(): NativePendingUpdate | null;
+  clearPendingUpdate(): void;
 }
 
 const native =
@@ -339,42 +341,48 @@ export function openNightlyInstallPermissionSettings(): void {
 
 /* ─── Install outcome from the previous process ──────────────────── */
 
-/** `PackageInstaller.STATUS_FAILURE_ABORTED`: the user cancelled the confirmation. */
-const PACKAGE_INSTALLER_STATUS_FAILURE_ABORTED = 3;
-
 export function consumeNightlyInstallResult(): void {
   const active = activeUpdater();
   if (active === null) return;
 
   let pending: NativePendingUpdate | null;
   try {
-    pending = active.native.consumePendingUpdateResult();
+    pending = active.native.readPendingUpdate();
   } catch {
     return;
   }
   if (pending === null) return;
 
-  // The user dismissed the system's install dialog. Nothing went wrong, so the
-  // update stays on offer instead of turning into a failure.
-  if (pending.failureStatus === PACKAGE_INSTALLER_STATUS_FAILURE_ABORTED) {
-    const update = nightlyUpdaterUpdate(getNightlyUpdaterState());
-    setNightlyUpdaterState(update ? { kind: "available", update } : { kind: "idle" });
-    return;
+  const outcome = resolveNightlyInstallOutcome(pending, active.build.commit);
+  // Still installing (or the confirmation is still up): leave the record for
+  // the launch that follows the install.
+  if (outcome.kind === "pending") return;
+  try {
+    active.native.clearPendingUpdate();
+  } catch {
+    // A record that cannot be cleared is reported again next time; harmless.
   }
-
-  const outcome = describeNightlyInstallOutcome(pending, active.build.commit);
-  if (outcome.ok) {
-    setNightlyUpdaterState({ kind: "upToDate" });
-    Alert.alert("Update installed", outcome.message);
-    return;
+  switch (outcome.kind) {
+    case "success":
+      setNightlyUpdaterState({ kind: "upToDate" });
+      Alert.alert("Update installed", outcome.message);
+      return;
+    case "cancelled": {
+      // The user dismissed the system's install dialog. Nothing went wrong, so
+      // the update stays on offer instead of turning into a failure.
+      const update = nightlyUpdaterUpdate(getNightlyUpdaterState());
+      setNightlyUpdaterState(update ? { kind: "available", update } : { kind: "idle" });
+      return;
+    }
+    case "failure":
+      setNightlyUpdaterState({
+        kind: "error",
+        step: "install",
+        message: outcome.message,
+        update: null,
+      });
+      Alert.alert("Update failed", outcome.message);
   }
-  setNightlyUpdaterState({
-    kind: "error",
-    step: "install",
-    message: outcome.message,
-    update: null,
-  });
-  Alert.alert("Update failed", outcome.message);
 }
 
 /* ─── Last-check stamp ───────────────────────────────────────────── */

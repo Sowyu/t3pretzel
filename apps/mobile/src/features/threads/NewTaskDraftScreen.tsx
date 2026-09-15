@@ -55,7 +55,7 @@ import {
 } from "../../components/ComposerToolbar";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { ComposerAttachmentButton } from "../../components/ComposerAttachmentButton";
-import { ComposerStashControl } from "./ComposerStashControl";
+import { ComposerStashButton, ComposerStashPanel } from "./ComposerStashControl";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { composerStripAttachments } from "../../lib/composerImages";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
@@ -1608,6 +1608,7 @@ export function NewTaskDraftScreen(props: {
         </Pressable>
       ) : null}
 
+      {flow.draftKey ? <ComposerStashPanel draftKey={flow.draftKey} /> : null}
       <ComposerSurface
         style={{
           borderRadius: 26,
@@ -1685,7 +1686,7 @@ export function NewTaskDraftScreen(props: {
                       onPickFiles={handlePickFiles}
                     />
                     {flow.draftKey ? (
-                      <ComposerStashControl
+                      <ComposerStashButton
                         disabled={isComposerInteractionLocked}
                         draftKey={flow.draftKey}
                         hasContent={flow.prompt.trim().length > 0 || flow.attachments.length > 0}
