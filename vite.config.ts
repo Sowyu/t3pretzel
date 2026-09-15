@@ -3,18 +3,11 @@ import { defineConfig } from "vite-plus";
 import * as NodeURL from "node:url";
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      "~": NodeURL.fileURLToPath(new URL("./apps/web/src", import.meta.url)),
-    },
-  },
   test: {
     environment: "node",
     exclude: [
-      "**/.repos/**",
       "**/node_modules/**",
       "**/dist/**",
-      "**/dist-electron/**",
       "**/.{idea,git,cache,output,temp}/**",
     ],
     hookTimeout: 60_000,
@@ -31,14 +24,11 @@ export default defineConfig({
   },
   fmt: {
     ignorePatterns: [
-      ".repos/**",
       ".alchemy",
       "dist",
-      "dist-electron",
       "node_modules",
       "pnpm-lock.yaml",
       "*.tsbuildinfo",
-      "**/routeTree.gen.ts",
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
       "apps/mobile/uniwind-types.d.ts",
@@ -56,14 +46,10 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: [
-      ".repos",
-      ".repos/**",
       "dist",
-      "dist-electron",
       "node_modules",
       "pnpm-lock.yaml",
       "*.tsbuildinfo",
-      "**/routeTree.gen.ts",
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
       "apps/mobile/uniwind-types.d.ts",
@@ -110,19 +96,12 @@ export default defineConfig({
               message:
                 "Import from an explicit @t3tools/client-runtime/* subpath. The package has no root export.",
             },
-            {
-              name: "@pierre/diffs/react",
-              importNames: ["CodeView"],
-              message:
-                "Use StyledDiffCodeView so web diff surfaces share styling and virtualized geometry.",
-            },
           ],
         },
       ],
       "t3code/no-global-process-runtime": "error",
       "t3code/no-inline-schema-compile": "warn",
       "t3code/no-manual-effect-runtime-in-tests": "error",
-      "t3code/no-native-title-tooltip": "error",
       "t3code/namespace-node-imports": "error",
     },
     overrides: [
@@ -180,28 +159,6 @@ export default defineConfig({
           "t3code/no-mobile-uniwind-theme-escape-hatches": ["error", { allowUniwindTheme: true }],
         },
       },
-      // Legacy manual Effect runners tracked as debt: no net-new occurrences.
-      // Lower a ceiling when you migrate a file, and delete its entry at zero.
-      ...Object.entries({
-        "apps/server/src/orchestration/Layers/CheckpointReactor.test.ts": 42,
-        "apps/server/src/orchestration/Layers/OrchestrationEngine.test.ts": 5,
-        "apps/server/src/orchestration/Layers/OrchestrationReactor.test.ts": 4,
-        "apps/server/src/orchestration/Layers/ProviderCommandReactor.test.ts": 66,
-        "apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.test.ts": 29,
-        "apps/server/src/orchestration/Layers/ThreadDeletionReactor.test.ts": 2,
-        "apps/server/src/orchestration/commandInvariants.test.ts": 5,
-        "apps/server/src/orchestration/projector.test.ts": 20,
-        "apps/server/src/provider/Layers/CodexAdapter.test.ts": 1,
-        "apps/server/src/provider/Layers/CodexSessionRuntime.test.ts": 5,
-        "apps/server/src/provider/Layers/CursorAdapter.test.ts": 1,
-        "apps/server/src/provider/Layers/CursorProvider.test.ts": 1,
-        "apps/server/src/provider/Layers/ProviderService.test.ts": 2,
-        "apps/server/src/provider/Layers/ProviderSessionReaper.test.ts": 12,
-        "apps/server/src/provider/acp/CursorAcpSupport.test.ts": 1,
-      }).map(([file, maxOccurrences]) => {
-        const rule: ["error", { maxOccurrences: number }] = ["error", { maxOccurrences }];
-        return { files: [file], rules: { "t3code/no-manual-effect-runtime-in-tests": rule } };
-      }),
     ],
     options: {
       reportUnusedDisableDirectives: "error",
