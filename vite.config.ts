@@ -5,11 +5,7 @@ import * as NodeURL from "node:url";
 export default defineConfig({
   test: {
     environment: "node",
-    exclude: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/.{idea,git,cache,output,temp}/**",
-    ],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.{idea,git,cache,output,temp}/**"],
     hookTimeout: 60_000,
     testTimeout: 60_000,
     setupFiles: [
