@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import * as NodeFSP from "node:fs/promises";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import withAndroidNetworkSecurityConfig from "./withAndroidNetworkSecurityConfig.cjs";
@@ -9,7 +9,7 @@ const tempDirectories = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
+    tempDirectories.splice(0).map((directory) => NodeFSP.rm(directory, { recursive: true })),
   );
 });
 
@@ -29,7 +29,7 @@ describe("Android network security config", () => {
   });
 
   it("writes a config that trusts user-installed CAs alongside system ones", async () => {
-    const projectRoot = await mkdtemp(path.join(tmpdir(), "t3-nsc-"));
+    const projectRoot = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-nsc-"));
     tempDirectories.push(projectRoot);
     const config = withAndroidNetworkSecurityConfig({ name: "Test", slug: "test" });
     await config.mods.android.dangerous({
@@ -42,8 +42,8 @@ describe("Android network security config", () => {
       },
       modResults: {},
     });
-    const xml = await readFile(
-      path.join(projectRoot, "app", "src", "main", "res", "xml", "network_security_config.xml"),
+    const xml = await NodeFSP.readFile(
+      NodePath.join(projectRoot, "app", "src", "main", "res", "xml", "network_security_config.xml"),
       "utf8",
     );
     expect(xml).toContain('<certificates src="system" />');
