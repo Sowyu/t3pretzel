@@ -6,6 +6,7 @@ import { PROVIDER_SEND_TURN_MAX_ATTACHMENTS } from "@t3tools/contracts";
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
 import { useComposerImagePreviewUri } from "../../components/ComposerAttachmentStrip";
+import { GlassSurface } from "../../components/GlassSurface";
 import { selectionHaptic } from "../../lib/haptics";
 import { relativeTime } from "../../lib/time";
 import type { DraftComposerImageAttachment } from "../../lib/composerImages";
@@ -212,9 +213,21 @@ export function ComposerStashPanel(props: { readonly draftKey: string }) {
 
   return (
     <View className="items-end px-2">
-      <View
-        className="overflow-hidden rounded-t-[18px] border border-b-0 border-border bg-card-translucent"
-        style={{ marginBottom: -8, paddingBottom: 8, minWidth: listOpen ? "100%" : undefined }}
+      {/* Same material as the composer and its popover: native glass on iOS 26,
+          a backdrop blur on Android 12 and later, a solid card below that. */}
+      <GlassSurface
+        chrome="none"
+        fallbackClassName="border border-b-0 border-border"
+        glassEffectStyle="clear"
+        tintColorClassName="accent-glass-surface"
+        style={{
+          borderRadius: 18,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+          marginBottom: -8,
+          paddingBottom: 8,
+          minWidth: listOpen ? "100%" : undefined,
+        }}
       >
         <Pressable
           accessibilityLabel={listOpen ? "Close stash" : `Open stash, ${entries.length} saved`}
@@ -262,7 +275,7 @@ export function ComposerStashPanel(props: { readonly draftKey: string }) {
             </ScrollView>
           )
         ) : null}
-      </View>
+      </GlassSurface>
     </View>
   );
 }
