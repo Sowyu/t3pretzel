@@ -88,13 +88,17 @@ const VARIANT_CONFIG = {
     relyingParty: "clerk.t3.codes",
     assets: PREVIEW_ASSETS,
   },
-  // This fork's release channel: the nightly artwork and label, its own
-  // package so it installs next to the store app and upstream previews.
+  // This fork's release channel: the nightly artwork and label on T3's preview
+  // bundle ids. Clerk only completes OAuth sign-in for redirect hosts the T3
+  // instance lists (clerk://<package>.callback); the store and preview ids are
+  // on it and nothing this fork owns could be added. Sharing the preview id
+  // keeps T3 Connect sign-in working, still installs next to the store app,
+  // and only collides with T3's internal preview builds.
   nightly: {
     appName: "T3 Code Nightly",
     scheme: "t3code-nightly",
-    iosBundleIdentifier: "com.t3tools.t3code.nightly",
-    androidPackage: "com.t3tools.t3code.nightly",
+    iosBundleIdentifier: "com.t3tools.t3code.preview",
+    androidPackage: "com.t3tools.t3code.preview",
     relyingParty: "clerk.t3.codes",
     assets: PREVIEW_ASSETS,
   },
@@ -432,6 +436,7 @@ const config: ExpoConfig = {
     ...(!isIosPersonalTeamBuild ? ["./plugins/withWidgetLogoAsset.cjs", widgetsPlugin] : []),
     "./plugins/withIosSceneLifecycle.cjs",
     "./plugins/withAndroidNetworkSecurityConfig.cjs",
+    "./plugins/withAndroidReleaseSigning.cjs",
     "./plugins/withAndroidGradleHeap.cjs",
     "./plugins/withAndroidModernPopupMenu.cjs",
     "./plugins/withAndroidModernAlertDialog.cjs",

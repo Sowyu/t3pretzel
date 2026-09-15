@@ -13,7 +13,9 @@ The app talks to any T3 Code server. Run one with `npx t3@latest` or the upstrea
 
 ## Nightly builds
 
-Every push to `main` builds the Android app and publishes it to the rolling [nightly release](https://github.com/Sowyu/t3pretzel/releases/tag/nightly). It is the _nightly_ variant (`com.t3tools.t3code.nightly`, "T3 Code Nightly", nightly artwork), so it installs next to the Play Store app. arm64-v8a, signed with the standard debug keystore, OTA updates off, T3 Connect on.
+Every push to `main` builds the Android app and publishes it to the rolling [nightly release](https://github.com/Sowyu/t3pretzel/releases/tag/nightly). It is the _nightly_ variant ("T3 Code Nightly", nightly artwork), so it installs next to the Play Store app. arm64-v8a, OTA updates off, T3 Connect on.
+
+Its package id is `com.t3tools.t3code.preview`, the id of T3's internal preview build, because T3's Clerk instance only completes OAuth sign-in for the package ids it lists and this fork cannot add one. Every nightly is signed with one key kept in the `NIGHTLY_KEYSTORE_BASE64` and `NIGHTLY_KEYSTORE_PASSWORD` repository secrets, so each one updates the previous. A fork needs its own: generate a keystore with `keytool`, store it base64-encoded in those two secrets, and set the matching `T3CODE_ANDROID_KEYSTORE_*` variables from `.env.example` for local release builds.
 
 Coming from the Play Store app: sign in to T3 Connect with the same account and your linked environments appear under Connections with a "Connect all" button. Directly paired environments (LAN, Tailscale) have to be paired again from the desktop app's Settings → Connections, since pairing tokens belong to one install.
 
