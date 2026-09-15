@@ -98,6 +98,13 @@ function CloudEnvironmentRowsContent(
     (entry: RelayEnvironmentView) => controller.connectRelayEnvironment(entry.environment),
     [controller],
   );
+  // Someone moving over from another install signs in and finds every linked
+  // environment waiting here; one tap beats connecting them one by one.
+  const handleConnectAllCloudEnvironments = useCallback(() => {
+    for (const entry of availableCloudEnvironments) {
+      void controller.connectRelayEnvironment(entry.environment);
+    }
+  }, [availableCloudEnvironments, controller]);
 
   const handleToggleCloudError = useCallback((environmentId: string) => {
     setExpandedErrorId((current) => (current === environmentId ? null : environmentId));
@@ -111,25 +118,36 @@ function CloudEnvironmentRowsContent(
         <View className="flex-row items-center justify-between px-1">
           <Text className="text-sm font-t3-bold uppercase text-foreground-muted">T3 Connect</Text>
           {discoveryAvailable ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={controller.relayDiscovery.isRefreshing}
-              onPress={() => {
-                void controller.refreshRelayEnvironments();
-              }}
-              className="h-9 w-9 items-center justify-center rounded-full bg-subtle active:opacity-70 disabled:opacity-50"
-            >
-              {controller.relayDiscovery.isRefreshing ? (
-                <ActivityIndicator colorClassName={"accent-icon"} size="small" />
-              ) : (
-                <SymbolView
-                  name="arrow.clockwise"
-                  size={14}
-                  tintColorClassName={"accent-icon"}
-                  type="monochrome"
-                />
-              )}
-            </Pressable>
+            <View className="flex-row items-center gap-2">
+              {availableCloudEnvironments.length > 1 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleConnectAllCloudEnvironments}
+                  className="h-9 items-center justify-center rounded-full bg-subtle px-4 active:opacity-70"
+                >
+                  <Text className="text-sm font-t3-medium text-foreground">Connect all</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                disabled={controller.relayDiscovery.isRefreshing}
+                onPress={() => {
+                  void controller.refreshRelayEnvironments();
+                }}
+                className="h-9 w-9 items-center justify-center rounded-full bg-subtle active:opacity-70 disabled:opacity-50"
+              >
+                {controller.relayDiscovery.isRefreshing ? (
+                  <ActivityIndicator colorClassName={"accent-icon"} size="small" />
+                ) : (
+                  <SymbolView
+                    name="arrow.clockwise"
+                    size={14}
+                    tintColorClassName={"accent-icon"}
+                    type="monochrome"
+                  />
+                )}
+              </Pressable>
+            </View>
           ) : null}
         </View>
       ) : null}

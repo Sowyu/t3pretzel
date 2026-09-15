@@ -3,7 +3,7 @@ import type { ExpoConfig } from "expo/config";
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 
-type AppVariant = "development" | "preview" | "production";
+type AppVariant = "development" | "preview" | "nightly" | "production";
 
 const repoEnv = loadRepoEnv();
 Object.assign(process.env, repoEnv);
@@ -88,6 +88,16 @@ const VARIANT_CONFIG = {
     relyingParty: "clerk.t3.codes",
     assets: PREVIEW_ASSETS,
   },
+  // This fork's release channel: the nightly artwork and label, its own
+  // package so it installs next to the store app and upstream previews.
+  nightly: {
+    appName: "T3 Code Nightly",
+    scheme: "t3code-nightly",
+    iosBundleIdentifier: "com.t3tools.t3code.nightly",
+    androidPackage: "com.t3tools.t3code.nightly",
+    relyingParty: "clerk.t3.codes",
+    assets: PREVIEW_ASSETS,
+  },
   production: {
     appName: "T3 Code",
     scheme: "t3code",
@@ -102,6 +112,7 @@ function resolveAppVariant(value: string | undefined): AppVariant {
   switch (value) {
     case "development":
     case "preview":
+    case "nightly":
     case "production":
       return value;
     default:
