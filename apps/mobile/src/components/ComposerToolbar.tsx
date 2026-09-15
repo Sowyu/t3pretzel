@@ -248,7 +248,11 @@ export function ComposerActionButton(props: {
           size={16}
           weight="semibold"
           tintColorClassName={
-            props.variant === "danger" ? "accent-danger-foreground" : "accent-primary-foreground"
+            props.variant === "danger"
+              ? "accent-danger-foreground"
+              : props.disabled
+                ? "accent-icon-subtle"
+                : "accent-primary-foreground"
           }
           type="monochrome"
         />
