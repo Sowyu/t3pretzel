@@ -90,7 +90,11 @@ import { useScaledTextRole } from "../settings/appearance/useScaledTextRole";
 import type { RemoteClientConnectionState } from "../../lib/connection";
 import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
-import { ComposerStashButton, ComposerStashPanel } from "./ComposerStashControl";
+import {
+  ComposerStashButton,
+  ComposerStashPanel,
+  useComposerStashJoin,
+} from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import {
   ComposerDictationCancelAction,
@@ -241,6 +245,8 @@ export function ComposerSurface(props: {
         style={{
           overflow: "hidden",
           borderRadius: targetBorderRadius,
+          borderTopLeftRadius: props.style.borderTopLeftRadius,
+          borderTopRightRadius: props.style.borderTopRightRadius,
           elevation: Platform.Version < 28 ? 10 : undefined,
         }}
       >
@@ -337,6 +343,9 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   const [previewVideo, setPreviewVideo] = useState<VideoPreviewSource | null>(null);
   const hasContent = props.draftMessage.trim().length > 0 || props.draftAttachments.length > 0;
   // Only media belongs above the composer; every other file reads as its inline chip.
+  // Where the stash tab or its open list sits on the composer, the corners
+  // under it go square so the two read as one piece of glass.
+  const stashJoin = useComposerStashJoin();
   const stripAttachments = useMemo(
     () => composerStripAttachments(props.draftAttachments),
     [props.draftAttachments],
@@ -724,8 +733,8 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
 
         <ComposerStashPanel draftKey={composerOwnerKey} />
         <ComposerSurface
-          style={
-            isExpanded
+          style={{
+            ...(isExpanded
               ? {
                   borderRadius: 26,
                   minHeight: 140,
@@ -739,8 +748,9 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                   borderRadius: 27,
                   overflow: "hidden" as const,
                   paddingVertical: 2,
-                }
-          }
+                }),
+            ...stashJoin,
+          }}
         >
           <ComposerDictationDraftContent
             className={isExpanded ? undefined : "flex-row items-center"}

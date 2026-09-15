@@ -22,6 +22,7 @@ import {
   createNativeMailSearchToolbarItem,
   NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED,
 } from "../layout/native-mail-search-toolbar";
+import { GlassControl } from "../../components/GlassControl";
 import { useNightlyUpdater } from "../updates/nightly-updater-runtime";
 import type { HomeProjectSortOrder } from "./homeThreadList";
 import { WorkspaceConnectionTitle } from "./WorkspaceConnectionTitle";
@@ -252,10 +253,11 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               <Pressable
                 accessibilityLabel={`Update to ${nightly.state.update.title}`}
                 accessibilityRole="button"
-                className="h-11 items-center justify-center rounded-full bg-subtle px-3.5"
                 onPress={nightly.update}
               >
-                <RNText className="text-[13px] font-t3-medium text-foreground">Update</RNText>
+                <GlassControl className="h-11 items-center justify-center px-3.5" radius={22}>
+                  <RNText className="text-[13px] font-t3-medium text-foreground">Update</RNText>
+                </GlassControl>
               </Pressable>
             ) : null}
 
@@ -264,21 +266,19 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               isAnchoredToRight
               onPressAction={handleMenuAction}
             >
-              <Pressable
-                accessibilityLabel="Filter and sort threads"
-                accessibilityRole="button"
-                className="size-11 items-center justify-center rounded-full bg-subtle"
-              >
-                <SymbolView
-                  name={
-                    hasCustomListOptions
-                      ? "line.3.horizontal.decrease.circle.fill"
-                      : "line.3.horizontal.decrease.circle"
-                  }
-                  size={16}
-                  tintColorClassName={"accent-icon"}
-                  type="monochrome"
-                />
+              <Pressable accessibilityLabel="Filter and sort threads" accessibilityRole="button">
+                <GlassControl className="size-11 items-center justify-center" radius={22}>
+                  <SymbolView
+                    name={
+                      hasCustomListOptions
+                        ? "line.3.horizontal.decrease.circle.fill"
+                        : "line.3.horizontal.decrease.circle"
+                    }
+                    size={16}
+                    tintColorClassName={"accent-icon"}
+                    type="monochrome"
+                  />
+                </GlassControl>
               </Pressable>
             </ControlPillMenu>
             {/* Built identically to the filter button so the two circles
@@ -288,14 +288,15 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               accessibilityLabel="Open settings"
               accessibilityRole="button"
               onPress={props.onOpenSettings}
-              className="size-11 items-center justify-center rounded-full bg-subtle"
             >
-              <SymbolView
-                name="gearshape"
-                size={18}
-                tintColorClassName={"accent-icon"}
-                type="monochrome"
-              />
+              <GlassControl className="size-11 items-center justify-center" radius={22}>
+                <SymbolView
+                  name="gearshape"
+                  size={18}
+                  tintColorClassName={"accent-icon"}
+                  type="monochrome"
+                />
+              </GlassControl>
             </Pressable>
           </View>
 

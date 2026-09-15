@@ -28,6 +28,7 @@ import {
   toNativeMenuActions,
 } from "./AndroidAnchoredMenu";
 import { SymbolView } from "./AppSymbol";
+import { GlassControl } from "./GlassControl";
 import { AppText as Text } from "./AppText";
 
 const ThemedMenuView = withUniwind(
@@ -101,12 +102,15 @@ export function ControlPill(props: {
 
   const isCircle =
     variant === "circle" || variant === "danger" || (variant === "primary" && !props.label);
+  // Neutral pills sit on glass; primary and danger keep their solid fills.
+  const usesGlass = variant === "circle" || variant === "pill";
+  const layoutClassName = isCircle
+    ? "h-11 w-11 items-center justify-center rounded-full"
+    : variant === "primary"
+      ? "h-11 flex-row items-center justify-center gap-2 rounded-full px-5"
+      : "h-11 flex-row items-center justify-center gap-2 rounded-full px-3.5";
   const containerClassName = cn(
-    isCircle
-      ? "h-11 w-11 items-center justify-center rounded-full"
-      : variant === "primary"
-        ? "h-11 flex-row items-center justify-center gap-2 rounded-full px-5"
-        : "h-11 flex-row items-center justify-center gap-2 rounded-full px-3.5",
+    layoutClassName,
     variant === "primary"
       ? props.disabled
         ? "bg-subtle-strong"
@@ -125,16 +129,8 @@ export function ControlPill(props: {
       : "",
   );
 
-  return (
-    <Pressable
-      accessibilityLabel={props.accessibilityLabel ?? props.label}
-      accessibilityRole="button"
-      onPress={props.activateOnPressIn ? handlePress : props.onPress}
-      onPressIn={props.activateOnPressIn ? handlePressIn : undefined}
-      onPressOut={props.activateOnPressIn ? handlePressOut : undefined}
-      disabled={props.disabled}
-      className={containerClassName}
-    >
+  const content = (
+    <>
       {props.iconNode ? (
         <View className="h-4 w-4 items-center justify-center">{props.iconNode}</View>
       ) : props.icon ? (
@@ -146,6 +142,28 @@ export function ControlPill(props: {
         />
       ) : null}
       {props.label ? <Text className={labelClassName}>{props.label}</Text> : null}
+    </>
+  );
+  const pressableProps = {
+    accessibilityLabel: props.accessibilityLabel ?? props.label,
+    accessibilityRole: "button" as const,
+    onPress: props.activateOnPressIn ? handlePress : props.onPress,
+    onPressIn: props.activateOnPressIn ? handlePressIn : undefined,
+    onPressOut: props.activateOnPressIn ? handlePressOut : undefined,
+    disabled: props.disabled,
+  };
+  if (usesGlass) {
+    return (
+      <Pressable {...pressableProps}>
+        <GlassControl className={cn(layoutClassName, props.className)} radius={22}>
+          {content}
+        </GlassControl>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable {...pressableProps} className={containerClassName}>
+      {content}
     </Pressable>
   );
 }

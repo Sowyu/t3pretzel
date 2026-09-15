@@ -55,7 +55,11 @@ import {
 } from "../../components/ComposerToolbar";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { ComposerAttachmentButton } from "../../components/ComposerAttachmentButton";
-import { ComposerStashButton, ComposerStashPanel } from "./ComposerStashControl";
+import {
+  ComposerStashButton,
+  ComposerStashPanel,
+  useComposerStashJoin,
+} from "./ComposerStashControl";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { composerStripAttachments } from "../../lib/composerImages";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
@@ -187,6 +191,7 @@ export function NewTaskDraftScreen(props: {
   readonly incomingShareId?: string;
 }) {
   const projects = useProjects();
+  const stashJoin = useComposerStashJoin();
   const flow = useNewTaskFlow();
   const navigation = useNavigation();
   const {
@@ -1611,6 +1616,7 @@ export function NewTaskDraftScreen(props: {
       {flow.draftKey ? <ComposerStashPanel draftKey={flow.draftKey} /> : null}
       <ComposerSurface
         style={{
+          ...stashJoin,
           borderRadius: 26,
           minHeight: 140,
           overflow: "hidden",

@@ -109,14 +109,14 @@ export function GlassSurface({
         {...props}
         ref={ref}
         className={borderClassName}
-        style={[surfaceStyle, shapeOf(flattened)]}
+        style={[surfaceStyle, layoutOf(flattened)]}
       >
         <LiquidGlassView
           glassType="regular"
           glassTintColor={fallbackColor === undefined ? undefined : String(fallbackColor)}
           glassOpacity={isDarkMode ? 0.55 : 0.4}
           isInteractive={false}
-          style={style}
+          style={contentOf(flattened)}
         >
           {children}
         </LiquidGlassView>
@@ -136,18 +136,46 @@ export function GlassSurface({
 export const supportsLiquidGlass = Platform.OS === "android" && Platform.Version >= 33;
 
 /** The corner radii of a style, so the clipping wrapper matches the glass shape. */
-function shapeOf(flattened: ViewStyle | undefined): ViewStyle {
+const LAYOUT_STYLE_KEYS = [
+  "borderRadius",
+  "borderTopLeftRadius",
+  "borderTopRightRadius",
+  "borderBottomLeftRadius",
+  "borderBottomRightRadius",
+  "margin",
+  "marginTop",
+  "marginBottom",
+  "marginLeft",
+  "marginRight",
+  "marginHorizontal",
+  "marginVertical",
+  "alignSelf",
+  "width",
+  "minWidth",
+  "maxWidth",
+  "flex",
+  "flexGrow",
+  "flexShrink",
+] as const;
+
+// The wrapper View is what the parent lays out, so the shape, margins and
+// sizing move onto it; the glass node inside only keeps padding and content.
+function layoutOf(flattened: ViewStyle | undefined): ViewStyle {
   if (!flattened) return {};
-  const shape: ViewStyle = {};
-  for (const key of [
-    "borderRadius",
-    "borderTopLeftRadius",
-    "borderTopRightRadius",
-    "borderBottomLeftRadius",
-    "borderBottomRightRadius",
-  ] as const) {
+  const layout: Record<string, unknown> = {};
+  for (const key of LAYOUT_STYLE_KEYS) {
     const value = flattened[key];
-    if (value !== undefined) shape[key] = value;
+    if (value !== undefined) layout[key] = value;
   }
-  return shape;
+  return layout as ViewStyle;
+}
+
+function contentOf(flattened: ViewStyle | undefined): ViewStyle {
+  if (!flattened) return {};
+  const content: Record<string, unknown> = { ...flattened };
+  for (const key of LAYOUT_STYLE_KEYS) {
+    if (key.startsWith("border")) continue;
+    delete content[key];
+  }
+  return content as ViewStyle;
 }

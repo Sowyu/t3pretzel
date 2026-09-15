@@ -169,6 +169,22 @@ function StashRow(props: {
 }
 
 /**
+ * Corner overrides for the composer under the stash tab: the tab sits on the
+ * composer's top-right corner, so that corner goes square; with the list open
+ * the whole top edge is covered, so both top corners go square.
+ */
+export function useComposerStashJoin(): {
+  readonly borderTopRightRadius?: number;
+  readonly borderTopLeftRadius?: number;
+} {
+  const entries = usePromptStash();
+  const listOpen = usePromptStashListOpen();
+  if (listOpen) return { borderTopLeftRadius: 0, borderTopRightRadius: 0 };
+  if (entries.length > 0) return { borderTopRightRadius: 0 };
+  return {};
+}
+
+/**
  * The desktop composer's stash tab, attached to the top of the composer: a
  * "Stash · N" row that opens the list of stashed prompts in place. Tap a row to
  * restore it, the cross to forget it.
@@ -212,7 +228,7 @@ export function ComposerStashPanel(props: { readonly draftKey: string }) {
   if (entries.length === 0 && !listOpen) return null;
 
   return (
-    <View className="items-end px-2">
+    <View className={listOpen ? "items-stretch" : "items-end px-2"}>
       {/* Same material as the composer and its popover: native glass on iOS 26,
           a backdrop blur on Android 12 and later, a solid card below that. */}
       <GlassSurface
@@ -224,9 +240,8 @@ export function ComposerStashPanel(props: { readonly draftKey: string }) {
           borderRadius: 18,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
-          marginBottom: -8,
-          paddingBottom: 8,
-          minWidth: listOpen ? "100%" : undefined,
+          marginBottom: -10,
+          paddingBottom: 10,
         }}
       >
         <Pressable
