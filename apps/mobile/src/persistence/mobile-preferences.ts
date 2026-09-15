@@ -18,6 +18,8 @@ const PREFERENCES_FALLBACK_KEY = "t3code.preferences.fallback";
 export interface Preferences {
   readonly liveActivitiesEnabled?: boolean;
   readonly themeId?: MobileThemeId;
+  /** Periodic headless shell refresh. Unset means on; see `background-refresh.ts`. */
+  readonly backgroundRefreshEnabled?: boolean;
   readonly lightThemeId?: MobileThemeId;
   readonly darkThemeId?: MobileThemeId;
   readonly themeMode?: MobileThemeMode;
@@ -90,6 +92,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     themeId?: MobileThemeId;
     lightThemeId?: MobileThemeId;
     darkThemeId?: MobileThemeId;
+    backgroundRefreshEnabled?: boolean;
     themeMode?: MobileThemeMode;
     materialYouStyleLayoutEnabled?: boolean;
     baseFontSize?: number;
@@ -114,6 +117,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     typeof parsed.themeId === "string" &&
     (MOBILE_THEME_IDS as readonly string[]).includes(parsed.themeId)
   ) {
+  if (typeof parsed.backgroundRefreshEnabled === "boolean") {
+    preferences.backgroundRefreshEnabled = parsed.backgroundRefreshEnabled;
+  }
     preferences.themeId = parsed.themeId as MobileThemeId;
   }
   if (

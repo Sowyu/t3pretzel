@@ -399,6 +399,9 @@ const config: ExpoConfig = {
     ],
     "expo-secure-store",
     "expo-sqlite",
+    // Android needs nothing here (autolinking registers the WorkManager worker);
+    // the plugin adds the iOS background-processing mode and task identifier.
+    "expo-background-task",
     ...(isIosPersonalTeamBuild
       ? [sharingPlugin]
       : ["./plugins/withShareExtensionDisplayName.cjs", sharingPlugin]),

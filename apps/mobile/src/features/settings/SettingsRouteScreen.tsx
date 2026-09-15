@@ -20,6 +20,14 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import { backgroundRefreshSummaryLabel } from "../../connection/background-refresh-plan";
+import {
+  backgroundRefreshEnabled,
+  backgroundRefreshRecordSnapshot,
+  reconcileBackgroundRefreshRegistration,
+  subscribeBackgroundRefreshRecord,
+} from "../../connection/background-refresh";
+import { relativeTime } from "../../lib/time";
 import { supportsAgentAwarenessPush } from "../agent-awareness/capabilities";
 import {
   openAndroidLiveUpdateSettings,
@@ -730,6 +738,44 @@ function AutoSettleSettingsRows() {
 }
 
 /**
+ * The periodic headless shell refresh. Android decides when the worker actually
+ * runs, so the row reports the last completed run rather than a schedule.
+ */
+function BackgroundRefreshRow() {
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const enabled = AsyncResult.isSuccess(preferences)
+    ? backgroundRefreshEnabled(preferences.value)
+    : true;
+  const record = useSyncExternalStore(
+    subscribeBackgroundRefreshRecord,
+    backgroundRefreshRecordSnapshot,
+    backgroundRefreshRecordSnapshot,
+  );
+
+  const subtitle = !enabled
+    ? "Off"
+    : record === null
+      ? "Waiting for the first run"
+      : `${backgroundRefreshSummaryLabel(record)} · ${relativeTime(
+          new Date(record.finishedAtMs).toISOString(),
+        )} ago`;
+
+  return (
+    <SettingsSwitchRow
+      icon="arrow.clockwise"
+      label="Background refresh"
+      subtitle={subtitle}
+      value={enabled}
+      onValueChange={(value) => {
+        savePreferences({ backgroundRefreshEnabled: value });
+        void reconcileBackgroundRefreshRegistration(value);
+      }}
+    />
+  );
+}
+
+/**
  * Device-local legacy toggles. Mobile has no client-settings sync, so this is
  * the counterpart of web's Settings → General → Legacy features backed by
  * mobile preferences.
@@ -854,6 +900,7 @@ function AppSettingsSection() {
 
   return (
     <SettingsSection title="App">
+      <BackgroundRefreshRow />
       <SettingsRow icon="internaldrive" label="Client Storage" target="SettingsClientStorage" />
       <SettingsRow icon="stethoscope" label="Diagnostics" target="SettingsDiagnostics" />
       <SettingsRow
