@@ -22,6 +22,7 @@ import {
   createNativeMailSearchToolbarItem,
   NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED,
 } from "../layout/native-mail-search-toolbar";
+import { useNightlyUpdater } from "../updates/nightly-updater-runtime";
 import type { HomeProjectSortOrder } from "./homeThreadList";
 import { WorkspaceConnectionTitle } from "./WorkspaceConnectionTitle";
 import {
@@ -71,6 +72,8 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
   const { materialYouStyleLayoutActive } = useAppearancePreferences();
   const insets = useSafeAreaInsets();
   const stageLabel = resolveMobileStageLabel(Constants.expoConfig?.extra?.appVariant);
+  // Also where the nightly updater starts: this header mounts with the app.
+  const nightly = useNightlyUpdater();
   // Thread List v2 lays the list out in fixed creation order, so the
   // sort/group filter controls would be silently ignored — hide them and
   // key the "customized" icon state off the environment filter alone.
@@ -244,6 +247,17 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
                 </View>
               }
             />
+
+            {nightly.state.kind === "available" ? (
+              <Pressable
+                accessibilityLabel={`Update to ${nightly.state.update.title}`}
+                accessibilityRole="button"
+                className="h-11 items-center justify-center rounded-full bg-subtle px-3.5"
+                onPress={nightly.update}
+              >
+                <RNText className="text-[13px] font-t3-medium text-foreground">Update</RNText>
+              </Pressable>
+            ) : null}
 
             <ControlPillMenu
               actions={menuActions}

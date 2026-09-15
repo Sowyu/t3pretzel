@@ -27,6 +27,9 @@ import { useMobileNavigationTheme } from "./lib/useMobileNavigationTheme";
 import { SubscriptionUsageCoordinator } from "./widgets/SubscriptionUsageCoordinator";
 
 import "../global.css";
+// Registers the prompt stash as an attachment owner before any file sweep can
+// run; the composer that otherwise loads it may not have rendered yet.
+import "./state/prompt-stash-actions";
 
 if (process.env.EXPO_PUBLIC_SHOWCASE === "1") {
   prepareNativeShowcaseCapture();

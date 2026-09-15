@@ -782,6 +782,30 @@ function signedOutAttachmentOwners() {
   ]);
 }
 
+interface ComposerAttachmentOwnerSource {
+  /** Loads the store, so an unhydrated one is never mistaken for an empty one. */
+  readonly hydrate: () => Promise<void>;
+  readonly owners: () => ReadonlyArray<{
+    readonly attachments: ReadonlyArray<DraftComposerAttachment>;
+  }>;
+}
+
+const extraAttachmentOwnerSources = new Set<ComposerAttachmentOwnerSource>();
+
+/**
+ * Registers a store outside the drafts atom that also owns attachment files
+ * (the prompt stash). Its attachments count as referenced, so the unused-file
+ * sweep leaves their bytes alone. Sources register at module load; the sweep
+ * hydrates them before it reads their owners.
+ */
+export function registerComposerAttachmentOwnerSource(source: ComposerAttachmentOwnerSource): void {
+  extraAttachmentOwnerSources.add(source);
+}
+
+function extraAttachmentOwners() {
+  return [...extraAttachmentOwnerSources].flatMap((source) => source.owners());
+}
+
 /** Clipboard fragments can refer to a local file that has not finished uploading yet. */
 export function findLocalComposerClipboardAttachment(
   environmentId: EnvironmentId,
@@ -810,7 +834,12 @@ function isComposerAttachmentFileReferenced(fileUri: string): boolean {
   const queuedMessages = Object.values(
     appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
   ).flat();
-  return [...drafts, ...queuedMessages, ...signedOutAttachmentOwners()].some((owner) =>
+  return [
+    ...drafts,
+    ...queuedMessages,
+    ...signedOutAttachmentOwners(),
+    ...extraAttachmentOwners(),
+  ].some((owner) =>
     owner.attachments.some(
       (attachment) =>
         attachment.fileUri !== undefined &&
@@ -827,7 +856,12 @@ function isComposerAttachmentUploadReferenced(
   const queuedMessages = Object.values(
     appAtomRegistry.get(threadOutboxManager.queuedMessagesByThreadKeyAtom),
   ).flat();
-  return [...drafts, ...queuedMessages, ...signedOutAttachmentOwners()].some((owner) =>
+  return [
+    ...drafts,
+    ...queuedMessages,
+    ...signedOutAttachmentOwners(),
+    ...extraAttachmentOwners(),
+  ].some((owner) =>
     owner.attachments.some(
       (attachment) =>
         attachment.uploadEnvironmentId === environmentId &&
@@ -873,6 +907,10 @@ export async function releaseUnusedComposerAttachmentFiles(
     return;
   }
   await flushThreadOutbox();
+  // Same reason as the drafts hydration above: a stash that has not loaded yet
+  // looks like it owns nothing, and its files would all read as unused. A
+  // failed load rejects here, which skips the sweep rather than guessing.
+  await Promise.all([...extraAttachmentOwnerSources].map((source) => source.hydrate()));
 
   const allFilesReferenced = [...candidates].every(isComposerAttachmentFileReferenced);
   const allUploadsReferenced = [...uploadCandidates].every(([environmentId, attachmentIds]) =>

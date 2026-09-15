@@ -26,6 +26,11 @@ jobs:
     env:
       APP_VARIANT: nightly
       T3CODE_MOBILE_UPDATES_ENABLED: "0"
+      # Build identity the in-app nightly updater compares against the release.
+      # The run number only ever increases, so Android accepts each nightly as
+      # an update of the last.
+      T3CODE_ANDROID_VERSION_CODE: ${{ github.run_number }}
+      T3CODE_BUILD_COMMIT: ${{ github.sha }}
       # Public identifiers of the production T3 Connect deployment, the same
       # values .env.example carries. Not secrets.
       T3CODE_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsudDMuY29kZXMk

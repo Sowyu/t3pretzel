@@ -1,3 +1,6 @@
+import * as NodeChildProcess from "node:child_process";
+import * as NodeURL from "node:url";
+
 import type { ExpoConfig } from "expo/config";
 
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
@@ -9,6 +12,12 @@ const repoEnv = loadRepoEnv();
 Object.assign(process.env, repoEnv);
 
 const APP_VARIANT = resolveAppVariant(repoEnv.APP_VARIANT);
+const ANDROID_VERSION_CODE = resolveAndroidVersionCode(repoEnv.T3CODE_ANDROID_VERSION_CODE);
+// The nightly in-app updater compares these three against the GitHub release it
+// finds, so they must describe the running binary and nothing else.
+const BUILD_COMMIT = resolveBuildCommit(repoEnv.T3CODE_BUILD_COMMIT);
+const BUILT_AT = resolveBuiltAt(repoEnv.T3CODE_BUILD_TIME);
+const UPDATE_REPOSITORY = repoEnv.T3CODE_UPDATE_REPOSITORY ?? "Sowyu/t3pretzel";
 const isIosPersonalTeamBuild = repoEnv.T3CODE_IOS_PERSONAL_TEAM === "1";
 const runtimeVersionPolicy =
   process.env.MOBILE_VERSION_POLICY ??
@@ -111,6 +120,57 @@ const VARIANT_CONFIG = {
     assets: RELEASE_ASSETS,
   },
 } as const;
+
+function resolveAndroidVersionCode(value: string | undefined): number {
+  const raw = value?.trim();
+  const versionCode = raw ? Number(raw) : 1;
+  if (!Number.isInteger(versionCode) || versionCode < 1) {
+    throw new Error(
+      `T3CODE_ANDROID_VERSION_CODE must be a positive integer; received "${value}". CI sets it from the workflow run number.`,
+    );
+  }
+  return versionCode;
+}
+
+/**
+ * The commit the binary was built from. CI passes it explicitly because the
+ * nightly checkout is detached; a local build reads it from git.
+ */
+function resolveBuildCommit(value: string | undefined): string {
+  const explicit = value?.trim();
+  if (explicit) return explicit;
+  // A source tarball or a shallow export has no git metadata. The updater treats
+  // "unknown" as "never matches a release", so it only ever offers.
+  return runGitFromRepoRoot("git rev-parse HEAD") || "unknown";
+}
+
+function runGitFromRepoRoot(command: string): string {
+  try {
+    return NodeChildProcess.execSync(command, {
+      cwd: NodeURL.fileURLToPath(new URL("../../", import.meta.url)),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * When the source this binary carries was written, as the commit date of HEAD.
+ * Deliberately not `Date.now()`: `extra` feeds the fingerprint runtimeVersion,
+ * so a wall-clock value would give every evaluation of this config a different
+ * runtimeVersion and no published OTA would ever match a binary. The commit date
+ * is also the better reference for the updater — rebuilding an old commit today
+ * should still accept the newer nightly as an update.
+ */
+function resolveBuiltAt(value: string | undefined): string {
+  const explicit = value?.trim();
+  if (explicit) return explicit;
+  const committedAt = runGitFromRepoRoot("git show -s --format=%cI HEAD");
+  // "unknown" parses as NaN; the updater then falls back to comparing commits.
+  return committedAt || "unknown";
+}
 
 function resolveAppVariant(value: string | undefined): AppVariant {
   switch (value) {
@@ -291,6 +351,7 @@ const config: ExpoConfig = {
   android: {
     icon: variant.assets.appIcon,
     package: variant.androidPackage,
+    versionCode: ANDROID_VERSION_CODE,
     ...(repoEnv.T3CODE_ANDROID_GOOGLE_SERVICES_FILE
       ? { googleServicesFile: repoEnv.T3CODE_ANDROID_GOOGLE_SERVICES_FILE }
       : {}),
@@ -447,6 +508,12 @@ const config: ExpoConfig = {
   extra: {
     appVariant: APP_VARIANT,
     iosPersonalTeamBuild: isIosPersonalTeamBuild,
+    build: {
+      commit: BUILD_COMMIT,
+      versionCode: ANDROID_VERSION_CODE,
+      builtAt: BUILT_AT,
+      repository: UPDATE_REPOSITORY,
+    },
     relay: {
       url: repoEnv.T3CODE_RELAY_URL ?? null,
     },

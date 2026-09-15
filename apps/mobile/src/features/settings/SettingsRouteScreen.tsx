@@ -54,6 +54,13 @@ import {
   registerHiddenUpdateTap,
   runAppUpdateCheck,
 } from "../updates/app-updates";
+import {
+  nightlyUpdaterAction,
+  nightlyUpdaterActionLabel,
+  nightlyUpdaterStatusLabel,
+  shortCommit,
+} from "../updates/nightly-updater";
+import { useNightlyUpdater, type NightlyUpdaterBinding } from "../updates/nightly-updater-runtime";
 import { useSavedRemoteConnections } from "../../state/use-remote-environment-registry";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
@@ -759,6 +766,9 @@ function LegacySettingsSection() {
 }
 
 function AppSettingsSection() {
+  // Nightly builds sideload a whole APK from GitHub, so they replace the
+  // expo-updates version row entirely. Every other variant keeps it.
+  const nightly = useNightlyUpdater();
   const [updateState, setUpdateState] = useState<AppUpdateCheckState>("idle");
   const updateInFlight = useRef(false);
   const hiddenUpdateTapCount = useRef(0);
@@ -852,7 +862,9 @@ function AppSettingsSection() {
         target="SettingsOpenSourceLicenses"
       />
       <SettingsRow icon="doc.text" label="Legal" fullScreenTarget="SettingsLegal" />
-      {updateCheckAvailable ? (
+      {nightly.applies ? (
+        <NightlyUpdatesRow nightly={nightly} />
+      ) : updateCheckAvailable ? (
         <Pressable
           accessibilityLabel={`Version ${versionLabel}`}
           accessibilityRole="text"
@@ -865,6 +877,68 @@ function AppSettingsSection() {
         versionRow
       )}
     </SettingsSection>
+  );
+}
+
+/**
+ * The nightly channel's version row: which commit is running, what the updater
+ * is doing, and the one thing the user can do about it.
+ */
+function NightlyUpdatesRow(props: { readonly nightly: NightlyUpdaterBinding }) {
+  const { state } = props.nightly;
+  const statusLabel = nightlyUpdaterStatusLabel(state);
+  const action = nightlyUpdaterAction(state);
+  const label = `Nightly ${shortCommit(props.nightly.commit)}`;
+
+  const runAction = () => {
+    switch (action) {
+      case "check":
+        props.nightly.check();
+        return;
+      // "update" starts the download; "retry" resumes whichever step failed and
+      // falls back to a fresh check when the failure left no update behind.
+      case "update":
+      case "retry":
+        props.nightly.update();
+        return;
+      case "allowInstalls":
+        props.nightly.allowInstalls();
+        return;
+      default:
+        return;
+    }
+  };
+
+  return (
+    <View className="flex-row items-center gap-4 p-4">
+      <SymbolView
+        name="arrow.down.circle"
+        size={22}
+        tintColorClassName={"accent-icon"}
+        type="monochrome"
+        weight="regular"
+      />
+      <View className="min-w-0 flex-1 gap-0.5">
+        <Text className="text-lg text-foreground">{label}</Text>
+        {statusLabel ? (
+          <Text className="text-xs text-foreground-muted/70" numberOfLines={2}>
+            {statusLabel}
+          </Text>
+        ) : null}
+      </View>
+      {action ? (
+        <Pressable
+          accessibilityLabel={nightlyUpdaterActionLabel(action)}
+          accessibilityRole="button"
+          className="rounded-full bg-subtle px-3.5 py-2"
+          onPress={runAction}
+        >
+          <Text className="text-sm font-t3-medium text-foreground">
+            {nightlyUpdaterActionLabel(action)}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 

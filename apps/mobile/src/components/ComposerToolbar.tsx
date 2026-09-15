@@ -271,6 +271,8 @@ export function ComposerToolbarButton(props: {
   readonly maxWidth?: number;
   readonly minWidth?: number;
   readonly onPress?: () => void;
+  /** Secondary action on the same pill. A nested Pressable would swallow it on Android. */
+  readonly onLongPress?: () => void;
   readonly showChevron?: boolean;
   readonly textTransform?: "none" | "uppercase";
   readonly variant?: "default" | "primary" | "danger";
@@ -294,6 +296,7 @@ export function ComposerToolbarButton(props: {
       accessibilityRole="button"
       disabled={props.disabled}
       onPress={props.onPress}
+      onLongPress={props.onLongPress}
       className={cn(
         // Default width cap lives in the class chain (not the inline style)
         // so callers can lift it with max-w-full — flex-filling pills in the
