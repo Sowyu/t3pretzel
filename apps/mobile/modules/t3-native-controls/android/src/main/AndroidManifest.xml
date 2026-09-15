@@ -1,1 +1,8 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    Required by ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS. Without it the
+    system drops the dialog, and the background refresh has no way to ask for
+    the exemption it needs to run at all on most OEM Android builds.
+  -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+</manifest>

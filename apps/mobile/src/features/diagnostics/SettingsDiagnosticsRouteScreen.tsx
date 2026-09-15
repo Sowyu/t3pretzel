@@ -1,11 +1,22 @@
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, View } from "react-native";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
+import {
+  backgroundRefreshRecordSnapshot,
+  backgroundRefreshStatusSnapshot,
+  subscribeBackgroundRefreshRecord,
+  subscribeBackgroundRefreshStatus,
+} from "../../connection/background-refresh";
+import { BACKGROUND_REFRESH_INTERVAL_MINUTES } from "../../connection/background-refresh-plan";
+import {
+  isBatteryOptimizationRestricted,
+  supportsBatteryOptimizationHint,
+} from "../../lib/batteryOptimization";
 import { tryCopyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import {
@@ -104,6 +115,8 @@ export function SettingsDiagnosticsRouteScreen() {
           )}
         </SettingsSection>
 
+        <BackgroundRefreshSection />
+
         <View className="gap-3">
           <SettingsSection title="Actions">
             <Pressable
@@ -131,6 +144,109 @@ export function SettingsDiagnosticsRouteScreen() {
           </Text>
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Why the periodic refresh did or did not happen. Android reports nothing about
+ * a wakeup it decided to skip, so "last run by the system" is the only evidence
+ * that the OS is still honouring the schedule.
+ */
+function BackgroundRefreshSection() {
+  const record = useSyncExternalStore(
+    subscribeBackgroundRefreshRecord,
+    backgroundRefreshRecordSnapshot,
+    backgroundRefreshRecordSnapshot,
+  );
+  const status = useSyncExternalStore(
+    subscribeBackgroundRefreshStatus,
+    backgroundRefreshStatusSnapshot,
+    backgroundRefreshStatusSnapshot,
+  );
+  const [batteryRestricted, setBatteryRestricted] = useState(isBatteryOptimizationRestricted);
+
+  useEffect(() => {
+    if (!supportsBatteryOptimizationHint()) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") setBatteryRestricted(isBatteryOptimizationRestricted());
+    });
+    return () => subscription.remove();
+  }, []);
+
+  return (
+    <SettingsSection title="Background refresh">
+      <DiagnosticsLine
+        first
+        label="Scheduler"
+        value={
+          status === "restricted"
+            ? "Restricted by the system"
+            : `Every ${BACKGROUND_REFRESH_INTERVAL_MINUTES} min at the earliest`
+        }
+      />
+      {supportsBatteryOptimizationHint() ? (
+        <DiagnosticsLine
+          label="Battery"
+          value={batteryRestricted ? "Optimised, so wakeups are deferred" : "Unrestricted"}
+        />
+      ) : null}
+      <DiagnosticsLine
+        label="Last run by the system"
+        value={
+          record === null
+            ? "Unknown"
+            : record.workerRanAtMs === null
+              ? "Never"
+              : new Date(record.workerRanAtMs).toLocaleString()
+        }
+      />
+      {record === null ? (
+        <DiagnosticsLine label="Last run" value="Nothing has run yet" />
+      ) : (
+        <>
+          <DiagnosticsLine
+            label="Last run"
+            value={`${new Date(record.finishedAtMs).toLocaleString()} · ${
+              record.trigger === "worker" ? "system wakeup" : "app resume"
+            } · ${Math.round(record.durationMs / 100) / 10}s`}
+          />
+          {record.error === undefined ? null : (
+            <DiagnosticsLine label="Error" value={record.error} danger />
+          )}
+          {record.environments.map((environment) => (
+            <DiagnosticsLine
+              key={`${environment.label}:${environment.outcome}`}
+              label={environment.label}
+              value={
+                environment.reason === undefined
+                  ? environment.outcome
+                  : `${environment.outcome} · ${environment.reason}`
+              }
+              danger={environment.outcome === "failed"}
+            />
+          ))}
+        </>
+      )}
+    </SettingsSection>
+  );
+}
+
+function DiagnosticsLine(props: {
+  readonly danger?: boolean;
+  readonly first?: boolean;
+  readonly label: string;
+  readonly value: string;
+}) {
+  return (
+    <View className={props.first ? "gap-0.5 p-4" : "gap-0.5 border-t border-border-subtle p-4"}>
+      <Text className="text-xs text-foreground-muted">{props.label}</Text>
+      <Text
+        selectable
+        className={props.danger ? "text-base text-danger-foreground" : "text-base text-foreground"}
+      >
+        {props.value}
+      </Text>
     </View>
   );
 }

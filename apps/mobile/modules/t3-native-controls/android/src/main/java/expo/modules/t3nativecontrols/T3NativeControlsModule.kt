@@ -1,6 +1,12 @@
 package expo.modules.t3nativecontrols
 
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
+import android.util.Log
 import androidx.core.content.FileProvider
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
@@ -66,6 +72,17 @@ class T3NativeControlsModule : Module() {
       appContext.currentActivity?.intent?.getStringExtra("showcaseTheme")
     }
 
+    // Android only wakes an app for periodic work when it is not battery
+    // optimised, which is what makes the background refresh silently stop on
+    // Samsung, Xiaomi, and OnePlus phones.
+    Function("isIgnoringBatteryOptimizations") {
+      isIgnoringBatteryOptimizations()
+    }
+
+    AsyncFunction("requestIgnoreBatteryOptimizations") {
+      requestIgnoreBatteryOptimizations()
+    }
+
     Function("prepareShowcaseCapture") {
       // Android app data is cleared by the host runner before launch.
     }
@@ -76,5 +93,31 @@ class T3NativeControlsModule : Module() {
         ?.resolve("t3-showcase-ready")
         ?.writeText(scene)
     }
+  }
+
+  /** Unknown counts as unrestricted, so the hint never nags somebody we cannot help. */
+  private fun isIgnoringBatteryOptimizations(): Boolean {
+    val context = appContext.reactContext ?: return true
+    val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+    return power?.isIgnoringBatteryOptimizations(context.packageName) ?: true
+  }
+
+  private fun requestIgnoreBatteryOptimizations() {
+    val activity = appContext.currentActivity ?: error("The app is not active.")
+    val request = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+      data = Uri.parse("package:${activity.packageName}")
+    }
+    try {
+      activity.startActivity(request)
+    } catch (error: ActivityNotFoundException) {
+      // Some OEM builds hide the per-app dialog. The optimisation list is always
+      // there and leaves the user one tap from the same switch.
+      Log.i(TAG, "No per-app battery optimisation dialog: ${error.message}")
+      activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+    }
+  }
+
+  private companion object {
+    const val TAG = "T3NativeControls"
   }
 }

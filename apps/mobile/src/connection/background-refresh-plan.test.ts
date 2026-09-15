@@ -7,8 +7,12 @@ import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 
 import {
+  type BackgroundRefreshRecord,
+  backgroundRefreshReason,
+  backgroundRefreshRowSubtitle,
   backgroundRefreshSummaryLabel,
   backgroundRefreshTargets,
+  describeBackgroundRefreshFailure,
   shouldRegisterBackgroundRefresh,
   summarizeBackgroundRefresh,
 } from "./background-refresh-plan";
@@ -62,36 +66,81 @@ describe("shouldRegisterBackgroundRefresh", () => {
   });
 });
 
+const refreshed = { label: "Cloud desktop", outcome: "refreshed" } as const;
+const unreachable = { label: "Cloud desktop", outcome: "failed", reason: "HTTP 401" } as const;
+const unauthorized = {
+  label: "Cloud desktop",
+  outcome: "skipped",
+  reason: "no T3 Connect session",
+} as const;
+
 describe("summarizeBackgroundRefresh", () => {
-  it("counts each outcome and the elapsed time", () => {
-    expect(
-      summarizeBackgroundRefresh({
-        outcomes: ["refreshed", "failed", "skipped", "refreshed"],
-        startedAtMs: 1_000,
-        finishedAtMs: 4_500,
-      }),
-    ).toEqual({
+  it("counts each outcome, the elapsed time, and keeps the detail", () => {
+    const record = summarizeBackgroundRefresh({
+      environments: [refreshed, unreachable, unauthorized, refreshed],
+      startedAtMs: 1_000,
+      finishedAtMs: 4_500,
+      trigger: "worker",
+    });
+    expect(record).toMatchObject({
       finishedAtMs: 4_500,
       durationMs: 3_500,
       refreshed: 2,
       skipped: 1,
       failed: 1,
+      trigger: "worker",
+      workerRanAtMs: 4_500,
     });
+    expect(record.environments).toHaveLength(4);
+    expect(record.error).toBeUndefined();
   });
 
   it("never reports a negative duration when the clock moves back", () => {
     const record = summarizeBackgroundRefresh({
-      outcomes: [],
+      environments: [],
       startedAtMs: 5_000,
       finishedAtMs: 1_000,
+      trigger: "worker",
     });
     expect(record.durationMs).toBe(0);
   });
+
+  it("carries the last worker run across a foreground run", () => {
+    const record = summarizeBackgroundRefresh({
+      environments: [refreshed],
+      startedAtMs: 10_000,
+      finishedAtMs: 11_000,
+      trigger: "foreground",
+      previousWorkerRanAtMs: 900,
+    });
+    expect(record.workerRanAtMs).toBe(900);
+  });
+
+  it("reports no worker run when one has never happened", () => {
+    const record = summarizeBackgroundRefresh({
+      environments: [],
+      startedAtMs: 0,
+      finishedAtMs: 1,
+      trigger: "foreground",
+      error: "no T3 Connect session",
+    });
+    expect(record.workerRanAtMs).toBeNull();
+    expect(record.error).toBe("no T3 Connect session");
+  });
 });
 
-describe("backgroundRefreshSummaryLabel", () => {
-  const base = { finishedAtMs: 0, durationMs: 0, refreshed: 0, skipped: 0, failed: 0 };
+const base: BackgroundRefreshRecord = {
+  finishedAtMs: 0,
+  durationMs: 0,
+  refreshed: 0,
+  skipped: 0,
+  failed: 0,
+  trigger: "worker",
+  workerRanAtMs: 0,
+  environments: [],
+};
 
+describe("backgroundRefreshSummaryLabel", () => {
   it("leads with what was updated", () => {
     expect(backgroundRefreshSummaryLabel({ ...base, refreshed: 2 })).toBe("2 updated");
   });
@@ -109,5 +158,130 @@ describe("backgroundRefreshSummaryLabel", () => {
   it("separates skipped environments from an empty catalog", () => {
     expect(backgroundRefreshSummaryLabel({ ...base, skipped: 1 })).toBe("Nothing to refresh");
     expect(backgroundRefreshSummaryLabel(base)).toBe("No environments");
+  });
+
+  it("says the run failed when nothing was even attempted", () => {
+    expect(backgroundRefreshSummaryLabel({ ...base, error: "ran out of time" })).toBe("Failed");
+  });
+
+  it("still leads with the successes when only part of the run fell over", () => {
+    expect(backgroundRefreshSummaryLabel({ ...base, refreshed: 1, error: "ran out of time" })).toBe(
+      "1 updated",
+    );
+  });
+});
+
+describe("backgroundRefreshReason", () => {
+  it("prefers the run-level error", () => {
+    expect(
+      backgroundRefreshReason({
+        ...base,
+        failed: 1,
+        environments: [unreachable],
+        error: "ran out of time",
+      }),
+    ).toBe("ran out of time");
+  });
+
+  it("falls back to the first failure, then the first skip", () => {
+    expect(
+      backgroundRefreshReason({
+        ...base,
+        skipped: 1,
+        failed: 1,
+        environments: [unauthorized, unreachable],
+      }),
+    ).toBe("HTTP 401");
+    expect(backgroundRefreshReason({ ...base, skipped: 1, environments: [unauthorized] })).toBe(
+      "no T3 Connect session",
+    );
+  });
+
+  it("stays quiet when everything worked", () => {
+    expect(
+      backgroundRefreshReason({ ...base, refreshed: 1, environments: [refreshed] }),
+    ).toBeNull();
+  });
+});
+
+describe("backgroundRefreshRowSubtitle", () => {
+  const subtitle = (record: BackgroundRefreshRecord | null, overrides = {}) =>
+    backgroundRefreshRowSubtitle({
+      enabled: true,
+      status: "available",
+      record,
+      relativeLabel: "12m",
+      ...overrides,
+    });
+
+  it("says off before anything else", () => {
+    expect(subtitle(base, { enabled: false, status: "restricted" })).toBe("Off");
+  });
+
+  it("names a system restriction over the last run", () => {
+    expect(subtitle(base, { status: "restricted" })).toBe("Restricted by the system");
+  });
+
+  it("waits for the first run", () => {
+    expect(subtitle(null)).toBe("Waiting for the first run");
+  });
+
+  it("appends the age of a clean run", () => {
+    expect(subtitle({ ...base, refreshed: 2, environments: [refreshed, refreshed] })).toBe(
+      "2 updated · 12m ago",
+    );
+  });
+
+  it("appends why the run failed", () => {
+    expect(subtitle({ ...base, error: "no T3 Connect session" })).toBe(
+      "Failed · 12m ago · no T3 Connect session",
+    );
+  });
+});
+
+describe("describeBackgroundRefreshFailure", () => {
+  it("names the HTTP status", () => {
+    expect(
+      describeBackgroundRefreshFailure({
+        _tag: "RemoteEnvironmentAuthUndeclaredStatusError",
+        status: 401,
+        message: "Remote environment endpoint … returned undeclared status 401.",
+      }),
+    ).toBe("HTTP 401");
+  });
+
+  it("translates the transport failures", () => {
+    expect(describeBackgroundRefreshFailure({ _tag: "RemoteEnvironmentAuthTimeoutError" })).toBe(
+      "timed out",
+    );
+    expect(describeBackgroundRefreshFailure({ _tag: "RemoteEnvironmentAuthFetchError" })).toBe(
+      "network error",
+    );
+    expect(describeBackgroundRefreshFailure({ _tag: "EnvironmentAuthInvalidError" })).toBe(
+      "sign-in rejected",
+    );
+  });
+
+  it("turns a connection reason into a phrase", () => {
+    expect(
+      describeBackgroundRefreshFailure({
+        _tag: "ConnectionBlockedError",
+        reason: "authentication",
+        detail: "Sign in to T3 Connect to connect this environment.",
+      }),
+    ).toBe("sign-in needed");
+    expect(
+      describeBackgroundRefreshFailure({ _tag: "ConnectionTransientError", reason: "network" }),
+    ).toBe("network error");
+  });
+
+  it("falls back to a shortened message", () => {
+    expect(describeBackgroundRefreshFailure(new Error("Something\n  broke"))).toBe(
+      "Something broke",
+    );
+    expect(describeBackgroundRefreshFailure(new Error("x".repeat(60)))).toBe(
+      `${"x".repeat(47)}\u2026`,
+    );
+    expect(describeBackgroundRefreshFailure(undefined)).toBe("unknown error");
   });
 });

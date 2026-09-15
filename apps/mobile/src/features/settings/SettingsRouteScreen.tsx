@@ -8,7 +8,7 @@ import { SymbolView } from "../../components/AppSymbol";
 import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, View } from "react-native";
+import { Alert, AppState, Linking, Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -20,13 +20,21 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
-import { backgroundRefreshSummaryLabel } from "../../connection/background-refresh-plan";
+import { backgroundRefreshRowSubtitle } from "../../connection/background-refresh-plan";
 import {
   backgroundRefreshEnabled,
   backgroundRefreshRecordSnapshot,
+  backgroundRefreshStatusSnapshot,
   reconcileBackgroundRefreshRegistration,
+  refreshBackgroundRefreshStatus,
   subscribeBackgroundRefreshRecord,
+  subscribeBackgroundRefreshStatus,
 } from "../../connection/background-refresh";
+import {
+  isBatteryOptimizationRestricted,
+  requestUnrestrictedBattery,
+  supportsBatteryOptimizationHint,
+} from "../../lib/batteryOptimization";
 import { relativeTime } from "../../lib/time";
 import { supportsAgentAwarenessPush } from "../agent-awareness/capabilities";
 import {
@@ -739,7 +747,8 @@ function AutoSettleSettingsRows() {
 
 /**
  * The periodic headless shell refresh. Android decides when the worker actually
- * runs, so the row reports the last completed run rather than a schedule.
+ * runs, so the row reports the last completed run and, when the OS is holding
+ * the app back, the one thing the user can do about it.
  */
 function BackgroundRefreshRow() {
   const savePreferences = useAtomSet(updateMobilePreferencesAtom);
@@ -752,26 +761,67 @@ function BackgroundRefreshRow() {
     backgroundRefreshRecordSnapshot,
     backgroundRefreshRecordSnapshot,
   );
+  const status = useSyncExternalStore(
+    subscribeBackgroundRefreshStatus,
+    backgroundRefreshStatusSnapshot,
+    backgroundRefreshStatusSnapshot,
+  );
+  const [batteryRestricted, setBatteryRestricted] = useState(isBatteryOptimizationRestricted);
 
-  const subtitle = !enabled
-    ? "Off"
-    : record === null
-      ? "Waiting for the first run"
-      : `${backgroundRefreshSummaryLabel(record)} · ${relativeTime(
-          new Date(record.finishedAtMs).toISOString(),
-        )} ago`;
+  // Granting the exemption happens in the system settings app, so the answer
+  // only ever changes while this screen is away.
+  useEffect(() => {
+    if (!supportsBatteryOptimizationHint()) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      setBatteryRestricted(isBatteryOptimizationRestricted());
+      void refreshBackgroundRefreshStatus();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const subtitle = backgroundRefreshRowSubtitle({
+    enabled,
+    status,
+    record,
+    relativeLabel: record === null ? "" : relativeTime(new Date(record.finishedAtMs).toISOString()),
+  });
 
   return (
-    <SettingsSwitchRow
-      icon="arrow.clockwise"
-      label="Background refresh"
-      subtitle={subtitle}
-      value={enabled}
-      onValueChange={(value) => {
-        savePreferences({ backgroundRefreshEnabled: value });
-        void reconcileBackgroundRefreshRegistration(value);
-      }}
-    />
+    <>
+      <SettingsSwitchRow
+        icon="arrow.clockwise"
+        label="Background refresh"
+        subtitle={subtitle}
+        value={enabled}
+        onValueChange={(value) => {
+          savePreferences({ backgroundRefreshEnabled: value });
+          void reconcileBackgroundRefreshRegistration(value);
+        }}
+      />
+      {enabled && batteryRestricted ? (
+        <Pressable
+          accessibilityLabel="Allow unrestricted battery"
+          accessibilityRole="button"
+          onPress={() => void requestUnrestrictedBattery()}
+          className="flex-row items-center gap-4 border-t border-border-subtle p-4 active:opacity-70"
+        >
+          <SymbolView
+            name="bolt"
+            size={22}
+            tintColorClassName={"accent-icon"}
+            type="monochrome"
+            weight="regular"
+          />
+          <View className="min-w-0 flex-1">
+            <Text className="text-lg text-foreground">Allow unrestricted battery</Text>
+            <Text className="text-sm text-foreground-muted">
+              Android is deferring background work for this app.
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
+    </>
   );
 }
 
