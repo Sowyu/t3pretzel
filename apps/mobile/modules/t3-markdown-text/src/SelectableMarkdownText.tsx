@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { parseMarkdownWithOptions } from "react-native-nitro-markdown/headless";
 
 import {
@@ -32,6 +32,10 @@ export type {
   SelectableMarkdownTextProps,
 } from "./SelectableMarkdownText.types";
 
+// About 80 lines of body text per Text: far below the 16384px texture height
+// that Android stops drawing at, even on 3.5x-density screens.
+const ANDROID_MAX_LIST_ITEMS_PER_CHUNK = 40;
+
 export function hasNativeSelectableMarkdownText(): boolean {
   return true;
 }
@@ -59,7 +63,10 @@ export function SelectableMarkdownText({
     const document = preserveSoftBreaks
       ? nativeMarkdownWithPreservedSoftBreaks(parsedDocument)
       : parsedDocument;
-    return nativeMarkdownDocumentChunks(document).map((chunk) =>
+    return nativeMarkdownDocumentChunks(document, {
+      maxListItemsPerChunk:
+        Platform.OS === "android" ? ANDROID_MAX_LIST_ITEMS_PER_CHUNK : undefined,
+    }).map((chunk) =>
       chunk.kind === "selectable"
         ? {
             ...chunk,

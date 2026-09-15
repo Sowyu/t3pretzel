@@ -1,7 +1,7 @@
 import { SymbolView } from "../../components/AppSymbol";
 import { ControlPillMenu } from "../../components/ControlPill";
 import type { MenuAction } from "@react-native-menu/menu";
-import * as Haptics from "expo-haptics";
+import { mediumImpactHaptic } from "../../lib/haptics";
 import {
   createContext,
   use,
@@ -392,7 +392,7 @@ function ThreadSwipeableRow(props: ThreadSwipeableProps) {
   );
   const handleFullSwipeArmedChange = useCallback((armed: boolean) => {
     if (armed && !fullSwipeArmedRef.current) {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      void mediumImpactHaptic();
     }
     fullSwipeArmedRef.current = armed;
   }, []);

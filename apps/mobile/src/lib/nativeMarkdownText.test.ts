@@ -633,6 +633,38 @@ describe("nativeMarkdownListItemBlocks", () => {
 });
 
 describe("nativeMarkdownDocumentChunks", () => {
+  it("splits a long list into bounded chunks that keep their numbering", () => {
+    const items = Array.from({ length: 100 }, (_, index) => ({
+      type: "list_item" as const,
+      children: [
+        {
+          type: "paragraph" as const,
+          children: [{ type: "text" as const, content: `Item ${index + 1}` }],
+        },
+      ],
+    }));
+    const document: MarkdownNode = {
+      type: "document",
+      children: [
+        { type: "heading", level: 2, beg: 0, children: [{ type: "text", content: "Items" }] },
+        { type: "list", ordered: true, start: 1, beg: 10, children: items },
+      ],
+    };
+
+    expect(nativeMarkdownDocumentChunks(document)).toHaveLength(1);
+
+    const chunks = nativeMarkdownDocumentChunks(document, { maxListItemsPerChunk: 40 });
+    expect(chunks.map((chunk) => chunk.key)).toEqual([
+      "selectable:offset:0",
+      "selectable:offset:10:part0",
+      "selectable:offset:10:part1",
+      "selectable:offset:10:part2",
+    ]);
+    const lists = chunks.slice(1).map((chunk) => chunk.node.children?.[0]);
+    expect(lists.map((list) => list?.children?.length)).toEqual([40, 40, 20]);
+    expect(lists.map((list) => list?.start)).toEqual([1, 41, 81]);
+  });
+
   it("renders plain blockquotes as rich blocks so their marker spans wrapped lines", () => {
     const blockquote: MarkdownNode = {
       type: "blockquote",

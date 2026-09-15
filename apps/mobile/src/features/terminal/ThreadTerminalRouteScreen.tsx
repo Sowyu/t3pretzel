@@ -18,6 +18,7 @@ import {
   KeyboardStickyView,
   useKeyboardState,
 } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AndroidHeaderIconButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import {
@@ -49,6 +50,8 @@ import {
 import { useThreadSelection } from "../../state/use-thread-selection";
 import { useSelectedThreadDetail } from "../../state/use-thread-detail";
 import { EnvironmentConnectionNotice } from "../connection/EnvironmentConnectionNotice";
+import { isAndroidKeyboardAnimationUsable } from "../keyboard/androidKeyboardRecovery";
+import { useAndroidKeyboardRecovery } from "../keyboard/useAndroidKeyboardRecovery";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import { TerminalSurface } from "./NativeTerminalSurface";
 import { getMobileTerminalTheme } from "./terminalTheme";
@@ -514,9 +517,19 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     height: state.height,
     isVisible: state.isVisible,
   }));
-  const isAccessoryVisible = keyboardState.isVisible && !isAccessoryDismissed;
+  const insets = useSafeAreaInsets();
+  const { isQuarantined: isKeyboardStateQuarantined, markInputFocused } =
+    useAndroidKeyboardRecovery();
+  const isKeyboardAnimationUsable = isAndroidKeyboardAnimationUsable({
+    isKeyboardVisible: keyboardState.isVisible,
+    isQuarantined: isKeyboardStateQuarantined,
+  });
+  const isAccessoryVisible = isKeyboardAnimationUsable && !isAccessoryDismissed;
+  // With the keyboard up its height already clears the gesture bar and the
+  // home indicator; with it down the terminal owns the bottom edge, so the
+  // last rows need the safe area or they scroll under the system chrome.
   const terminalBottomInset =
-    (keyboardState.isVisible ? keyboardState.height : 0) +
+    (isKeyboardAnimationUsable ? keyboardState.height : insets.bottom) +
     (isAccessoryVisible ? TERMINAL_ACCESSORY_HEIGHT : 0);
 
   useEffect(() => {
@@ -1183,11 +1196,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   accessibilityLabel={
                     panes.primarySidebarVisible ? "Maximize terminal" : "Show threads"
                   }
-                  icon={
-                    panes.primarySidebarVisible
-                      ? "arrow.up.left.and.arrow.down.right"
-                      : "sidebar.left"
-                  }
+                  icon="sidebar.left"
                   onPress={togglePrimarySidebar}
                 />
               ) : null}
@@ -1328,6 +1337,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                 }}
                 onInput={handleInput}
                 onResize={handleResize}
+                onTerminalFocus={markInputFocused}
                 style={{ flex: 1 }}
                 terminalKey={terminalKey}
                 theme={terminalTheme}
@@ -1348,6 +1358,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
             ) : null}
             {isAccessoryVisible ? (
               <KeyboardStickyView
+                enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
                 style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
                 offset={{ closed: 0, opened: 0 }}
               >
@@ -1396,13 +1407,13 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   </ComposerToolbarRow>
                 </View>
               </KeyboardStickyView>
-            ) : !keyboardState.isVisible ? (
+            ) : !isKeyboardAnimationUsable ? (
               <Pressable
                 accessibilityLabel="Show keyboard"
                 accessibilityRole="button"
                 onPress={handleShowKeyboard}
                 style={({ pressed }) => ({
-                  bottom: 16,
+                  bottom: Math.max(insets.bottom, 16) + 16,
                   borderRadius: 28,
                   opacity: pressed ? 0.72 : 1,
                   position: "absolute",

@@ -450,19 +450,50 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     projectSettings.sources.defaultThreadEnvMode === "project"
       ? projectSettings.settings.defaultThreadEnvMode
       : undefined;
-  const defaultWorkspaceMode: WorkspaceMode = resolveDefaultThreadEnvMode({
+  // The ref actually checked out in the project root, serialized onto new
+  // local threads. It comes from the live status stream rather than listRefs'
+  // `current` flag, which is served from a cache that can lag an out-of-band
+  // `git switch` by minutes — and from the same value the PR badge compares
+  // against. Detached HEAD and non-repository projects report no ref, so this
+  // stays null instead of fabricating a branch. The status family is
+  // deduplicated per (environmentId, cwd) with the thread rows.
+  const projectGitStatus = useEnvironmentQuery(
+    // `|| null` also skips the stand-in project's empty workspaceRoot.
+    selectedProject && selectedProject.workspaceRoot
+      ? vcsEnvironment.status({
+          environmentId: selectedProject.environmentId,
+          input: { cwd: selectedProject.workspaceRoot },
+        })
+      : null,
+  );
+  const currentCheckoutBranchName = projectGitStatus.data?.refName ?? null;
+  const configuredWorkspaceMode: WorkspaceMode = resolveDefaultThreadEnvMode({
     projectSetting: projectThreadEnvMode,
     projectFile: t3ProjectFileDefaultMode,
     globalDefault: projectSettings.settings.defaultThreadEnvMode,
   });
+  // A worktree needs a git repository. Web falls back to the current checkout
+  // for non-git projects (resolveSendEnvMode); without the same fallback the
+  // draft sits on "New worktree" with no branch to pick and Start stays disabled.
+  const projectIsRepo = projectGitStatus.data?.isRepo ?? null;
+  const defaultWorkspaceMode: WorkspaceMode =
+    configuredWorkspaceMode === "worktree" && projectIsRepo === false
+      ? "local"
+      : configuredWorkspaceMode;
   // While unsettled the resolved default is provisional. Nothing may write
   // it into the draft during that window (the auto-branch effect does), or
-  // the frozen interim value beats the t3.json default once it loads.
-  const defaultWorkspaceModeSettled = isDefaultThreadEnvModeSettled({
-    explicitMode: selectedProjectDraft.workspaceSelection?.mode,
-    projectSetting: projectThreadEnvMode,
-    projectFilePending: t3ProjectFileQuery.isPending,
-  });
+  // the frozen interim value beats the t3.json default once it loads. A
+  // worktree default also waits for the repository check that can demote it.
+  const defaultWorkspaceModeSettled =
+    isDefaultThreadEnvModeSettled({
+      explicitMode: selectedProjectDraft.workspaceSelection?.mode,
+      projectSetting: projectThreadEnvMode,
+      projectFilePending: t3ProjectFileQuery.isPending,
+    }) &&
+    (selectedProjectDraft.workspaceSelection?.mode !== undefined ||
+      configuredWorkspaceMode !== "worktree" ||
+      projectIsRepo !== null ||
+      projectGitStatus.error !== null);
   const workspaceMode = selectedProjectDraft.workspaceSelection?.mode ?? defaultWorkspaceMode;
   const selectedBranchName = selectedProjectDraft.workspaceSelection?.branch ?? null;
   const selectedWorktreePath = selectedProjectDraft.workspaceSelection?.worktreePath ?? null;
@@ -659,23 +690,6 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       ),
     [allBranchRefs],
   );
-  // The ref actually checked out in the project root, serialized onto new
-  // local threads. It comes from the live status stream rather than listRefs'
-  // `current` flag, which is served from a cache that can lag an out-of-band
-  // `git switch` by minutes — and from the same value the PR badge compares
-  // against. Detached HEAD and non-repository projects report no ref, so this
-  // stays null instead of fabricating a branch. The status family is
-  // deduplicated per (environmentId, cwd) with the thread rows.
-  const projectGitStatus = useEnvironmentQuery(
-    branchTarget.environmentId !== null && branchTarget.cwd !== null
-      ? vcsEnvironment.status({
-          environmentId: branchTarget.environmentId,
-          input: { cwd: branchTarget.cwd },
-        })
-      : null,
-  );
-  const currentCheckoutBranchName = projectGitStatus.data?.refName ?? null;
-
   const filteredBranches = useMemo(() => {
     const query = branchQuery.trim().toLowerCase();
     if (query.length === 0) {

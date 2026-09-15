@@ -19,7 +19,7 @@ import {
   createNativeStackNavigator,
   type NativeStackNavigationProp,
 } from "@react-navigation/native-stack";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import {
   createContext,
   use,
@@ -378,13 +378,11 @@ type ThreadSettingsSessionValue = {
   readonly displayedDescriptors: ReadonlyArray<ProviderOptionDescriptor>;
   readonly providerExpansionOverrides: ReadonlySet<string>;
   readonly hasLegacyModels: boolean;
-  readonly pendingModel: ModelOption | null;
+  readonly initialProviderKey: string | null;
   readonly providerFilter: string | null;
   readonly searchQuery: string;
   readonly showLegacy: boolean;
   readonly applyOptionChange: (id: string, value: string | boolean) => void;
-  readonly commitPendingModel: () => boolean;
-  readonly isApplied: (option: ModelOption) => boolean;
   readonly isDisplayed: (option: ModelOption) => boolean;
   readonly pressModel: (option: ModelOption) => void;
   readonly setProviderFilter: (providerKey: string | null) => void;
@@ -406,6 +404,12 @@ function ThreadSettingsSessionProvider(
     () => new Set(),
   );
   const [pendingModel, setPendingModel] = useState<ModelOption | null>(null);
+  // Picks apply while the picker stays open, so the applied selection can move
+  // between providers mid-session. Disclosure defaults stay on the provider the
+  // picker opened with so no section folds up under the user's finger.
+  const [initialProviderKey] = useState<string | null>(
+    () => props.selectedModel?.instanceId ?? null,
+  );
 
   const isApplied = useCallback(
     (option: ModelOption) =>
@@ -413,15 +417,15 @@ function ThreadSettingsSessionProvider(
       option.selection.model === props.selectedModel.model,
     [props.selectedModel],
   );
-  // The list highlights the staged pick; Save turns it into the applied one.
+  // A tap highlights at once; the applied selection catches up a frame later.
   const isDisplayed = useCallback(
     (option: ModelOption) => (pendingModel ? option.key === pendingModel.key : isApplied(option)),
     [isApplied, pendingModel],
   );
 
-  // While a model is staged, the settings rows describe and edit the staged
-  // model's options (kept on its pending selection); Save applies model and
-  // options together. Otherwise they edit the applied selection directly.
+  // A staged model is not applied yet, so the settings rows describe and edit
+  // its own pending selection. Once it applies, which is normally the next
+  // frame, the rows edit the applied selection directly.
   const displayedDescriptors = useMemo(
     () =>
       pendingModel
@@ -439,20 +443,20 @@ function ThreadSettingsSessionProvider(
     () => props.providerGroups.some((group) => group.models.some((model) => model.isLegacy)),
     [props.providerGroups],
   );
-  const commitPendingModel = useCallback(() => {
-    if (pendingModel) {
-      if (!canCommitPendingModel(pendingModel, props.providerGroups)) {
-        Alert.alert(
-          "Model unavailable",
-          "Set up this provider on web or desktop, or select another model.",
-        );
-        return false;
+  // A pick applies on tap, never on Done. A model the catalog cannot commit yet
+  // stays staged and applies as soon as it becomes committable, so no choice is
+  // stranded behind a button.
+  const stageOrApply = useCallback(
+    (next: ModelOption | null) => {
+      if (next && canCommitPendingModel(next, props.providerGroups)) {
+        setPendingModel(null);
+        props.onSelectModel(next);
+        return;
       }
-      void Haptics.selectionAsync();
-      props.onSelectModel(pendingModel);
-    }
-    return true;
-  }, [pendingModel, props.onSelectModel, props.providerGroups]);
+      setPendingModel(next);
+    },
+    [props.onSelectModel, props.providerGroups],
+  );
 
   const applyOptionChange = useCallback(
     (id: string, value: string | boolean) => {
@@ -461,15 +465,12 @@ function ThreadSettingsSessionProvider(
         return;
       }
       if (pendingModel) {
-        setPendingModel({
-          ...pendingModel,
-          selection: { ...pendingModel.selection, options: next },
-        });
+        stageOrApply({ ...pendingModel, selection: { ...pendingModel.selection, options: next } });
       } else {
         props.onUpdateOptionSelections(next);
       }
     },
-    [displayedDescriptors, pendingModel, props.onUpdateOptionSelections],
+    [displayedDescriptors, pendingModel, props.onUpdateOptionSelections, stageOrApply],
   );
 
   const toggleProvider = useCallback((providerKey: string) => {
@@ -484,16 +485,16 @@ function ThreadSettingsSessionProvider(
 
   const pressModel = useCallback(
     (option: ModelOption) => {
-      void Haptics.selectionAsync();
-      setPendingModel((current) =>
+      void selectionHaptic();
+      stageOrApply(
         pendingModelAfterPress({
-          current,
+          current: pendingModel,
           pressed: option,
           pressedIsApplied: isApplied(option),
         }),
       );
     },
-    [isApplied],
+    [isApplied, pendingModel, stageOrApply],
   );
 
   const value = useMemo<ThreadSettingsSessionValue>(
@@ -506,13 +507,11 @@ function ThreadSettingsSessionProvider(
       displayedDescriptors,
       providerExpansionOverrides,
       hasLegacyModels,
-      pendingModel,
+      initialProviderKey,
       providerFilter,
       searchQuery,
       showLegacy: showLegacyToggle,
       applyOptionChange,
-      commitPendingModel,
-      isApplied,
       isDisplayed,
       pressModel,
       setProviderFilter,
@@ -522,15 +521,13 @@ function ThreadSettingsSessionProvider(
     }),
     [
       applyOptionChange,
-      commitPendingModel,
       displayedDescriptors,
       providerExpansionOverrides,
       hasLegacyModels,
-      isApplied,
+      initialProviderKey,
       isDisplayed,
       props.environmentId,
       props.providerInstanceId,
-      pendingModel,
       pressModel,
       providerFilter,
       props.onUpdateRuntimeMode,
@@ -656,10 +653,9 @@ function useThreadSettingsCatalogItems(
           return [];
         }
         const isPrimary = driver !== undefined && PRIMARY_PROVIDER_DRIVERS.has(driver);
-        // Staging a model must not change disclosure state. The applied model
-        // stays stable for the lifetime of this picker (Save closes it), so it
-        // is safe to use as the initial selected-provider default.
-        const containsAppliedSelection = group.models.some(session.isApplied);
+        // Neither staging nor applying a model may move disclosure state, so
+        // the default follows the provider the picker opened with.
+        const containsAppliedSelection = group.providerKey === session.initialProviderKey;
         const isNarrowed = session.providerFilter !== null || session.searchQuery.trim().length > 0;
         const collapsible = !isNarrowed;
         const collapsed = providerSectionIsCollapsed({
@@ -692,7 +688,7 @@ function useThreadSettingsCatalogItems(
         ];
       }),
     [
-      session.isApplied,
+      session.initialProviderKey,
       session.isDisplayed,
       session.providerExpansionOverrides,
       session.providerFilter,
@@ -916,7 +912,7 @@ function ThreadSettingsChoiceContent(props: {
             description: choice.description,
             selected: choice.mode === session.runtimeMode,
             onPress: () => {
-              void Haptics.selectionAsync();
+              void selectionHaptic();
               session.onUpdateRuntimeMode(choice.mode);
               props.onSelected();
             },
@@ -930,7 +926,7 @@ function ThreadSettingsChoiceContent(props: {
               description: undefined,
               selected: choice.id === getProviderOptionCurrentValue(activeDescriptor),
               onPress: () => {
-                void Haptics.selectionAsync();
+                void selectionHaptic();
                 session.applyOptionChange(activeDescriptor.id, choice.id);
                 props.onSelected();
               },
@@ -1015,10 +1011,6 @@ function ThreadSettingsModelsScreen() {
       if (error) Alert.alert("Could not refresh models", error);
     });
   }, [isRefreshingProviders, refreshProviderCatalog, session.environmentId]);
-  const commitAndClose = useCallback(() => {
-    if (!session.commitPendingModel()) return;
-    presentation.onClose();
-  }, [presentation, session]);
   const filterMenu = useMemo(
     () => ({
       title: "Model filters",
@@ -1069,9 +1061,9 @@ function ThreadSettingsModelsScreen() {
               onPress: refreshProviders,
             },
             {
-              accessibilityLabel: session.pendingModel ? "Save thread settings" : "Done",
+              accessibilityLabel: "Done",
               icon: "checkmark",
-              onPress: commitAndClose,
+              onPress: presentation.onClose,
             },
           ]}
           onBack={presentation.onClose}
@@ -1125,13 +1117,6 @@ function ThreadSettingsModelsScreen() {
           navigation.navigate("ThreadSettingsChoice", { ...submenu, title });
         }}
       />
-      <NativeHeaderToolbar placement="left">
-        <NativeHeaderToolbar.Button
-          accessibilityLabel="Cancel thread settings"
-          label="Cancel"
-          onPress={presentation.onClose}
-        />
-      </NativeHeaderToolbar>
       <NativeHeaderToolbar placement="right">
         <NativeHeaderToolbar.Button
           accessibilityLabel="Refresh models"
@@ -1141,9 +1126,9 @@ function ThreadSettingsModelsScreen() {
           separateBackground
         />
         <NativeHeaderToolbar.Button
-          accessibilityLabel={session.pendingModel ? "Save thread settings" : "Done"}
-          label={session.pendingModel ? "Save" : "Done"}
-          onPress={commitAndClose}
+          accessibilityLabel="Done"
+          label="Done"
+          onPress={presentation.onClose}
         />
       </NativeHeaderToolbar>
       {Platform.OS === "ios" && !usesNativeMailSearchToolbar ? (

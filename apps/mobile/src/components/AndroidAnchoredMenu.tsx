@@ -5,6 +5,7 @@ import type { StyleProp, ViewStyle } from "react-native";
 import { BackHandler, Pressable, ScrollView, View } from "react-native";
 import { useKeyboardState } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { appBlurTargetRef } from "../lib/appBlurTarget";
 import { cn } from "../lib/cn";
@@ -36,8 +37,25 @@ type OverlayFrame = {
   readonly height: number;
 };
 
+/**
+ * MenuAction plus a `leading` node rendered before the title. Only this JS
+ * menu can draw it; native menus (iOS UIMenu) take symbol names, not views,
+ * so ControlPillMenu strips it via {@link toNativeMenuActions} there.
+ */
+export type AndroidMenuAction = Omit<MenuAction, "subactions"> & {
+  readonly leading?: ReactNode;
+  readonly subactions?: readonly AndroidMenuAction[];
+};
+
+export function toNativeMenuActions(actions: readonly AndroidMenuAction[]): MenuAction[] {
+  return actions.map(({ leading: _leading, subactions, ...action }) => ({
+    ...action,
+    ...(subactions ? { subactions: toNativeMenuActions(subactions) } : {}),
+  }));
+}
+
 export type AndroidAnchoredMenuProps = {
-  readonly actions: readonly MenuAction[];
+  readonly actions: readonly AndroidMenuAction[];
   readonly title?: string;
   readonly onPressAction?: MenuComponentProps["onPressAction"];
   /** Applied to the anchor wrapper — call sites flex these to fill toolbars. */
@@ -63,7 +81,7 @@ export type AndroidAnchoredMenuProps = {
  */
 export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const [anchor, setAnchor] = useState<AnchorSnapshot | null>(null);
-  const [path, setPath] = useState<readonly MenuAction[]>([]);
+  const [path, setPath] = useState<readonly AndroidMenuAction[]>([]);
   // Height of the modal's root view, in the modal's own coordinate space.
   // Menus that flip above their anchor are pinned by their BOTTOM edge
   // (bottom = rootHeight - anchorTop), so drill-in height changes grow
@@ -80,6 +98,7 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
 
   const keyboardVisible = useKeyboardState((state) => state.isVisible);
   const keyboardHeight = useKeyboardState((state) => state.height);
+  const insets = useSafeAreaInsets();
   const close = useCallback(() => {
     setAnchor(null);
     setPath([]);
@@ -155,9 +174,13 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
         );
   // The keyboard stays up while the menu is open (in-window overlay, no
   // focus change), so the space it covers is not usable — without this the
-  // composer-pill menus "open down" into the IME and can't be tapped.
+  // composer-pill menus "open down" into the IME and can't be tapped. The
+  // portal host spans the whole window, so the gesture bar is unusable too;
+  // the keyboard already covers it when up, hence the max rather than a sum.
   const usableBottom =
-    overlay === null ? 0 : overlay.height - (keyboardVisible ? keyboardHeight : 0);
+    overlay === null
+      ? 0
+      : overlay.height - Math.max(keyboardVisible ? keyboardHeight : 0, insets.bottom);
   const spaceBelow =
     local === null || overlay === null
       ? 0
@@ -170,7 +193,7 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const placeable = local !== null && rootHeight !== null;
 
   const onPressItem = useCallback(
-    (action: MenuAction) => {
+    (action: AndroidMenuAction) => {
       if ((action.subactions?.length ?? 0) > 0) {
         setPath((current) => [...current, action]);
         return;
@@ -268,6 +291,9 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
                         )}
                         onPress={() => onPressItem(action)}
                       >
+                        {action.leading ? (
+                          <View className="items-center justify-center">{action.leading}</View>
+                        ) : null}
                         <View className="flex-1 gap-0.5">
                           <Text
                             className={cn(

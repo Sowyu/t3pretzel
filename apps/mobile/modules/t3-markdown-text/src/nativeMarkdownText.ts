@@ -872,12 +872,43 @@ export function nativeMarkdownNodePosition(node: MarkdownNode, index: number): s
   return node.beg === undefined ? `index:${index}` : `offset:${node.beg}`;
 }
 
+export interface NativeMarkdownChunkOptions {
+  /**
+   * Android draws nothing past the GPU's maximum texture height (16384px on
+   * most devices), so one selectable Text taller than that loses its tail and
+   * takes seconds per frame to draw. Lists are the block that grows without
+   * bound; splitting a long list across chunks keeps every Text well under
+   * the limit. Cross-block text selection stops at the split.
+   */
+  readonly maxListItemsPerChunk?: number;
+}
+
+// ponytail: only top-level lists are split; a paragraph or nested list with
+// hundreds of soft-broken lines can still exceed the texture height.
+function splitLongList(node: MarkdownNode, maxItems: number): ReadonlyArray<MarkdownNode> {
+  const children = node.children ?? [];
+  if (node.type !== "list" || children.length <= maxItems) {
+    return [node];
+  }
+  const parts: MarkdownNode[] = [];
+  for (let offset = 0; offset < children.length; offset += maxItems) {
+    parts.push({
+      ...node,
+      children: children.slice(offset, offset + maxItems),
+      ...(node.ordered ? { start: (node.start ?? 1) + offset } : {}),
+    });
+  }
+  return parts;
+}
+
 export function nativeMarkdownDocumentChunks(
   document: MarkdownNode,
+  options: NativeMarkdownChunkOptions = {},
 ): ReadonlyArray<NativeMarkdownDocumentChunk> {
   const chunks: NativeMarkdownDocumentChunk[] = [];
   let selectableNodes: MarkdownNode[] = [];
   let selectableStart = 0;
+  let selectableKeySuffix = "";
 
   const flushSelectable = () => {
     const first = selectableNodes[0];
@@ -886,21 +917,37 @@ export function nativeMarkdownDocumentChunks(
     }
     chunks.push({
       kind: "selectable",
-      key: `selectable:${nativeMarkdownNodePosition(first, selectableStart)}`,
+      key: `selectable:${nativeMarkdownNodePosition(first, selectableStart)}${selectableKeySuffix}`,
       node: {
         type: "document",
         children: selectableNodes,
       },
     });
     selectableNodes = [];
+    selectableKeySuffix = "";
   };
 
   for (const [index, child] of (document.children ?? []).entries()) {
     if (!containsRichBlock(child)) {
-      if (selectableNodes.length === 0) {
-        selectableStart = index;
+      const parts =
+        options.maxListItemsPerChunk === undefined
+          ? [child]
+          : splitLongList(child, options.maxListItemsPerChunk);
+      for (const [partIndex, part] of parts.entries()) {
+        // Each part of a split list is its own Text; the parts share the
+        // source offset, so the key carries the part number as well.
+        if (parts.length > 1) {
+          flushSelectable();
+          selectableKeySuffix = `:part${partIndex}`;
+        }
+        if (selectableNodes.length === 0) {
+          selectableStart = index;
+        }
+        selectableNodes.push(part);
+        if (parts.length > 1) {
+          flushSelectable();
+        }
       }
-      selectableNodes.push(child);
       continue;
     }
 

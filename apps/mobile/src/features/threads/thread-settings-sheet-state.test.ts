@@ -89,19 +89,25 @@ describe("thread settings sheet state", () => {
     ).toBe(pending);
   });
 
-  it("stages a different model", () => {
+  it("stages a pressed model the picker can apply straight away", () => {
     const pressed = modelOption("gpt-other");
+    const staged = pendingModelAfterPress({
+      current: modelOption("gpt-next"),
+      pressed,
+      pressedIsApplied: false,
+    });
 
+    expect(staged).toBe(pressed);
+    // The picker applies a staged model as soon as this gate passes, so a tap
+    // on a catalog model persists on its own. Done only closes the sheet.
     expect(
-      pendingModelAfterPress({
-        current: modelOption("gpt-next"),
-        pressed,
-        pressedIsApplied: false,
-      }),
-    ).toBe(pressed);
+      canCommitPendingModel(pressed, [
+        { providerKey: "codex", providerLabel: "Codex", models: [pressed] },
+      ]),
+    ).toBe(true);
   });
 
-  it("cannot save a staged model after sign-out removes it from the catalog", () => {
+  it("leaves a staged model unapplied after sign-out removes it from the catalog", () => {
     const pending = modelOption("gemini-native");
     const group = { providerKey: "codex", providerLabel: "Codex", models: [pending] };
 

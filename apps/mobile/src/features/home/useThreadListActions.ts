@@ -2,12 +2,12 @@ import type { ThreadMoveDestination } from "../threads/threadOrder";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { canSnooze, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import * as Cause from "effect/Cause";
-import * as Haptics from "expo-haptics";
+import { lightImpactHaptic } from "../../lib/haptics";
 import { useCallback, useRef } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 
 import { withThreadDismissal } from "./thread-dismissal";
-import { showConfirmDialog } from "../../components/ConfirmDialogHost";
+import { showConfirmDialog, showTextInputDialog } from "../../components/ConfirmDialogHost";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { refreshArchivedThreadsForEnvironment } from "../archive/useArchivedThreadSnapshots";
 import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
@@ -27,6 +27,7 @@ import {
   threadDropLifecycle,
 } from "../threads/threadOrder";
 import { getThreadListV2OrderedSection } from "../threads/threadListV2";
+import { resolveThreadTitleRename } from "../threads/thread-title-rename";
 
 /** Version skew: never send settle/unsettle to a server that predates them
     (capability defaults false on decode for older servers). */
@@ -85,10 +86,6 @@ function actionFailureMessage(action: ThreadListAction, cause: Cause.Cause<unkno
   return `The thread could not be ${ACTION_VERBS[action]}.`;
 }
 
-function selectionHaptic(): void {
-  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-}
-
 function actionFailureTitle(action: ThreadListAction): string {
   if (action === "archive") return "Could not archive thread";
   if (action === "unarchive") return "Could not unarchive thread";
@@ -116,7 +113,7 @@ function useThreadActionExecutor(
       }
 
       inFlightThreadKeys.current.add(key);
-      selectionHaptic();
+      void lightImpactHaptic();
       try {
         if (
           (action === "settle" || action === "unsettle") &&
@@ -240,6 +237,7 @@ export function useThreadListActions(): {
     thread: EnvironmentThreadShell,
     direction: ThreadMoveDestination,
   ) => Promise<boolean>;
+  readonly renameThread: (thread: EnvironmentThreadShell) => void;
   readonly regenerateThreadTitle: (thread: EnvironmentThreadShell) => Promise<boolean>;
 } {
   const executeAction = useThreadActionExecutor();
@@ -288,7 +286,7 @@ export function useThreadListActions(): {
           return false;
         }
 
-        selectionHaptic();
+        void lightImpactHaptic();
         const result = await withThreadDismissal(
           key,
           () =>
@@ -334,7 +332,7 @@ export function useThreadListActions(): {
           return false;
         }
 
-        selectionHaptic();
+        void lightImpactHaptic();
         const result = await withThreadDismissal(
           key,
           () =>
@@ -374,7 +372,7 @@ export function useThreadListActions(): {
         );
         return false;
       }
-      selectionHaptic();
+      void lightImpactHaptic();
       // Same placement as web: a fresh pin takes the top of the arranged
       // run. Servers that predate reordering get the bare pin (keyless).
       let orderKey: string | undefined;
@@ -414,7 +412,7 @@ export function useThreadListActions(): {
         );
         return false;
       }
-      selectionHaptic();
+      void lightImpactHaptic();
       const result = await unpinMutation({
         environmentId: thread.environmentId,
         input: { threadId: thread.id },
@@ -451,7 +449,7 @@ export function useThreadListActions(): {
       }
 
       titleRegenerationInFlightThreadKeys.current.add(key);
-      selectionHaptic();
+      void lightImpactHaptic();
       try {
         const result = await updateThreadMetadata({
           environmentId: thread.environmentId,
@@ -471,6 +469,50 @@ export function useThreadListActions(): {
       } finally {
         titleRegenerationInFlightThreadKeys.current.delete(key);
       }
+    },
+    [updateThreadMetadata],
+  );
+  const renameThread = useCallback(
+    (thread: EnvironmentThreadShell) => {
+      const commit = (title: string) => {
+        const resolution = resolveThreadTitleRename({ title, originalTitle: thread.title });
+        if (resolution.action === "reject-empty") {
+          Alert.alert("Could not rename thread", "Thread title cannot be empty.");
+          return;
+        }
+        if (resolution.action === "noop") return;
+        void lightImpactHaptic();
+        void updateThreadMetadata({
+          environmentId: thread.environmentId,
+          input: { threadId: thread.id, title: resolution.title },
+        }).then((result) => {
+          if (result._tag === "Success") return;
+          const error = Cause.squash(result.cause);
+          Alert.alert(
+            "Could not rename thread",
+            error instanceof Error && error.message.trim().length > 0
+              ? error.message
+              : "The thread could not be renamed.",
+          );
+        });
+      };
+
+      if (Platform.OS === "ios") {
+        Alert.prompt(
+          "Rename thread",
+          undefined,
+          (title) => commit(title ?? ""),
+          "plain-text",
+          thread.title,
+        );
+        return;
+      }
+      showTextInputDialog({
+        title: "Rename thread",
+        initialValue: thread.title,
+        confirmText: "Rename",
+        onConfirm: commit,
+      });
     },
     [updateThreadMetadata],
   );
@@ -560,7 +602,7 @@ export function useThreadListActions(): {
       const shellByKey = new Map(
         shells.map((shell) => [scopedThreadKey(shell.environmentId, shell.id), shell]),
       );
-      selectionHaptic();
+      void lightImpactHaptic();
       appAtomRegistry.set(threadDropBusyAtom, true);
       const pending = crossSection
         ? null
@@ -653,6 +695,7 @@ export function useThreadListActions(): {
     pinThread,
     unpinThread,
     moveThread,
+    renameThread,
     regenerateThreadTitle,
   };
 }

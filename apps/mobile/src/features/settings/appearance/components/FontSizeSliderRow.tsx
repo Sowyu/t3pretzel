@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../../../lib/haptics";
 import { SymbolView } from "../../../../components/AppSymbol";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { View, type AccessibilityActionEvent } from "react-native";
@@ -56,7 +56,7 @@ export function FontSizeSliderRow(props: {
     if (next === current.value) {
       return;
     }
-    Haptics.selectionAsync().catch(() => undefined);
+    void selectionHaptic();
     current.onChange(next);
   }, []);
 

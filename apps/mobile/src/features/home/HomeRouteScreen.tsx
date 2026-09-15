@@ -27,7 +27,7 @@ import { getConnectionAwareBrandHeaderOptions } from "./WorkspaceConnectionTitle
 
 export function HomeRouteScreen() {
   const { width: windowWidth } = useWindowDimensions();
-  const { layout } = useAdaptiveWorkspaceLayout();
+  const { layout, panes, togglePrimarySidebar } = useAdaptiveWorkspaceLayout();
   const projects = useProjects();
   const threads = useThreadShells();
   const { environments: workspaceEnvironments, state: catalogState } = useWorkspaceState();
@@ -50,6 +50,7 @@ export function HomeRouteScreen() {
     pinThread,
     unpinThread,
     moveThread,
+    renameThread,
     regenerateThreadTitle,
     unsettleThread,
   } = useThreadListActions();
@@ -92,6 +93,7 @@ export function HomeRouteScreen() {
       }).map((scope) => ({
         key: scope.key,
         label: scope.title,
+        representative: scope.representative,
       })),
     [listOptions.projectGroupingMode, projects, selectedEnvironmentId],
   );
@@ -126,6 +128,11 @@ export function HomeRouteScreen() {
           }
         />
         <WorkspaceEmptyDetail
+          onShowSidebar={
+            Platform.OS === "android" && !panes.primarySidebarVisible
+              ? togglePrimarySidebar
+              : undefined
+          }
           onStartNewTask={() => navigation.navigate("NewTaskSheet", { screen: "NewTask" })}
         />
       </>
@@ -200,6 +207,7 @@ export function HomeRouteScreen() {
           onPinThread={pinThread}
           onUnpinThread={unpinThread}
           onMoveThread={moveThread}
+          onRenameThread={renameThread}
           onRegenerateThreadTitle={regenerateThreadTitle}
           onEnvironmentChange={setSelectedEnvironmentId}
           onProjectChange={setSelectedProjectKey}

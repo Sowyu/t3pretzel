@@ -32,7 +32,8 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { Alert, Keyboard, Platform, Pressable, View, type ViewStyle } from "react-native";
+import { Alert, AppState, Keyboard, Platform, Pressable, View, type ViewStyle } from "react-native";
+import { KeyboardEvents } from "react-native-keyboard-controller";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
 import {
   composerAttachmentUploadBlockReason,
@@ -411,6 +412,20 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     voiceInput.elapsedSeconds,
   );
   const isVoiceInputPresented = voicePresentation.statusLabel !== null;
+  // Android's back gesture hides the keyboard but leaves the editor focused,
+  // so the expanded card stayed on screen with nothing to type into. Collapse
+  // it like a tap on the feed does. Navigating away and app switches also hide
+  // the keyboard; those keep focus so typing resumes on return, and dictation
+  // owns the keyboard while it is presented.
+  useEffect(() => {
+    if (Platform.OS !== "android" || !isFocused || isVoiceInputPresented) return;
+    const subscription = KeyboardEvents.addListener("keyboardDidHide", () => {
+      if (navigation.isFocused() && AppState.currentState === "active") {
+        inputRef.current?.blur();
+      }
+    });
+    return () => subscription.remove();
+  }, [inputRef, isFocused, isVoiceInputPresented, navigation]);
   // An open draft stays visible; only a collapsed composer becomes a voice strip.
   const isExpanded = isFocused || settingsSheetPresentation.keepsComposerExpanded;
   const showsCompactDictation = isVoiceInputPresented && !isExpanded;
@@ -654,7 +669,12 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
               triggerKind={composerMenu.trigger.kind}
               isLoading={composerMenu.isLoading}
               error={composerMenu.error}
-              onSelect={composerMenu.onSelect}
+              onSelect={(item) => {
+                composerMenu.onSelect(item);
+                // Android drops editor focus when a popover row is tapped, so the
+                // keyboard closed and the field needed another tap to keep typing.
+                if (Platform.OS === "android") inputRef.current?.focus();
+              }}
             />
           </View>
         ) : null}

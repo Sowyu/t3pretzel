@@ -3,7 +3,7 @@ import {
   getQuestionAnswerPreview,
   hasQuestionAnswer,
 } from "@t3tools/client-runtime/work-log/user-input";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { Image } from "expo-image";
 import { type AppSymbolName, SymbolView } from "../../components/AppSymbol";
 import { MaskedView } from "@expo/ui/community/masked-view";
@@ -777,7 +777,7 @@ const ThreadWorkLogRow = memo(function ThreadWorkLogRow(
         hitSlop={4}
         onPress={() => {
           if (canExpand) {
-            void Haptics.selectionAsync();
+            void selectionHaptic();
             props.onToggleRow(row.id, props.anchorKey);
           }
         }}
@@ -946,7 +946,7 @@ export function ThreadWorkGroupToggle(props: {
         accessibilityHint={`Double tap to ${props.expanded ? "hide" : "show"} ${props.hiddenCount} tool ${props.hiddenCount === 1 ? "call" : "calls"}.`}
         hitSlop={4}
         onPress={() => {
-          void Haptics.selectionAsync();
+          void selectionHaptic();
           props.onToggle();
         }}
         className="min-h-8 flex-row items-center gap-1.5 rounded-md px-0.5 py-0 active:bg-subtle"
@@ -1033,7 +1033,7 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
         hitSlop={4}
         onPress={() => {
           if (!canExpand) return;
-          void Haptics.selectionAsync();
+          void selectionHaptic();
           props.onToggle();
         }}
         onLongPress={props.onCopy}

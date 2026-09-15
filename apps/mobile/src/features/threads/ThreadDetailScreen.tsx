@@ -26,7 +26,7 @@ import type {
   UsageLimitsReport,
   UserInputQuestion,
 } from "@t3tools/contracts";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { BlurTargetView } from "expo-blur";
 import { GlassBlurTargetContext } from "../../lib/glassBlurTarget";
 import {
@@ -41,7 +41,6 @@ import {
 } from "react";
 import {
   Alert,
-  AppState,
   Keyboard,
   Platform,
   useWindowDimensions,
@@ -50,6 +49,7 @@ import {
 } from "react-native";
 import {
   KeyboardController,
+  KeyboardEvents,
   KeyboardStickyView,
   useKeyboardState,
 } from "react-native-keyboard-controller";
@@ -82,6 +82,8 @@ import type {
   PendingUserInputDraftAnswer,
   ThreadFeedEntry,
 } from "../../lib/threadActivity";
+import { isAndroidKeyboardAnimationUsable } from "../keyboard/androidKeyboardRecovery";
+import { useAndroidKeyboardRecovery } from "../keyboard/useAndroidKeyboardRecovery";
 import { PendingApprovalCard } from "./PendingApprovalCard";
 import { ComposerFeedback } from "./ComposerFeedback";
 import { ComposerUsageLimits } from "./ComposerUsageLimits";
@@ -243,13 +245,20 @@ function useStreamingHaptics(threadId: ThreadId, feed: ReadonlyArray<ThreadFeedE
       return;
     }
 
+    // A tick every 320ms while a reply streams reads as the phone buzzing after
+    // every send on Android, even through the system haptic engine. One tick
+    // when a stream starts is enough there.
+    if (!isNewStream && Platform.OS === "android") {
+      return;
+    }
+
     const now = Date.now();
     if (!isNewStream && now - lastStreamHapticAtRef.current < 320) {
       return;
     }
 
     lastStreamHapticAtRef.current = now;
-    void Haptics.selectionAsync();
+    void selectionHaptic();
   }, [threadId, feed]);
 }
 
@@ -267,32 +276,23 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   // hide — then Home within a second). The keyboard library's height AND
   // visibility then stay frozen open, so gating the sticky translation on
   // visibility alone still strands the composer after resume. Quarantine the
-  // translation on every Android resume instead; any sign of a live keyboard
-  // stream — an owned input gaining focus, or any visibility/height movement —
-  // lifts it. A healthy resume sees no visual difference (the translation is
-  // already zero while the keyboard is closed).
-  const [keyboardStateSuspect, setKeyboardStateSuspect] = useState(false);
-  useEffect(() => {
-    if (Platform.OS !== "android") {
-      return;
-    }
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        setKeyboardStateSuspect(true);
+  // translation on every Android resume instead; only a fresh keyboard show or
+  // an owned input gaining focus lifts it. A healthy resume sees no visual
+  // difference (the translation is already zero while the keyboard is closed).
+  const { isQuarantined: isKeyboardStateQuarantined, markInputFocused } =
+    useAndroidKeyboardRecovery();
+  const isKeyboardAnimationUsable = isAndroidKeyboardAnimationUsable({
+    isKeyboardVisible,
+    isQuarantined: isKeyboardStateQuarantined,
+  });
+  const handleOwnedInputFocusChange = useCallback(
+    (focused: boolean) => {
+      if (focused) {
+        markInputFocused();
       }
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-  useEffect(() => {
-    setKeyboardStateSuspect(false);
-  }, [isKeyboardVisible, liveKeyboardHeight]);
-  const handleOwnedInputFocusChange = useCallback((focused: boolean) => {
-    if (focused) {
-      setKeyboardStateSuspect(false);
-    }
-  }, []);
+    },
+    [markInputFocused],
+  );
   const windowHeight = useWindowDimensions().height;
   const navigationHeaderHeight = useContext(HeaderHeightContext) || insets.top + IOS_NAV_BAR_HEIGHT;
   const agentLabel = `${props.selectedThread.modelSelection.instanceId} agent`;
@@ -326,7 +326,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   // focus-keyed inset is already in place while the composer rides down.
   // Dictation keeps that focus while the composer switches to its compact pill.
   const composerBottomInset = (
-    Platform.OS === "android" ? isKeyboardVisible : composerExpanded || composerFocused
+    Platform.OS === "android" ? isKeyboardAnimationUsable : composerExpanded || composerFocused
   )
     ? 0
     : Math.max(insets.bottom, 12);
@@ -613,6 +613,38 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     // checks follow state again so a user who scrolled up stays put.
     scheduleOverlayRepin(230);
   }, [scheduleOverlayRepin, selectedThreadKey, showFloatingStatus]);
+  // Android's keyboard integration lifts the feed for the keyboard alone. The
+  // composer card growing on focus left the last rows under the card, and the
+  // keyboard leaving left the feed mid-conversation, until the user scrolled.
+  // Re-pin once each keyboard transition has fully settled: a re-pin during
+  // the animation freezes the inset stream and swallows the close event,
+  // which leaves a keyboard-sized gap above the composer instead.
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+    const subscriptions = [
+      KeyboardEvents.addListener("keyboardDidShow", () => scheduleOverlayRepin(60)),
+      KeyboardEvents.addListener("keyboardDidHide", () => scheduleOverlayRepin(60)),
+    ];
+    return () => {
+      for (const subscription of subscriptions) subscription.remove();
+    };
+  }, [scheduleOverlayRepin]);
+  // The card also changes size on its own: the back gesture hides the keyboard
+  // first and the collapse follows, so the transition re-pin above lands with
+  // the card still expanded. Re-pin again once the card settles, but only with
+  // the keyboard at rest; while it animates, the transition handlers own it.
+  const previousComposerExpandedRef = useRef(composerExpanded);
+  useEffect(() => {
+    if (previousComposerExpandedRef.current === composerExpanded) {
+      return;
+    }
+    previousComposerExpandedRef.current = composerExpanded;
+    if (Platform.OS === "android" && !isKeyboardVisible) {
+      scheduleOverlayRepin(COMPOSER_TRANSITION_DURATION_MS + 60);
+    }
+  }, [composerExpanded, isKeyboardVisible, scheduleOverlayRepin]);
   const handleToggleUserInputCollapsed = useCallback(() => {
     if (activeUserInputRequestId === null) {
       return;
@@ -812,7 +844,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   );
 
   const handleScrollToEnd = useCallback(() => {
-    void Haptics.selectionAsync();
+    void selectionHaptic();
     void scrollMessageToEnd({ animated: true, closeKeyboard: false }).catch(() => {
       freeze.set(false);
     });
@@ -914,7 +946,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
           // iOS emits a native animated height target on both will-show and
           // will-hide, so stay subscribed for the full transition. Android
           // retains its background/resume stale-state quarantine.
-          enabled={Platform.OS === "ios" || (isKeyboardVisible && !keyboardStateSuspect)}
+          enabled={Platform.OS === "ios" || isKeyboardAnimationUsable}
           pointerEvents="box-none"
           style={{ position: "absolute", bottom: 0, left: 0, right: 0, top: 0 }}
           offset={{ closed: 0, opened: 0 }}

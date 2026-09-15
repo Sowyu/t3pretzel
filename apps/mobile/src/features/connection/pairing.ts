@@ -27,9 +27,21 @@ export class PairingQrPayloadEmptyError extends Schema.TaggedError<PairingQrPayl
   }
 }
 
+// Server-issued pairing codes are 12 characters from this alphabet (no 0/1/I/O),
+// printed without separators. People type them with the hyphens or spaces the
+// placeholder suggests, or in lowercase, and the server compares verbatim and
+// answers 401. Codes that do not fit the format (dev tokens) pass through as typed.
+const PAIRING_CODE_PATTERN = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{12}$/;
+
+export function normalizePairingCode(code: string): string {
+  const trimmed = code.trim();
+  const compact = trimmed.replace(/[\s-]+/g, "").toUpperCase();
+  return PAIRING_CODE_PATTERN.test(compact) ? compact : trimmed;
+}
+
 export function buildPairingUrl(host: string, code: string): string {
   const h = host.trim();
-  const c = code.trim();
+  const c = normalizePairingCode(code);
   if (!h) return "";
   if (!c) return h;
 

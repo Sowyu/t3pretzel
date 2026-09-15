@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import { useViewabilityAmount, type LegendListRef } from "@legendapp/list/react-native";
 import type {
@@ -617,6 +617,7 @@ const markdownLinkStyles = StyleSheet.create({
     height: 14,
     marginHorizontal: 3,
     transform: [{ translateY: 2 }],
+    flexShrink: 0,
   },
   favicon: {
     borderRadius: 3,
@@ -1144,7 +1145,7 @@ function useMarkdownStyles(
                 >
                   {ordered ? `${start + index}.` : "•"}
                 </NativeText>
-                <View className="min-w-0 flex-1">
+                <View className="min-w-0 flex-1" style={{ flexShrink: 1, overflow: "hidden" }}>
                   <Renderer node={child} depth={1} inListItem parentIsText={false} />
                 </View>
               </View>
@@ -2026,7 +2027,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           presentation.path,
         );
         if (relativePath) {
-          void Haptics.selectionAsync();
+          void selectionHaptic();
           if (isPdfFile({ name: relativePath })) {
             setExpandedFile(
               (current) =>
@@ -2059,7 +2060,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         workspaceRoot: props.workspaceRoot,
       });
       if (media) {
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         if (media.kind === "video") {
           setExpandedVideo((current) => current ?? media.source);
         } else {
@@ -2071,7 +2072,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       // A host file outside the workspace, such as a report an agent wrote to
       // a temp directory, opens read-only in the file screen.
       if (presentation.kind === "file" && isAbsolutePath(presentation.path)) {
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         if (isPdfFile({ name: presentation.path })) {
           setExpandedFile(
             (current) =>
@@ -2889,6 +2890,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             }
             contentContainerStyle={{
               paddingTop: 12,
+              paddingBottom: 12,
               paddingHorizontal: contentHorizontalPadding,
             }}
           />

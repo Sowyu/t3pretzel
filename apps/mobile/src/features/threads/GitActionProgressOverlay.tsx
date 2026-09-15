@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { errorHaptic, successHaptic } from "../../lib/haptics";
 import { GlassView } from "expo-glass-effect";
 import { SymbolView } from "../../components/AppSymbol";
 import { useCallback, useEffect, useRef } from "react";
@@ -31,9 +31,9 @@ export function GitActionProgressOverlay(props: {
     prevPhaseRef.current = progress.phase;
 
     if (prev === "running" && progress.phase === "success") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void successHaptic();
     } else if (prev === "running" && progress.phase === "error") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      void errorHaptic();
     }
   }, [progress.phase]);
 

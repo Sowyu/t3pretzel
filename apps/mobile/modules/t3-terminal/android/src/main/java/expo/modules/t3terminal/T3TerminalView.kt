@@ -9,6 +9,8 @@ import android.text.TextWatcher
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputConnectionWrapper
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -20,10 +22,11 @@ import kotlin.math.max
 class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val container = FrameLayout(context)
   private val terminalCanvas = TerminalCanvasView(context)
-  private val inputView = EditText(context)
+  private val inputView = TerminalInputView(context)
   private val onInput by EventDispatcher()
   private val onResize by EventDispatcher()
   private val onCapture by EventDispatcher()
+  private val onTerminalFocus by EventDispatcher()
   var captureRequest: Double = 0.0
     set(value) {
       if (field == value || value <= 0) return
@@ -213,6 +216,7 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
     if (isCleanedUp) return
     isCleanedUp = true
     inputView.setOnEditorActionListener(null)
+    inputView.setOnFocusChangeListener(null)
     terminalCanvas.onScrollRows = null
     terminalCanvas.onRequestKeyboard = null
     terminalCanvas.onCellMetricsChanged = null
@@ -237,25 +241,43 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
       InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
       InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     inputView.setPadding(0, 0, 0, 0)
+    // Lets the JS keyboard-recovery quarantine lift when the terminal takes focus.
+    inputView.setOnFocusChangeListener { _, hasFocus ->
+      if (hasFocus) onTerminalFocus(emptyMap<String, Any>())
+    }
+    inputView.onDeleteSurroundingText = { beforeLength, afterLength ->
+      onInput(mapOf("data" to "\u007F".repeat(beforeLength) + FORWARD_DELETE.repeat(afterLength)))
+    }
     inputView.setOnEditorActionListener { _, actionId, event ->
-      val isKeyUp = event?.action == KeyEvent.ACTION_UP
-      val isImeSend = actionId == EditorInfo.IME_ACTION_SEND && !isKeyUp
-      val isHardwareEnter = event?.keyCode == KeyEvent.KEYCODE_ENTER &&
-        event.action == KeyEvent.ACTION_DOWN
-      val isEnter = isImeSend || isHardwareEnter
-      if (isEnter) {
-        // Enter must send CR: raw-mode TUIs treat LF as Ctrl+J (insert newline).
-        onInput(mapOf("data" to "\r"))
-        true
-      } else {
-        false
+      when {
+        // The IME's own Send action button. Enter key events never get here: the key
+        // listener below consumes them.
+        event == null && actionId == EditorInfo.IME_ACTION_SEND -> {
+          // Enter must send CR: raw-mode TUIs treat LF as Ctrl+J (insert newline).
+          onInput(mapOf("data" to "\r"))
+          true
+        }
+        // Report any Enter key event as handled so TextView never treats it as
+        // "advance focus", which would move focus off the terminal.
+        else -> event != null && isEnterKey(event.keyCode)
       }
     }
     inputView.setOnKeyListener { _, keyCode, event ->
+      if (isEnterKey(keyCode)) {
+        // Consume both halves of the press. A single-line TextView treats an
+        // unhandled Enter key-up as "advance focus" and moves focus to the next
+        // view, so a hardware keyboard lost the terminal after each command (#8140).
+        if (event.action == KeyEvent.ACTION_DOWN) onInput(mapOf("data" to "\r"))
+        return@setOnKeyListener true
+      }
       if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
       when {
         keyCode == KeyEvent.KEYCODE_DEL -> {
           onInput(mapOf("data" to "\u007F"))
+          true
+        }
+        keyCode == KeyEvent.KEYCODE_FORWARD_DEL -> {
+          onInput(mapOf("data" to FORWARD_DELETE))
           true
         }
         // Hardware keyboard Ctrl+A..Z -> control bytes 0x01..0x1A (Ctrl+C, Ctrl+Z, ...).
@@ -458,4 +480,43 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
     } catch (_: IllegalArgumentException) {
       fallback
     }
+
+  private companion object {
+    const val FORWARD_DELETE = "\u001B[3~"
+
+    fun isEnterKey(keyCode: Int): Boolean =
+      keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+  }
+}
+
+/**
+ * Hidden field that owns the IME session. Its text is always empty: the text watcher
+ * forwards every insertion to the terminal and clears the buffer. Some keyboards
+ * (FUTO among them) express Backspace as deleteSurroundingText instead of a DEL key
+ * event, which on an empty buffer deleted nothing, so the terminal saw no Backspace
+ * until the keyboard gave up and fell back to key events (#8253). Those calls are
+ * translated into terminal delete sequences here.
+ */
+private class TerminalInputView(context: Context) : EditText(context) {
+  var onDeleteSurroundingText: ((beforeLength: Int, afterLength: Int) -> Unit)? = null
+
+  override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+    val connection = super.onCreateInputConnection(outAttrs) ?: return null
+    return object : InputConnectionWrapper(connection, true) {
+      override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean =
+        forwardDelete(beforeLength, afterLength) ||
+          super.deleteSurroundingText(beforeLength, afterLength)
+
+      override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean =
+        forwardDelete(beforeLength, afterLength) ||
+          super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+    }
+  }
+
+  private fun forwardDelete(beforeLength: Int, afterLength: Int): Boolean {
+    val handler = onDeleteSurroundingText ?: return false
+    val applies = text.isNullOrEmpty() && (beforeLength > 0 || afterLength > 0)
+    if (applies) handler(beforeLength.coerceAtLeast(0), afterLength.coerceAtLeast(0))
+    return applies
+  }
 }

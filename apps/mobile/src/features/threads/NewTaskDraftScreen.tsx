@@ -25,6 +25,9 @@ import {
 } from "react-native-keyboard-controller";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { isAndroidKeyboardAnimationUsable } from "../keyboard/androidKeyboardRecovery";
+import { useAndroidKeyboardRecovery } from "../keyboard/useAndroidKeyboardRecovery";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useFontFamily } from "../../lib/useFontFamily";
 
@@ -194,6 +197,12 @@ export function NewTaskDraftScreen(props: {
   } = useIncomingShare();
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useKeyboardState((state) => state.isVisible);
+  const { isQuarantined: isKeyboardStateQuarantined, markInputFocused } =
+    useAndroidKeyboardRecovery();
+  const isKeyboardAnimationUsable = isAndroidKeyboardAnimationUsable({
+    isKeyboardVisible,
+    isQuarantined: isKeyboardStateQuarantined,
+  });
   const controlsBottomPadding = Math.max(insets.bottom, 10);
   const keyboardOpenedOffset = Math.max(0, controlsBottomPadding - 8);
   const { projectScopes, selectedProject, selectedProjectKey, setProject } = flow;
@@ -1397,7 +1406,10 @@ export function NewTaskDraftScreen(props: {
         selection={composerMenu.selection}
         onChangeText={flow.setPrompt}
         onSelectionChange={composerMenu.onSelectionChange}
-        onFocus={() => setIsComposerFocused(true)}
+        onFocus={() => {
+          markInputFocused();
+          setIsComposerFocused(true);
+        }}
         onBlur={() => setIsComposerFocused(false)}
         onPasteImages={(uris) => void handleNativePasteImages(uris)}
         onPasteText={(paste) => void handleNativePasteText(paste)}
@@ -1547,7 +1559,12 @@ export function NewTaskDraftScreen(props: {
             triggerKind={composerMenu.trigger.kind}
             isLoading={composerMenu.isLoading}
             error={composerMenu.error}
-            onSelect={composerMenu.onSelect}
+            onSelect={(item) => {
+              composerMenu.onSelect(item);
+              // Android drops editor focus when a popover row is tapped, so the
+              // keyboard closed and the field needed another tap to keep typing.
+              if (Platform.OS === "android") promptInputRef.current?.focus();
+            }}
           />
         </View>
       ) : null}
@@ -1755,6 +1772,7 @@ export function NewTaskDraftScreen(props: {
         {heroViewport}
 
         <KeyboardStickyView
+          enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
           style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
           offset={{ closed: 0, opened: keyboardOpenedOffset }}
         >
@@ -1783,6 +1801,7 @@ export function NewTaskDraftScreen(props: {
 
       {heroViewport}
       <KeyboardStickyView
+        enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
         pointerEvents="box-none"
         style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}
         offset={{ closed: 0, opened: keyboardOpenedOffset }}

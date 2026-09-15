@@ -12,6 +12,7 @@ import android.text.Editable
 import android.text.InputType
 import android.text.InputFilter
 import android.text.Spanned
+import android.text.TextUtils
 import android.text.TextWatcher
 import android.text.style.ReplacementSpan
 import android.util.TypedValue
@@ -47,6 +48,7 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
   private val onComposerFocus by EventDispatcher()
   private val onComposerBlur by EventDispatcher()
   private val onComposerPasteImages by EventDispatcher()
+  private val onComposerSubmit by EventDispatcher()
   private val onComposerContextPress by EventDispatcher()
   private val onComposerPasteContext by EventDispatcher()
   private val onComposerPasteText by EventDispatcher()
@@ -87,6 +89,11 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
     }
     editor.pasteImagesListener = { uris ->
       onComposerPasteImages(mapOf("uris" to uris))
+    }
+    // A hardware keyboard has no on-screen Send button to reach for, so
+    // Ctrl/Meta+Enter sends. Plain Enter still inserts a newline.
+    editor.submitListener = {
+      onComposerSubmit(emptyMap<String, Any>())
     }
     editor.pasteContextListener = { payload ->
       nativeEventCount += 1
@@ -286,6 +293,8 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
     } else {
       Gravity.TOP or Gravity.START
     }
+    editor.maxLines = if (centered) 1 else Int.MAX_VALUE
+    editor.ellipsize = if (centered) TextUtils.TruncateAt.END else null
   }
 
   fun setContentInsetVertical(contentInsetVertical: Int) {
@@ -581,6 +590,7 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
   var readOnly = false
   var selectionListener: ((Int, Int) -> Unit)? = null
   var pasteImagesListener: ((List<String>) -> Unit)? = null
+  var submitListener: (() -> Unit)? = null
   var pasteContextListener: ((Map<String, String>) -> Unit)? = null
   var pasteTextListener: ((String, Int, Int) -> Unit)? = null
   var textPasteThresholdBytes = 0
@@ -609,12 +619,22 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
   }
 
   override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    val submit = submitListener
+    if (submit != null && isSubmitShortcut(keyCode, event)) {
+      submit()
+      return true
+    }
     val handled = when (keyCode) {
       KeyEvent.KEYCODE_DEL -> deleteChip(true)
       KeyEvent.KEYCODE_FORWARD_DEL -> deleteChip(false)
       else -> false
     }
     return handled || super.onKeyDown(keyCode, event)
+  }
+
+  private fun isSubmitShortcut(keyCode: Int, event: KeyEvent): Boolean {
+    val isEnter = keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+    return isEnter && (event.isCtrlPressed || event.isMetaPressed)
   }
 
   private fun deleteAdjacentChip(beforeLength: Int, afterLength: Int): Boolean = when {

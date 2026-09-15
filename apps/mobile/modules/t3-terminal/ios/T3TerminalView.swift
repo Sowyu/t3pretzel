@@ -241,6 +241,7 @@ public final class T3TerminalView: ExpoView, UITextFieldDelegate {
       onCapture(["text": normalized])
     }
   }
+  let onTerminalFocus = EventDispatcher()
 
   var terminalKey: String = "" {
     didSet {
@@ -466,6 +467,7 @@ public final class T3TerminalView: ExpoView, UITextFieldDelegate {
 
   @objc
   private func handleInputEditingDidBegin() {
+    onTerminalFocus()
     textInputModeDidChange()
   }
 
