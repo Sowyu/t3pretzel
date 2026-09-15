@@ -55,12 +55,7 @@ import {
 } from "../../components/ComposerToolbar";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { ComposerAttachmentButton } from "../../components/ComposerAttachmentButton";
-import {
-  ComposerStashButton,
-  ComposerStashPanel,
-  ComposerStashOutline,
-  useComposerStashChrome,
-} from "./ComposerStashControl";
+import { ComposerStashButton, useComposerStashChrome } from "./ComposerStashControl";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { composerStripAttachments } from "../../lib/composerImages";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
@@ -192,8 +187,8 @@ export function NewTaskDraftScreen(props: {
   readonly incomingShareId?: string;
 }) {
   const projects = useProjects();
-  const stashChrome = useComposerStashChrome();
   const flow = useNewTaskFlow();
+  const stashChrome = useComposerStashChrome(flow.draftKey ?? null);
   const navigation = useNavigation();
   const {
     consumeShare,
@@ -1614,14 +1609,10 @@ export function NewTaskDraftScreen(props: {
         </Pressable>
       ) : null}
 
-      {flow.draftKey ? (
-        <ComposerStashPanel draftKey={flow.draftKey} onLayout={stashChrome.onTabLayout} />
-      ) : null}
       <ComposerSurface
-        chromeless={stashChrome.attached}
-        onLayout={stashChrome.onSurfaceLayout}
+        crown={stashChrome.crown}
+        crownCap={stashChrome.cap}
         style={{
-          ...stashChrome.surfaceStyle,
           borderRadius: 26,
           minHeight: 140,
           overflow: "hidden",
@@ -1781,7 +1772,6 @@ export function NewTaskDraftScreen(props: {
           </ComposerDictationToolbar>
         </Animated.View>
       </ComposerSurface>
-      <ComposerStashOutline chrome={stashChrome} surfaceRadius={26} />
       <VideoPreviewModal source={previewVideo} onRequestClose={closeMediaPreview} />
       <FilePreviewModal source={previewFile} onRequestClose={closeMediaPreview} />
     </View>

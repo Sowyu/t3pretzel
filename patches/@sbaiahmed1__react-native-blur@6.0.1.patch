@@ -1,16 +1,42 @@
 diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
-index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f7ab3307e 100644
+index 304d49064f93f91eba1717adcfeb04cec203b1fe..92163ce52cdca92351f8517eb867feb584745f4e 100644
 --- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
 +++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassView.kt
-@@ -83,6 +83,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -59,6 +59,19 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+   private var borderTopRightRadius = -1f
+   private var borderBottomLeftRadius = -1f
+   private var borderBottomRightRadius = -1f
++  // Joined shape (see the shader): body below bodyTop, cap blended into it.
++  // All in dp; a cap width of 0 means a plain rounded rect.
++  private var bodyTopDp = 0f
++  private val capRectDp = FloatArray(4)
++  private var capRadiusDp = 0f
++  private var joinSmoothingDp = 12f
++  private var rimAlpha = 0f
++  private val isJoined: Boolean
++    get() = capRectDp[2] > 0f
++  val capX: Float get() = capRectDp[0]
++  val capY: Float get() = capRectDp[1]
++  val capWidth: Float get() = capRectDp[2]
++  val capHeight: Float get() = capRectDp[3]
+ 
+   // Shader engine state; only touched on API 33+.
+   private var glassNode: RenderNode? = null
+@@ -83,7 +96,12 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
    // cheap no-op when neither the offset, the capture, nor the effect changed.
    private val scrollTrackingListener = ViewTreeObserver.OnPreDrawListener {
      if (isSupported) {
-+      captureForFrame()
-       updateGlassNode()
+-      updateGlassNode()
++      try {
++        captureForFrame()
++        updateGlassNode()
++      } catch (e: Exception) {
++        logWarning("pre-draw glass update failed", e)
++      }
      }
      true
-@@ -94,29 +95,16 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+   }
+@@ -94,29 +112,16 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
    private val sourceLocation = IntArray(2)
    private val ownLocation = IntArray(2)
  
@@ -47,7 +73,7 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f
  
      // Capture at third linear resolution: ~9x fewer bytes and ~9x less
      // software raster work than full-res; the shader's blur consumes the
-@@ -168,7 +156,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -168,7 +173,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
        val source =
          findNearestScreenAncestor() ?: findNearestReactRootView() ?: parent as? ViewGroup
        captureSource = source
@@ -56,7 +82,7 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f
        refreshBackdrop()
      }
      initRunnable = runnable
-@@ -177,29 +165,6 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -177,29 +182,6 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
      registeredTreeObserver = viewTreeObserver.also {
        it.addOnPreDrawListener(scrollTrackingListener)
      }
@@ -86,7 +112,7 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f
    }
  
    override fun onDetachedFromWindow() {
-@@ -210,8 +175,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -210,8 +192,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
    fun cleanup() {
      initRunnable?.let { removeCallbacks(it) }
      initRunnable = null
@@ -96,7 +122,22 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f
      captureSource = null
      registeredTreeObserver?.let {
        if (it.isAlive) it.removeOnPreDrawListener(scrollTrackingListener)
-@@ -263,22 +227,20 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -246,7 +227,13 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+     // directly and would bake the React children into their own backdrop —
+     // the shader would then refract the children along with the background.
+     if (SharedBackdropCapture.captureInProgress) return
+-    if (isSupported && canvas.isHardwareAccelerated && updateGlassNode()) {
++    val drawable = try {
++      isSupported && canvas.isHardwareAccelerated && updateGlassNode()
++    } catch (e: Exception) {
++      logWarning("updateGlassNode failed in draw", e)
++      false
++    }
++    if (drawable) {
+       glassNode?.let { canvas.drawRenderNode(it) }
+     }
+     super.dispatchDraw(canvas)
+@@ -263,22 +250,20 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
      if (shaderFailed || width <= 0 || height <= 0) return false
      val node = glassNode ?: return false
      val source = captureSource ?: return false
@@ -127,7 +168,7 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f
  
      val generation = SharedBackdropCapture.generationOf(source)
      if (
-@@ -303,7 +265,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -303,7 +288,7 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
        // CAPTURE_DOWNSAMPLE-pixel steps, which reads as the glass "shaking"
        // against smoothly-scrolling content.
        recording.scale(downsample, downsample)
@@ -136,7 +177,7 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f
      } finally {
        node.endRecording()
      }
-@@ -329,20 +291,29 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+@@ -329,20 +314,29 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
      // dispatchDraw skips it entirely.
      if (shaderFailed) return
  
@@ -175,6 +216,148 @@ index 304d49064f93f91eba1717adcfeb04cec203b1fe..ee23e9cbaac6d54cb67d30f36995f91f
    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
    private fun ensureEngine() {
      if (glassNode != null) return
+@@ -382,7 +376,23 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+ 
+     shader.setFloatUniform("size", floatArrayOf(w, h))
+     shader.setFloatUniform("offset", floatArrayOf(0f, 0f))
+-    shader.setFloatUniform("cornerRadii", floatArrayOf(radius, radius, radius, radius))
++    // The cap sits flush with the body's right edge, so that body corner is
++    // square and the cap's edge runs straight into the body's.
++    val topRight = if (isJoined) 0f else radius
++    shader.setFloatUniform("cornerRadii", floatArrayOf(radius, topRight, radius, radius))
++    shader.setFloatUniform("bodyTop", if (isJoined) convertDpToPx(bodyTopDp) else 0f)
++    shader.setFloatUniform(
++      "capRect",
++      floatArrayOf(
++        convertDpToPx(capRectDp[0]),
++        convertDpToPx(capRectDp[1]),
++        convertDpToPx(capRectDp[2]),
++        convertDpToPx(capRectDp[3]),
++      ),
++    )
++    shader.setFloatUniform("capRadius", convertDpToPx(capRadiusDp))
++    shader.setFloatUniform("joinSmooth", convertDpToPx(joinSmoothingDp))
++    shader.setFloatUniform("rimAlpha", rimAlpha)
+     shader.setFloatUniform("refractionHeight", convertDpToPx(REFRACTION_HEIGHT_DP))
+     shader.setFloatUniform("refractionAmount", -convertDpToPx(REFRACTION_OFFSET_DP))
+     shader.setFloatUniform("depthEffect", DEPTH_EFFECT)
+@@ -401,7 +411,6 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+       )
+     )
+     shader.setFloatUniform("tintAlpha", (Color.alpha(glassTintColor) / 255f) * glassOpacity)
+-
+     val shaderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content")
+     val blurRadius =
+       if (glassType.equals("regular", ignoreCase = true)) REGULAR_BLUR_RADIUS
+@@ -498,6 +507,40 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+     updateCornerRadius()
+   }
+ 
++  fun setBodyTop(value: Float) {
++    bodyTopDp = value
++    effectDirty = true
++    invalidate()
++  }
++
++  fun setCap(x: Float, y: Float, width: Float, height: Float) {
++    val wasJoined = isJoined
++    capRectDp[0] = x
++    capRectDp[1] = y
++    capRectDp[2] = width
++    capRectDp[3] = height
++    effectDirty = true
++    if (wasJoined != isJoined) updateCornerRadius() else invalidate()
++  }
++
++  fun setCapRadius(value: Float) {
++    capRadiusDp = value
++    effectDirty = true
++    invalidate()
++  }
++
++  fun setJoinSmoothing(value: Float) {
++    joinSmoothingDp = value
++    effectDirty = true
++    invalidate()
++  }
++
++  fun setRimAlpha(value: Float) {
++    rimAlpha = value.coerceIn(0f, 1f)
++    effectDirty = true
++    invalidate()
++  }
++
+   fun setBorderTopLeftRadius(radius: Float) {
+     borderTopLeftRadius = radius
+     updateCornerRadius()
+@@ -543,6 +586,16 @@ class ReactNativeLiquidGlassView(context: Context) : FrameLayout(context) {
+     // outline clip for their exact shape.
+     shaderRadiusPx = if (isUniform) topLeft else baseRadius
+ 
++    if (isJoined) {
++      // The union of body and cap is not an outline shape; the shader masks
++      // it, so the view does not clip at all.
++      outlineProvider = ViewOutlineProvider.BOUNDS
++      clipToOutline = false
++      invalidateOutline()
++      effectDirty = true
++      invalidate()
++      return
++    }
+     if (isUniform) {
+       outlineProvider = object : ViewOutlineProvider() {
+         override fun getOutline(view: View, outline: Outline?) {
+diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassViewManager.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassViewManager.kt
+index df28970916f61e522b3a740deda8af498ea2f397..72a3253bba53cbd1e863751582cf939edd18a3d6 100644
+--- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassViewManager.kt
++++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/ReactNativeLiquidGlassViewManager.kt
+@@ -49,6 +49,46 @@ class ReactNativeLiquidGlassViewManager : ViewGroupManager<ReactNativeLiquidGlas
+     view?.setIsInteractive(isInteractive)
+   }
+ 
++  @ReactProp(name = "bodyTop")
++  override fun setBodyTop(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.setBodyTop(value.toFloat())
++  }
++
++  @ReactProp(name = "capX")
++  override fun setCapX(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.let { it.setCap(value.toFloat(), it.capY, it.capWidth, it.capHeight) }
++  }
++
++  @ReactProp(name = "capY")
++  override fun setCapY(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.let { it.setCap(it.capX, value.toFloat(), it.capWidth, it.capHeight) }
++  }
++
++  @ReactProp(name = "capWidth")
++  override fun setCapWidth(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.let { it.setCap(it.capX, it.capY, value.toFloat(), it.capHeight) }
++  }
++
++  @ReactProp(name = "capHeight")
++  override fun setCapHeight(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.let { it.setCap(it.capX, it.capY, it.capWidth, value.toFloat()) }
++  }
++
++  @ReactProp(name = "capRadius")
++  override fun setCapRadius(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.setCapRadius(value.toFloat())
++  }
++
++  @ReactProp(name = "joinSmoothing")
++  override fun setJoinSmoothing(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.setJoinSmoothing(value.toFloat())
++  }
++
++  @ReactProp(name = "rimAlpha")
++  override fun setRimAlpha(view: ReactNativeLiquidGlassView?, value: Double) {
++    view?.setRimAlpha(value.toFloat())
++  }
++
+   @ReactProp(name = "reducedTransparencyFallbackColor")
+   override fun setReducedTransparencyFallbackColor(view: ReactNativeLiquidGlassView?, reducedTransparencyFallbackColor: String?) {
+     // no-op
 diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
 index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e4f1f8e9e 100644
 --- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
@@ -358,3 +541,168 @@ index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e
    /** Generation of the last successful capture for [source]; consumers use it
     * to skip re-recording when neither the bitmap nor their sub-rect moved. */
    fun generationOf(source: View): Long = entries[source]?.generation ?: 0L
+diff --git a/android/src/main/res/raw/rnblur_liquidglass_effect.agsl b/android/src/main/res/raw/rnblur_liquidglass_effect.agsl
+index cce751fc18a2f6ca174249060971c267f90ec122..fa2ff1eb73e3d7678401e0c61942f6558315592d 100644
+--- a/android/src/main/res/raw/rnblur_liquidglass_effect.agsl
++++ b/android/src/main/res/raw/rnblur_liquidglass_effect.agsl
+@@ -49,6 +49,17 @@ uniform float chromaMultiplier;
+ uniform float3 tintColor;
+ uniform float tintAlpha;
+ 
++// Optional second lobe joined to the body as one piece of glass (a tab on
++// the composer). The body is the view below bodyTop; capRect (x, y, w, h,
++// view px, w <= 0 = none) is a rounded rect blended into it with a smooth
++// minimum, so the edge refraction runs around the union and the join reads
++// as one meniscus instead of two overlapping panes.
++uniform float bodyTop;
++uniform float4 capRect;
++uniform float capRadius;
++uniform float joinSmooth;
++uniform float rimAlpha;
++
+ const half3 rgbToY = half3(0.2126, 0.7152, 0.0722);
+ 
+ float radiusAt(float2 coord, float4 radii) {
+@@ -99,6 +110,24 @@ float2 gradSdRoundedRect(float2 coord, float2 halfSize, float radius) {
+     }
+ }
+ 
++float smoothMin(float a, float b, float k) {
++    float h = max(k - abs(a - b), 0.0) / k;
++    return min(a, b) - h * h * k * 0.25;
++}
++
++// Signed distance to the glass shape in view pixels: the body alone, or the
++// body joined with the cap.
++float sdShape(float2 p) {
++    float2 bodyHalf = float2(size.x, size.y - bodyTop) * 0.5;
++    float2 bodyCoord = p - float2(size.x * 0.5, bodyTop + bodyHalf.y);
++    float sdBody = sdRoundedRect(bodyCoord, bodyHalf, radiusAt(bodyCoord, cornerRadii));
++    if (capRect.z <= 0.0) return sdBody;
++    float2 capHalf = capRect.zw * 0.5;
++    float2 capCoord = p - (capRect.xy + capHalf);
++    float sdCap = sdRoundedRect(capCoord, capHalf, min(capRadius, min(capHalf.x, capHalf.y)));
++    return smoothMin(sdBody, sdCap, max(joinSmooth, 0.001));
++}
++
+ float circleMap(float x) {
+     return 1.0 - sqrt(1.0 - x * x);
+ }
+@@ -115,8 +144,16 @@ half4 main(float2 coord) {
+     float2 halfSize = size * 0.5;
+     float2 centeredCoord = (coord + offset) - halfSize;
+     float radius = radiusAt(centeredCoord, cornerRadii);
+-
+-    float sd = sdRoundedRect(centeredCoord, halfSize, radius);
++    bool joined = capRect.z > 0.0;
++
++    float2 shapeCoord = coord + offset;
++    float sd = sdShape(shapeCoord);
++    // Outside the joined shape the view is a plain rectangle (no outline
++    // clip can follow the union), so the shader cuts the shape itself.
++    if (joined && sd > 0.75) {
++        return half4(0.0);
++    }
++    float mask = joined ? 1.0 - smoothstep(-0.75, 0.75, sd) : 1.0;
+     if (-sd >= refractionHeight) {
+         half4 baseColor = content.eval(coord);
+ 
+@@ -134,8 +171,22 @@ half4 main(float2 coord) {
+     float smoothRadius = max(radius * 1.5, 30.0);
+     float gradRadius = min(smoothRadius, min(halfSize.x, halfSize.y));
+ 
+-    float2 shapeGrad = gradSdRoundedRect(centeredCoord, halfSize, gradRadius);
+-    float2 depthGrad = safeNormalize(centeredCoord, shapeGrad);
++    float2 shapeGrad;
++    float2 depthCoord = centeredCoord;
++    if (joined) {
++        // Numerical gradient of the union; the wide step softens the lens the
++        // way the enlarged analytic radius does for a lone rounded rect.
++        float e = 4.0;
++        float2 delta = float2(
++            sdShape(shapeCoord + float2(e, 0.0)) - sdShape(shapeCoord - float2(e, 0.0)),
++            sdShape(shapeCoord + float2(0.0, e)) - sdShape(shapeCoord - float2(0.0, e))
++        );
++        shapeGrad = safeNormalize(delta, float2(0.0, -1.0));
++        depthCoord = shapeCoord - float2(size.x * 0.5, bodyTop + (size.y - bodyTop) * 0.5);
++    } else {
++        shapeGrad = gradSdRoundedRect(centeredCoord, halfSize, gradRadius);
++    }
++    float2 depthGrad = safeNormalize(depthCoord, shapeGrad);
+     float2 grad = safeNormalize(shapeGrad + depthEffect * depthGrad, shapeGrad);
+ 
+     float2 refractedCoord = coord + d * grad;
+@@ -182,5 +233,11 @@ half4 main(float2 coord) {
+     color.rgb = (color.rgb - 0.5) * (1.0 + contrast) + 0.5;
+ 
+     half3 tintedRGB = mix(color.rgb, tintColor, tintAlpha);
+-    return half4(tintedRGB, color.a);
++    if (joined) {
++        // A faint rim just inside the edge, where a bordered view would draw
++        // its outline; it follows the union exactly.
++        float rim = rimAlpha * (1.0 - smoothstep(0.0, 1.5, -sd));
++        tintedRGB = mix(tintedRGB, half3(1.0), rim);
++    }
++    return half4(tintedRGB, color.a) * mask;
+ }
+diff --git a/lib/module/ReactNativeLiquidGlassViewNativeComponent.ts b/lib/module/ReactNativeLiquidGlassViewNativeComponent.ts
+index 343fb7481dd887ebbcd11ad3b71acae2adb44630..bdaf9c067ca7ba553f262bfe651fc14a10a1c9ab 100644
+--- a/lib/module/ReactNativeLiquidGlassViewNativeComponent.ts
++++ b/lib/module/ReactNativeLiquidGlassViewNativeComponent.ts
+@@ -13,6 +13,16 @@ export interface NativeProps extends ViewProps {
+   >;
+   isInteractive?: CodegenTypes.WithDefault<boolean, true>;
+   ignoreSafeArea?: CodegenTypes.WithDefault<boolean, true>;
++  // Android: a second rounded rect (the cap, in dp) joined to the body below
++  // bodyTop as one piece of glass. capWidth 0 leaves a plain rounded rect.
++  bodyTop?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capX?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capY?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capWidth?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capHeight?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capRadius?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  joinSmoothing?: CodegenTypes.WithDefault<CodegenTypes.Double, 12.0>;
++  rimAlpha?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
+ }
+ 
+ export default codegenNativeComponent<NativeProps>(
+diff --git a/lib/typescript/src/ReactNativeLiquidGlassViewNativeComponent.d.ts b/lib/typescript/src/ReactNativeLiquidGlassViewNativeComponent.d.ts
+index 28b042f1a1440702270832c7b83162815a3552c1..ab13a1bb0087c269c2cbae6d49cf1f22c487d768 100644
+--- a/lib/typescript/src/ReactNativeLiquidGlassViewNativeComponent.d.ts
++++ b/lib/typescript/src/ReactNativeLiquidGlassViewNativeComponent.d.ts
+@@ -7,6 +7,14 @@ export interface NativeProps extends ViewProps {
+     reducedTransparencyFallbackColor?: CodegenTypes.WithDefault<string, '#FFFFFF'>;
+     isInteractive?: CodegenTypes.WithDefault<boolean, true>;
+     ignoreSafeArea?: CodegenTypes.WithDefault<boolean, true>;
++    bodyTop?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++    capX?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++    capY?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++    capWidth?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++    capHeight?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++    capRadius?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++    joinSmoothing?: CodegenTypes.WithDefault<CodegenTypes.Double, 12.0>;
++    rimAlpha?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
+ }
+ declare const _default: import("react-native").HostComponent<NativeProps>;
+ export default _default;
+diff --git a/src/ReactNativeLiquidGlassViewNativeComponent.ts b/src/ReactNativeLiquidGlassViewNativeComponent.ts
+index 343fb7481dd887ebbcd11ad3b71acae2adb44630..bdaf9c067ca7ba553f262bfe651fc14a10a1c9ab 100644
+--- a/src/ReactNativeLiquidGlassViewNativeComponent.ts
++++ b/src/ReactNativeLiquidGlassViewNativeComponent.ts
+@@ -13,6 +13,16 @@ export interface NativeProps extends ViewProps {
+   >;
+   isInteractive?: CodegenTypes.WithDefault<boolean, true>;
+   ignoreSafeArea?: CodegenTypes.WithDefault<boolean, true>;
++  // Android: a second rounded rect (the cap, in dp) joined to the body below
++  // bodyTop as one piece of glass. capWidth 0 leaves a plain rounded rect.
++  bodyTop?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capX?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capY?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capWidth?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capHeight?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  capRadius?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
++  joinSmoothing?: CodegenTypes.WithDefault<CodegenTypes.Double, 12.0>;
++  rimAlpha?: CodegenTypes.WithDefault<CodegenTypes.Double, 0.0>;
+ }
+ 
+ export default codegenNativeComponent<NativeProps>(

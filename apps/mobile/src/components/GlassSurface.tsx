@@ -33,6 +33,25 @@ interface GlassSurfaceProps extends ViewProps {
   readonly blurTarget?: RefObject<View | null>;
   /** Uniwind styling used only when native Liquid Glass is unavailable. */
   readonly fallbackClassName?: string;
+  /**
+   * Android liquid glass only: a cap (a rounded rect in this view's dp
+   * coordinates) fused to the body below `bodyTop` as one piece of glass. The
+   * shader draws the union, so the edge refraction runs around the outline
+   * and the join reads as one meniscus. The view's own border is dropped;
+   * the shader draws a rim in its place.
+   */
+  readonly glassShape?: GlassShape | null;
+}
+
+export interface GlassShape {
+  readonly bodyTop: number;
+  readonly cap: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+    readonly radius: number;
+  };
 }
 
 export function GlassSurface({
@@ -45,6 +64,7 @@ export function GlassSurface({
   fallbackColor,
   blurTarget,
   fallbackClassName,
+  glassShape,
   className,
   style,
   ...props
@@ -104,19 +124,32 @@ export function GlassSurface({
     // children, so the content has to live inside the glass view: as a sibling
     // it would be captured and refracted back into its own backdrop.
     const flattened = StyleSheet.flatten([surfaceStyle, style]);
+    const shapeProps = glassShape
+      ? {
+          bodyTop: glassShape.bodyTop,
+          capX: glassShape.cap.x,
+          capY: glassShape.cap.y,
+          capWidth: glassShape.cap.width,
+          capHeight: glassShape.cap.height,
+          capRadius: glassShape.cap.radius,
+          joinSmoothing: 14,
+          rimAlpha: isDarkMode ? 0.14 : 0.08,
+        }
+      : { capWidth: 0 };
     return (
       <View
         {...props}
         ref={ref}
-        className={borderClassName}
+        className={glassShape ? cn("border-0 border-transparent", className) : borderClassName}
         style={[surfaceStyle, layoutOf(flattened)]}
       >
         <LiquidGlassView
           glassType="regular"
-          glassTintColor={fallbackColor === undefined ? undefined : String(fallbackColor)}
+          glassTintColor={fallbackColor === undefined ? undefined : hexColor(String(fallbackColor))}
           glassOpacity={isDarkMode ? 0.55 : 0.4}
           isInteractive={false}
           style={contentOf(flattened)}
+          {...shapeProps}
         >
           {children}
         </LiquidGlassView>
@@ -133,6 +166,17 @@ export function GlassSurface({
 
 // Android 13 can run the AGSL liquid glass shader: refraction, dispersion,
 // blur and tint from a live capture of the screen behind the view.
+// The native tint parser reads hex only; theme colours arrive as rgba().
+function hexColor(color: string): string {
+  const match = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?\s*\)$/i.exec(
+    color.trim(),
+  );
+  if (!match) return color;
+  const alpha = Math.round((match[4] === undefined ? 1 : Number(match[4])) * 255);
+  const hex = (value: number) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0");
+  return `#${hex(alpha)}${hex(Number(match[1]))}${hex(Number(match[2]))}${hex(Number(match[3]))}`;
+}
+
 export const supportsLiquidGlass = Platform.OS === "android" && Platform.Version >= 33;
 
 /** The corner radii of a style, so the clipping wrapper matches the glass shape. */

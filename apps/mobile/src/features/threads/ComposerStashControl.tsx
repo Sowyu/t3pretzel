@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -9,16 +9,12 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
 
 import { PROVIDER_SEND_TURN_MAX_ATTACHMENTS } from "@t3tools/contracts";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
 import { useComposerImagePreviewUri } from "../../components/ComposerAttachmentStrip";
-import { GlassSurface } from "../../components/GlassSurface";
-import { useUniwindTheme } from "../../lib/useUniwindTheme";
-import { stashOutlinePath } from "./stash-outline-path";
 import { selectionHaptic } from "../../lib/haptics";
 import { relativeTime } from "../../lib/time";
 import type { DraftComposerImageAttachment } from "../../lib/composerImages";
@@ -180,95 +176,41 @@ function StashRow(props: {
   );
 }
 
-const STASH_TAB_RADIUS = 18;
-// Concave curve where the tab's left edge flows into the composer's top edge.
-const STASH_JOIN_FILLET = 12;
+export const STASH_TAB_RADIUS = 18;
 
+/**
+ * What the composer surface needs to grow the stash tab out of its own glass:
+ * the crown to lay out above the body, and the tab's rect inside that crown
+ * (null while the list is open or the stash is empty, when the surface is a
+ * plain rounded rect).
+ */
 export interface ComposerStashChrome {
-  /** A tab or the open list sits on the composer, so the two share one outline. */
-  readonly attached: boolean;
-  readonly open: boolean;
-  readonly tab: LayoutRectangle | null;
-  readonly surface: LayoutRectangle | null;
-  /** Corners the composer must square so the shared outline can run straight. */
-  readonly surfaceStyle: {
-    readonly borderTopLeftRadius?: number;
-    readonly borderTopRightRadius?: number;
-  };
-  readonly onTabLayout: (event: LayoutChangeEvent) => void;
-  readonly onSurfaceLayout: (event: LayoutChangeEvent) => void;
+  readonly crown: ReactNode;
+  readonly cap: LayoutRectangle | null;
 }
 
 function sameLayout(a: LayoutRectangle | null, b: LayoutRectangle): boolean {
   return a !== null && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
-/**
- * Geometry shared by the stash tab, the composer and the outline drawn over
- * both. The tab and the composer keep their own glass fills; neither draws a
- * border, and `ComposerStashOutline` traces the union instead, so the pair
- * reads as one piece with the tab growing out of the composer.
- */
-export function useComposerStashChrome(): ComposerStashChrome {
+export function useComposerStashChrome(draftKey: string | null): ComposerStashChrome {
   const entries = usePromptStash();
   const open = usePromptStashListOpen();
   const [tab, setTab] = useState<LayoutRectangle | null>(null);
-  const [surface, setSurface] = useState<LayoutRectangle | null>(null);
   const onTabLayout = useCallback((event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout;
     setTab((current) => (sameLayout(current, next) ? current : next));
   }, []);
-  const onSurfaceLayout = useCallback((event: LayoutChangeEvent) => {
-    const next = event.nativeEvent.layout;
-    setSurface((current) => (sameLayout(current, next) ? current : next));
-  }, []);
-  const attached = open || entries.length > 0;
-  const surfaceStyle = useMemo(
-    () =>
-      open
-        ? { borderTopLeftRadius: 0, borderTopRightRadius: 0 }
-        : attached
-          ? { borderTopRightRadius: 0 }
-          : {},
-    [attached, open],
-  );
+  const attached = draftKey !== null && (open || entries.length > 0);
   return useMemo(
-    () => ({ attached, open, tab, surface, surfaceStyle, onTabLayout, onSurfaceLayout }),
-    [attached, open, tab, surface, surfaceStyle, onTabLayout, onSurfaceLayout],
-  );
-}
-
-/** Rendered after the composer so it sits on top of both glass fills. */
-export function ComposerStashOutline(props: {
-  readonly chrome: ComposerStashChrome;
-  readonly surfaceRadius: number;
-}) {
-  const colors = useUniwindTheme();
-  const { tab, surface, open } = props.chrome;
-  if (!props.chrome.attached || tab === null || surface === null) return null;
-  const top = tab.height - 1; // the composer overlaps the tab by a pixel, no seam
-  const width = surface.width;
-  const height = top + surface.height;
-  const paths = stashOutlinePath({
-    width,
-    height,
-    top,
-    tabX: open ? 0 : tab.x,
-    tabWidth: open ? width : tab.width,
-    tabRadius: STASH_TAB_RADIUS,
-    surfaceRadius: props.surfaceRadius,
-    fillet: STASH_JOIN_FILLET,
-  });
-  return (
-    <Svg
-      height={height}
-      pointerEvents="none"
-      style={{ position: "absolute", left: surface.x, top: 0 }}
-      width={width}
-    >
-      {paths.fillet ? <Path d={paths.fillet} fill={colors["--color-card"]} opacity={0.6} /> : null}
-      <Path d={paths.outline} fill="none" stroke={colors["--color-border"]} strokeWidth={1} />
-    </Svg>
+    () => ({
+      crown:
+        attached && draftKey !== null ? (
+          <ComposerStashPanel draftKey={draftKey} onTabLayout={onTabLayout} />
+        ) : null,
+      cap: attached && !open ? tab : null,
+    }),
+    [attached, draftKey, onTabLayout, open, tab],
   );
 }
 
@@ -279,7 +221,7 @@ export function ComposerStashOutline(props: {
  */
 export function ComposerStashPanel(props: {
   readonly draftKey: string;
-  readonly onLayout?: (event: LayoutChangeEvent) => void;
+  readonly onTabLayout?: (event: LayoutChangeEvent) => void;
 }) {
   const { draftKey } = props;
   const entries = usePromptStash();
@@ -318,22 +260,11 @@ export function ComposerStashPanel(props: {
 
   if (entries.length === 0 && !listOpen) return null;
 
+  // Laid out inside the composer's own glass (see ComposerSurface's crown), so
+  // the tab is a plain view: the surface shapes the material around it.
   return (
-    <View className={listOpen ? "items-stretch" : "items-end"} style={{ marginBottom: -1 }}>
-      {/* Same material as the composer and its popover: native glass on iOS 26,
-          a backdrop blur on Android 12 and later, a solid card below that. */}
-      {/* Same material as the composer so the two fills meet without a tone step. */}
-      <GlassSurface
-        chrome="none"
-        glassEffectStyle="regular"
-        onLayout={props.onLayout}
-        tintColorClassName="accent-glass-surface"
-        style={{
-          borderRadius: STASH_TAB_RADIUS,
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-        }}
-      >
+    <View className={listOpen ? "items-stretch" : "items-end"}>
+      <View onLayout={props.onTabLayout}>
         <Pressable
           accessibilityLabel={listOpen ? "Close stash" : `Open stash, ${entries.length} saved`}
           accessibilityRole="button"
@@ -357,30 +288,30 @@ export function ComposerStashPanel(props: {
             type="monochrome"
           />
         </Pressable>
-        {listOpen ? (
-          entries.length === 0 ? (
-            <Text className="border-t border-border-subtle px-4 py-3 text-sm text-foreground-muted">
-              Nothing stashed yet. Write a prompt, then tap the bookmark to set it aside.
-            </Text>
-          ) : (
-            <ScrollView
-              keyboardShouldPersistTaps="always"
-              // A ScrollView grows to fill its parent by default; the list should
-              // only be as tall as its rows, up to the cap.
-              style={{ flexGrow: 0, maxHeight: Math.round(windowHeight * 0.35) }}
-            >
-              {entries.map((entry) => (
-                <StashRow
-                  key={entry.id}
-                  entry={entry}
-                  onRestore={() => void restoreEntry(entry)}
-                  onDelete={() => deleteEntry(entry)}
-                />
-              ))}
-            </ScrollView>
-          )
-        ) : null}
-      </GlassSurface>
+      </View>
+      {listOpen ? (
+        entries.length === 0 ? (
+          <Text className="border-t border-border-subtle px-4 py-3 text-sm text-foreground-muted">
+            Nothing stashed yet. Write a prompt, then tap the bookmark to set it aside.
+          </Text>
+        ) : (
+          <ScrollView
+            keyboardShouldPersistTaps="always"
+            // A ScrollView grows to fill its parent by default; the list should
+            // only be as tall as its rows, up to the cap.
+            style={{ flexGrow: 0, maxHeight: Math.round(windowHeight * 0.35) }}
+          >
+            {entries.map((entry) => (
+              <StashRow
+                key={entry.id}
+                entry={entry}
+                onRestore={() => void restoreEntry(entry)}
+                onDelete={() => deleteEntry(entry)}
+              />
+            ))}
+          </ScrollView>
+        )
+      ) : null}
     </View>
   );
 }

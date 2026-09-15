@@ -23,6 +23,7 @@ import {
 import { StackActions, useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { ReactNode } from "react";
 import {
+  type RefObject,
   memo,
   useCallback,
   useEffect,
@@ -30,13 +31,13 @@ import {
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from "react";
 import {
   Alert,
   AppState,
   Keyboard,
   type LayoutChangeEvent,
+  type LayoutRectangle,
   Platform,
   Pressable,
   View,
@@ -76,7 +77,7 @@ import {
   ComposerAttachmentThumbnail,
 } from "../../components/ComposerAttachmentStrip";
 import { VideoPreviewModal, type VideoPreviewSource } from "../../components/VideoPreviewModal";
-import { GlassSurface, supportsLiquidGlass } from "../../components/GlassSurface";
+import { GlassSurface, type GlassShape, supportsLiquidGlass } from "../../components/GlassSurface";
 import { ComposerEditor, type ComposerEditorHandle } from "../../components/ComposerEditor";
 import { fileRoutePathSegments } from "../files/filePath";
 import {
@@ -101,8 +102,7 @@ import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
 import {
   ComposerStashButton,
-  ComposerStashPanel,
-  ComposerStashOutline,
+  STASH_TAB_RADIUS,
   useComposerStashChrome,
 } from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
@@ -223,9 +223,13 @@ export function ComposerSurface(props: {
   readonly style: ViewStyle;
   /** Morphs between the compact and expanded composer layouts. */
   readonly animateLayout?: boolean;
-  /** No border of its own: the stash chrome draws one outline around both. */
-  readonly chromeless?: boolean;
-  readonly onLayout?: (event: LayoutChangeEvent) => void;
+  /**
+   * Content laid out above the body inside the same surface (the stash tab or
+   * its open list). With `crownCap` set, Android's glass fuses that rect to the
+   * body as one shape; otherwise the crown simply sits inside the rounded rect.
+   */
+  readonly crown?: ReactNode;
+  readonly crownCap?: LayoutRectangle | null;
 }) {
   const { materialYouStyleLayoutActive } = useAppearancePreferences();
   const colors = useUniwindTheme();
@@ -245,24 +249,57 @@ export function ComposerSurface(props: {
     borderRadius: animatedBorderRadius.value,
   }));
   const layoutTransition = shouldAnimate ? COMPOSER_LAYOUT_TRANSITION : undefined;
+  const [crownHeight, setCrownHeight] = useState(0);
+  const handleCrownLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    setCrownHeight((current) => (current === height ? current : height));
+  }, []);
+  const crownCap = props.crown ? props.crownCap : null;
+  // The cap reaches STASH_TAB_RADIUS into the body so its own bottom corners
+  // vanish inside the union; only its top corners and the smooth join show.
+  const glassShape: GlassShape | null =
+    crownCap && crownHeight > 0
+      ? {
+          bodyTop: crownHeight,
+          cap: {
+            x: crownCap.x,
+            y: crownCap.y,
+            width: crownCap.width,
+            height: crownCap.height + STASH_TAB_RADIUS,
+            radius: STASH_TAB_RADIUS,
+          },
+        }
+      : null;
+  const { borderRadius: _radius, ...bodyStyle } = props.style;
+  const surfaceContent = props.crown ? (
+    <>
+      <View onLayout={handleCrownLayout}>{props.crown}</View>
+      <View style={bodyStyle}>{props.children}</View>
+    </>
+  ) : (
+    props.children
+  );
   // Android has no layout morph, and its liquid glass has to contain the
   // content it sits under (see GlassSurface), so the surface wraps the content.
   if (Platform.OS === "android") {
     return (
       <View
         className={
-          materialYouStyleLayoutActive
+          materialYouStyleLayoutActive || glassShape
             ? undefined
             : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
         }
-        onLayout={props.onLayout}
-        style={{
-          overflow: "hidden",
-          borderRadius: targetBorderRadius,
-          borderTopLeftRadius: props.style.borderTopLeftRadius,
-          borderTopRightRadius: props.style.borderTopRightRadius,
-          elevation: Platform.Version < 28 ? 10 : undefined,
-        }}
+        style={
+          // With a cap the shader cuts the union; a clip here would shear the
+          // tab's corners off, so the wrapper stays a plain box.
+          glassShape
+            ? undefined
+            : {
+                overflow: "hidden",
+                borderRadius: targetBorderRadius,
+                elevation: Platform.Version < 28 ? 10 : undefined,
+              }
+        }
       >
         <GlassSurface
           chrome="none"
@@ -272,17 +309,14 @@ export function ComposerSurface(props: {
               : colors["--color-card"]
           }
           fallbackClassName={
-            props.chromeless
-              ? undefined
-              : materialYouStyleLayoutActive
-                ? "border border-composer-border"
-                : "border border-border"
+            materialYouStyleLayoutActive ? "border border-composer-border" : "border border-border"
           }
           glassEffectStyle="regular"
+          glassShape={glassShape}
           tintColor="transparent"
-          style={props.style}
+          style={props.crown ? { borderRadius: targetBorderRadius } : props.style}
         >
-          {props.children}
+          {surfaceContent}
         </GlassSurface>
       </View>
     );
@@ -298,7 +332,6 @@ export function ComposerSurface(props: {
           : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
       }
       layout={layoutTransition}
-      onLayout={props.onLayout}
       style={[
         animatedShapeStyle,
         {
@@ -312,11 +345,7 @@ export function ComposerSurface(props: {
           materialYouStyleLayoutActive ? colors["--color-composer-surface"] : colors["--color-card"]
         }
         fallbackClassName={
-          props.chromeless
-            ? undefined
-            : materialYouStyleLayoutActive
-              ? "border border-composer-border"
-              : "border border-border"
+          materialYouStyleLayoutActive ? "border border-composer-border" : "border border-border"
         }
         glassEffectStyle="regular"
         // The composer is a passive material containing interactive controls.
@@ -333,7 +362,7 @@ export function ComposerSurface(props: {
         layout={layoutTransition}
         style={[props.style, animatedShapeStyle]}
       >
-        {props.children}
+        {surfaceContent}
       </Animated.View>
     </Animated.View>
   );
@@ -368,7 +397,6 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   // Only media belongs above the composer; every other file reads as its inline chip.
   // Where the stash tab or its open list sits on the composer, the corners
   // under it go square so the two read as one piece of glass.
-  const stashChrome = useComposerStashChrome();
   const stripAttachments = useMemo(
     () => composerStripAttachments(props.draftAttachments),
     [props.draftAttachments],
@@ -407,6 +435,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     );
   }, [props.serverConfig, props.selectedThread.modelSelection.instanceId]);
   const composerOwnerKey = scopedThreadKey(props.environmentId, props.selectedThread.id);
+  const stashChrome = useComposerStashChrome(composerOwnerKey);
   const openDraftDocument = (attachment: ComposerDocumentAttachment) => {
     Keyboard.dismiss();
     navigation.navigate("ThreadAttachment", {
@@ -754,10 +783,9 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
           </Pressable>
         ) : null}
 
-        <ComposerStashPanel draftKey={composerOwnerKey} onLayout={stashChrome.onTabLayout} />
         <ComposerSurface
-          chromeless={stashChrome.attached}
-          onLayout={stashChrome.onSurfaceLayout}
+          crown={stashChrome.crown}
+          crownCap={stashChrome.cap}
           style={{
             ...(isExpanded
               ? {
@@ -774,7 +802,6 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                   overflow: "hidden" as const,
                   paddingVertical: 2,
                 }),
-            ...stashChrome.surfaceStyle,
           }}
         >
           <ComposerDictationDraftContent
@@ -1088,7 +1115,6 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
             </ComposerDictationToolbar>
           </Animated.View>
         </ComposerSurface>
-        <ComposerStashOutline chrome={stashChrome} surfaceRadius={isExpanded ? 26 : 27} />
       </Animated.View>
 
       <VideoPreviewModal source={previewVideo} onRequestClose={closePreview} />
