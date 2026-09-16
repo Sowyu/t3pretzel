@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -7,6 +7,9 @@ import { AppText as Text } from "./AppText";
 import { GlassControl } from "./GlassControl";
 import { GlassSurface } from "./GlassSurface";
 import { cn } from "../lib/cn";
+
+// Bottom corners of the floating glass bar; the composer's card uses the same scale.
+const FLOATING_CORNER_RADIUS = 24;
 
 export interface AndroidHeaderAction {
   readonly accessibilityLabel: string;
@@ -60,11 +63,20 @@ export function AndroidScreenHeader(props: {
       caller owns the matching top inset for that content and measures this
       bar with `onLayout` (see ThreadRouteScreen). */
   readonly floating?: boolean;
-  readonly onLayout?: (event: LayoutChangeEvent) => void;
+  /** The bar's on-screen height, for the caller's content inset. */
+  readonly onHeightChange?: (height: number) => void;
 }) {
   const insets = useSafeAreaInsets();
   const paddingTop = props.embedded ? 8 : Math.max(insets.top, 12);
   const paddingClassName = cn("px-3", props.below ? "pb-3" : "pb-2.5");
+  const { onHeightChange } = props;
+  // The floating bar overshoots the top of the screen by its corner radius,
+  // so only its bottom corners round on screen.
+  const overshoot = props.floating ? FLOATING_CORNER_RADIUS : 0;
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => onHeightChange?.(event.nativeEvent.layout.height - overshoot),
+    [onHeightChange, overshoot],
+  );
 
   const content = (
     <>
@@ -123,11 +135,18 @@ export function AndroidScreenHeader(props: {
       <GlassSurface
         chrome="none"
         glassEffectStyle="regular"
-        onLayout={props.onLayout}
+        onLayout={handleLayout}
         tintColor="transparent"
-        style={{ position: "absolute", top: 0, left: 0, right: 0, borderRadius: 0, zIndex: 1 }}
+        style={{
+          position: "absolute",
+          top: -overshoot,
+          left: 0,
+          right: 0,
+          borderRadius: FLOATING_CORNER_RADIUS,
+          zIndex: 1,
+        }}
       >
-        <View className={paddingClassName} style={{ paddingTop }}>
+        <View className={paddingClassName} style={{ paddingTop: paddingTop + overshoot }}>
           {content}
         </View>
       </GlassSurface>
@@ -137,7 +156,7 @@ export function AndroidScreenHeader(props: {
   return (
     <View
       className={cn("border-b border-header-border bg-header", paddingClassName)}
-      onLayout={props.onLayout}
+      onLayout={handleLayout}
       style={{
         paddingTop,
         borderBottomWidth: props.hideBottomBorder ? 0 : undefined,

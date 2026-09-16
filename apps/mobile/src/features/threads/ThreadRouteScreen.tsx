@@ -22,7 +22,7 @@ import {
   projectScriptRuntimeEnv,
   resolveProjectScripts,
 } from "@t3tools/shared/projectScripts";
-import { Alert, Platform, ScrollView, View, type LayoutChangeEvent } from "react-native";
+import { Alert, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWorkspaceState } from "../../state/workspace";
 import { restoredNewTaskDraftKey } from "../../state/new-task-draft-key";
@@ -707,8 +707,7 @@ function ThreadRouteContent(
   // height as a top inset: the first row then starts below the bar and a
   // scroll to the top still shows the whole message.
   const [androidHeaderHeight, setAndroidHeaderHeight] = useState(0);
-  const handleAndroidHeaderLayout = useCallback((event: LayoutChangeEvent) => {
-    const height = event.nativeEvent.layout.height;
+  const handleAndroidHeaderHeight = useCallback((height: number) => {
     setAndroidHeaderHeight((current) => (current === height ? current : height));
   }, []);
   const androidHeaderActions = useMemo<ReadonlyArray<AndroidHeaderAction>>(() => {
@@ -998,7 +997,7 @@ function ThreadRouteContent(
           actions={androidHeaderActions}
           floating
           hideBottomBorder={materialYouStyleLayoutActive}
-          onLayout={handleAndroidHeaderLayout}
+          onHeightChange={handleAndroidHeaderHeight}
         />
       ) : null}
     </>
