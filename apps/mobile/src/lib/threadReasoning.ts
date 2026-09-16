@@ -88,7 +88,9 @@ function buildThreadReasoningByTurn(
     // repeated seq replaces its chunk rather than appending it twice.
     const seq =
       typeof payload?.seq === "number" && Number.isFinite(payload.seq) ? payload.seq : chunks.size;
-    chunks.set(seq, activity.summary);
+    // The wire summary is trimmed to satisfy the contract; the exact chunk,
+    // spacing included, rides in payload.text.
+    chunks.set(seq, typeof payload?.text === "string" ? payload.text : activity.summary);
   }
 
   const reasoningByTurn = new Map<string, ThreadReasoningTurn>();

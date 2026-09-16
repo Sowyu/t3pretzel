@@ -11,7 +11,7 @@ here="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 patcher="$here/../patch.mjs"
 node_bin="${T3_THINKING_NODE:-$(command -v node || printf '/usr/bin/node')}"
 state="$t3_home/runtime/service-state.json"
-marker='/\* t3-thinking v2 \*/'
+marker="$("$node_bin" "$patcher" --revision | sed 's/[*]/\\*/g')"
 
 [ -f "$state" ] || exit 0
 read -r active pending < <("$node_bin" -e '

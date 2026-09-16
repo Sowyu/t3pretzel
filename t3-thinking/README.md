@@ -59,15 +59,15 @@ The emitted activity is:
 {
   kind: "reasoning.text",
   tone: "info",
-  summary: bufferedTextChunk,
-  payload: { itemId, streamKind, seq },
+  summary: bufferedTextChunk.trim(),   // the contract requires a trimmed, non-empty summary
+  payload: { itemId, streamKind, seq, text: bufferedTextChunk },  // exact chunk, spacing kept
   turnId
 }
 ```
 
 `seq` starts at zero for each `(threadId, itemId)` and increments after every flush. Flushes happen at 400 characters, on the next reasoning event after 500 ms, and when an item or turn completes. Each edit carries `/* t3-thinking */`; a second patch run is a no-op. For a bundle the patcher checks syntax before its atomic rename and verifies three markers; for an executable it verifies one marker and an unchanged byte length.
 
-To verify a real turn, start the server with `./t3-thinking serve --port 3777`, open a project in the T3 client, select a Claude Code model, enable thinking, and send a prompt. Inspect the server websocket or the browser Network tab. During the turn, the stream should contain `thread.activity.append` events whose activity has `kind: "reasoning.text"`, `tone: "info"`, and the payload above. The tone stays one every released client already decodes; a new tone would fail the whole thread stream decode in the web app and on phones. Concatenate `summary` values by `payload.itemId` and ascending `payload.seq`.
+To verify a real turn, start the server with `./t3-thinking serve --port 3777`, open a project in the T3 client, select a Claude Code model, enable thinking, and send a prompt. Inspect the server websocket or the browser Network tab. During the turn, the stream should contain `thread.activity.append` events whose activity has `kind: "reasoning.text"`, `tone: "info"`, and the payload above. The tone stays one every released client already decodes; a new tone would fail the whole thread stream decode in the web app and on phones. Concatenate `payload.text` (falling back to `summary`) by `payload.itemId` and ascending `payload.seq`. Claude Code's thinking deltas carry no item id; those chunks are keyed `turn:<turnId>`.
 
 The runner needs only Bash, Node.js, and npm, on macOS or Linux.
 

@@ -6,9 +6,13 @@ import { spawnSync } from "node:child_process";
 
 // The revision is part of the marker: a binary carrying an older patch fails
 // --check, and the service hook restores the pristine build and re-patches.
-const PATCH_REVISION = 2;
+const PATCH_REVISION = 3;
 const marker = `/* t3-thinking v${PATCH_REVISION} */`;
 const anyMarker = /\/\* t3-thinking(?: v\d+)? \*\//g;
+if (process.argv[2] === "--revision") {
+  console.log(marker);
+  process.exit(0);
+}
 const file = process.argv[2];
 const checkOnly = process.argv[3] === "--check";
 
@@ -99,9 +103,12 @@ if (t3ThinkingKey !== void 0) {
   t3ThinkingBuffer.text += String(t3ThinkingPayload.delta ?? "");
   const t3ThinkingNow = Date.now();
   if (t3ThinkingBuffer.text.length >= 400 || t3ThinkingNow - t3ThinkingBuffer.lastFlushAt >= 500) {
-    yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingBuffer.text, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingPayload.streamKind, seq: t3ThinkingBuffer.seq }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
-    t3ThinkingBuffer.text = "";
-    t3ThinkingBuffer.seq += 1;
+    const t3ThinkingSummary = t3ThinkingBuffer.text.trim();
+    if (t3ThinkingSummary.length > 0) {
+      yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingSummary, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingPayload.streamKind, seq: t3ThinkingBuffer.seq, text: t3ThinkingBuffer.text }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
+      t3ThinkingBuffer.text = "";
+      t3ThinkingBuffer.seq += 1;
+    }
     t3ThinkingBuffer.lastFlushAt = t3ThinkingNow;
   }
 }
@@ -111,7 +118,8 @@ if (event.type === "item.completed" || event.type === "turn.completed" || event.
     if (!t3ThinkingKey.startsWith(thread.id + ":") || t3ThinkingBuffer.text.length === 0) continue;
     const t3ThinkingItemId = t3ThinkingKey.slice(thread.id.length + 1);
     if (event.type === "item.completed" && t3ThinkingCompletedItemId !== t3ThinkingItemId) continue;
-    yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingBuffer.text, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingBuffer.streamKind, seq: t3ThinkingBuffer.seq }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
+    const t3ThinkingFinal = t3ThinkingBuffer.text.trim();
+    if (t3ThinkingFinal.length > 0) yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingFinal, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingBuffer.streamKind, seq: t3ThinkingBuffer.seq, text: t3ThinkingBuffer.text }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
     t3ThinkingBuffers.delete(t3ThinkingKey);
   }
 }

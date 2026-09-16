@@ -18,6 +18,8 @@ function reasoningActivity(input: {
   readonly itemId: string;
   readonly seq: number;
   readonly summary: string;
+  /** The exact chunk; the summary is its trimmed form on the wire. */
+  readonly text?: string;
   readonly createdAt: string;
   readonly turnId?: typeof turnId | null;
 }): OrchestrationThreadActivity {
@@ -26,7 +28,12 @@ function reasoningActivity(input: {
     tone: "info",
     kind: "reasoning.text",
     summary: input.summary,
-    payload: { itemId: input.itemId, streamKind: "reasoning_text", seq: input.seq },
+    payload: {
+      itemId: input.itemId,
+      streamKind: "reasoning_text",
+      seq: input.seq,
+      ...(input.text === undefined ? {} : { text: input.text }),
+    },
     turnId: input.turnId === undefined ? turnId : input.turnId,
     createdAt: input.createdAt,
   };
@@ -195,5 +202,26 @@ describe("thinking traces in the feed", () => {
 
     expect(rowTypes(false)).toEqual(["message", "thinking"]);
     expect(rowTypes(true)).toEqual(["message", "reasoning"]);
+  });
+  it("keeps the spacing between chunks from payload.text, not the trimmed summary", () => {
+    const activities = [
+      reasoningActivity({
+        id: "r-1",
+        itemId: "turn:turn-1",
+        seq: 0,
+        summary: "Let me look",
+        text: "Let me look ",
+        createdAt: "2026-09-16T00:00:01.000Z",
+      }),
+      reasoningActivity({
+        id: "r-2",
+        itemId: "turn:turn-1",
+        seq: 1,
+        summary: "at the file.",
+        text: "at the file.\n",
+        createdAt: "2026-09-16T00:00:02.000Z",
+      }),
+    ];
+    expect(threadReasoningText(activities, turnId)).toBe("Let me look at the file.");
   });
 });
