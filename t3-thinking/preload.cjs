@@ -6,10 +6,39 @@
 // re-patching. Harmless in any other process: it only defines a global.
 
 const buffers = new Map();
-const debug = process.env.T3_THINKING_DEBUG === "1";
+const debugLevel = Number(process.env.T3_THINKING_DEBUG ?? "0") || 0;
+const debug = debugLevel >= 1;
+const trace = debugLevel >= 2;
 const log = (message) => {
   if (debug) process.stderr.write(`[t3-thinking] ${message}\n`);
 };
+const say = (message) => process.stderr.write(`[t3-thinking] ${message}\n`);
+
+// Claude Code returns thinking text only when started with
+// `--thinking-display summarized` (the other choice, `omitted`, is what the
+// harness gets by default: thinking blocks arrive empty). The server spawns
+// Claude Code through child_process, so the flag is appended there for every
+// stream-json Claude Code process that does not set it or disable thinking.
+const childProcess = require("node:child_process");
+const originalSpawn = childProcess.spawn;
+function isClaudeCodeSpawn(command, args) {
+  if (!Array.isArray(args)) return false;
+  const name = String(command);
+  const looksLikeClaude = /(^|\/)claude(\.exe)?$/.test(name) || name === "claude";
+  return looksLikeClaude && args.includes("--output-format") && args.includes("stream-json");
+}
+childProcess.spawn = function t3ThinkingSpawn(command, args, options) {
+  if (isClaudeCodeSpawn(command, args) && !args.includes("--thinking-display")) {
+    const thinkingAt = args.indexOf("--thinking");
+    const disabled = thinkingAt >= 0 && args[thinkingAt + 1] === "disabled";
+    if (!disabled) {
+      args = [...args, "--thinking-display", "summarized"];
+      say("spawning Claude Code with --thinking-display summarized");
+    }
+  }
+  return originalSpawn.call(this, command, args, options);
+};
+require("node:module").syncBuiltinESMExports();
 const FLUSH_CHARS = 400;
 const FLUSH_MS = 500;
 
@@ -51,14 +80,14 @@ function note(event, thread) {
   const method = event.raw?.method;
   // Live lines, so a turn can be read while it runs: each event type and raw
   // method the first time it shows up, and every reasoning delta.
-  if (!stats.types[event.type]) log(`turn ${String(event.turnId)} first ${event.type}${typeof method === "string" ? ` via ${method}` : ""} itemId=${String(event.itemId)}`);
+  if (trace && !stats.types[event.type]) log(`turn ${String(event.turnId)} first ${event.type}${typeof method === "string" ? ` via ${method}` : ""} itemId=${String(event.itemId)}`);
   stats.types[event.type] = (stats.types[event.type] ?? 0) + 1;
   if (event.type === "content.delta") {
     const kind = event.payload?.streamKind ?? "?";
     stats.deltas[kind] = (stats.deltas[kind] ?? 0) + 1;
-    if (kind !== "assistant_text") log(`turn ${String(event.turnId)} delta ${kind} #${stats.deltas[kind]} itemId=${String(event.itemId)} chars=${String(event.payload?.delta ?? "").length}`);
+    if (trace && kind !== "assistant_text") log(`turn ${String(event.turnId)} delta ${kind} #${stats.deltas[kind]} itemId=${String(event.itemId)} chars=${String(event.payload?.delta ?? "").length}`);
   }
-  if (typeof method === "string" && !stats.rawMethods[method]) log(`turn ${String(event.turnId)} first raw ${method} (${event.type})`);
+  if (trace && typeof method === "string" && !stats.rawMethods[method]) log(`turn ${String(event.turnId)} first raw ${method} (${event.type})`);
   if (typeof method === "string") stats.rawMethods[method] = (stats.rawMethods[method] ?? 0) + 1;
   const content = event.raw?.payload?.message?.content;
   if (Array.isArray(content)) {

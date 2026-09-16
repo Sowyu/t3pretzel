@@ -104,10 +104,12 @@ the patched binary. While the launcher is trialling a new version the script
 only patches the file and waits, because a child exit during a trial means
 rollback.
 
-## What you will actually see
+## Why the preload also touches Claude Code's arguments
 
-Claude returns most thinking blocks empty: on this server's transcript only
-7% of 1,120 blocks carried any text, and those were short summaries of longer
-reasoning stretches. That is the model, not the pipeline: the same summaries
-are what Claude's own desktop app shows. Expect one grey block on some turns,
-none on most.
+Claude Code returns thinking text only when started with
+`--thinking-display summarized`; its other choice, `omitted`, is the default
+the T3 harness gets, and then every thinking block arrives empty (deltas with
+zero characters). The preload wraps `child_process.spawn` and appends the
+flag to every stream-json Claude Code process that does not set it or run
+with thinking disabled. What you get is the same summarized thinking that
+Claude's own apps show; the API does not expose more than that.
