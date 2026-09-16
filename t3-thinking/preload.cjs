@@ -37,7 +37,40 @@ function* appendActivity(ctx, itemId, buffer, streamKind) {
   buffer.seq += 1;
 }
 
+// Debug: what each turn actually delivers, so a silent path can be found
+// without guessing. Logged once per turn at its terminal event.
+const turnStats = new Map();
+function note(event, thread) {
+  if (!debug) return;
+  const key = `${thread.id}:${String(event.turnId)}`;
+  let stats = turnStats.get(key);
+  if (!stats) {
+    stats = { deltas: {}, types: {}, thinkingBlocks: 0, rawMethods: {} };
+    turnStats.set(key, stats);
+  }
+  stats.types[event.type] = (stats.types[event.type] ?? 0) + 1;
+  if (event.type === "content.delta") {
+    const kind = event.payload?.streamKind ?? "?";
+    stats.deltas[kind] = (stats.deltas[kind] ?? 0) + 1;
+  }
+  const method = event.raw?.method;
+  if (typeof method === "string") stats.rawMethods[method] = (stats.rawMethods[method] ?? 0) + 1;
+  const content = event.raw?.payload?.message?.content;
+  if (Array.isArray(content)) {
+    const blocks = content.filter((b) => b && b.type === "thinking").length;
+    if (blocks > 0) {
+      stats.thinkingBlocks += blocks;
+      log(`thinking blocks in raw ${String(method)} (${event.type}): ${blocks}`);
+    }
+  }
+  if (event.type === "turn.completed" || event.type === "turn.aborted" || event.type === "turn.failed") {
+    log(`turn ${String(event.turnId)} summary: deltas=${JSON.stringify(stats.deltas)} types=${JSON.stringify(stats.types)} raw=${JSON.stringify(stats.rawMethods)} thinkingBlocks=${stats.thinkingBlocks}`);
+    turnStats.delete(key);
+  }
+}
+
 globalThis.__t3Thinking = function* (event, thread, now, orchestrationEngine, providerCommandId, EventId, toTurnId) {
+  note(event, thread);
   const ctx = { event, thread, now, orchestrationEngine, providerCommandId, EventId, turnId: toTurnId(event.turnId) };
   const payload = event.type === "content.delta" ? event.payload : undefined;
   const isReasoning =
