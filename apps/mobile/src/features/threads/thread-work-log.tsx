@@ -34,10 +34,7 @@ import {
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import type {
   EnvironmentId,
-  OrchestrationThreadActivity,
-  ThreadId,
   ToolActivityIcon,
-  TurnId,
 } from "@t3tools/contracts";
 import { toolActivityFaviconUrl } from "@t3tools/shared/favicon";
 
@@ -77,9 +74,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useAssetUrl } from "../../state/assets";
-import { useAtomValue } from "@effect/atom-react";
-import { environmentThreadDetails } from "../../state/threads";
-import { threadReasoningText } from "../../lib/threadReasoning";
 
 const SHIMMER_WIDTH = 72;
 const SHIMMER_SWEEP_MS = 1_350;
@@ -1136,110 +1130,6 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
     </Animated.View>
   );
 });
-
-/** Below this, three lines almost always hold the whole block on a phone. */
-const REASONING_COLLAPSE_MIN_LENGTH = 140;
-
-/**
- * One turn's reasoning text, shown when Settings → Experimental → Thinking
- * traces is on. The row subscribes to the thread's activities and maps them
- * down to this turn's text, so a chunk that changes another turn (or no text
- * at all) never reaches React. A finished turn collapses to three lines,
- * because the transcript keeps the text but the answer below it is the point.
- */
-export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
-  readonly environmentId: EnvironmentId;
-  readonly threadId: ThreadId;
-  readonly turnId: TurnId | null;
-  readonly rowId: string;
-  readonly live: boolean;
-  readonly expanded: boolean;
-  readonly onToggle: (rowId: string, anchorKey: string) => void;
-}) {
-  const selectTurnText = useCallback(
-    (activities: ReadonlyArray<OrchestrationThreadActivity>) =>
-      threadReasoningText(activities, props.turnId),
-    [props.turnId],
-  );
-  const streamed = useAtomValue(
-    environmentThreadDetails.activitiesAtom({
-      environmentId: props.environmentId,
-      threadId: props.threadId,
-    }),
-    selectTurnText,
-  );
-  const text = useStreamingReveal(streamed, props.live);
-  if (text.length === 0) {
-    return null;
-  }
-  const collapsed = !props.live && !props.expanded;
-  return (
-    <View className="mb-2 px-1">
-      <Text
-        selectable
-        className="text-sm leading-snug text-foreground-muted opacity-90"
-        {...(collapsed ? { numberOfLines: 3 } : {})}
-      >
-        {text}
-      </Text>
-      {!props.live && text.length >= REASONING_COLLAPSE_MIN_LENGTH ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: props.expanded }}
-          hitSlop={8}
-          onPress={() => props.onToggle(props.rowId, props.rowId)}
-        >
-          <Text className="mt-0.5 font-t3-medium text-xs text-foreground-muted">
-            {props.expanded ? "Show less" : "Show more"}
-          </Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-});
-
-/**
- * Reveals the streamed text a few characters per frame instead of jumping a
- * chunk at a time, so it reads as typing whatever size the server's chunks
- * are. The reveal catches up with the backlog over about ten frames, and a
- * finished turn shows everything at once.
- */
-function useStreamingReveal(target: string, live: boolean): string {
-  const [shown, setShown] = useState(live ? "" : target);
-  const shownRef = useRef(shown);
-  shownRef.current = shown;
-  const frame = useRef<number | null>(null);
-  useEffect(() => {
-    if (!live) {
-      setShown(target);
-      return;
-    }
-    // A chunk that rewrote earlier text (a replayed seq) is not an extension
-    // of what is on screen; snap rather than animate through it.
-    if (!target.startsWith(shownRef.current)) {
-      setShown(target);
-      return;
-    }
-    const step = () => {
-      frame.current = null;
-      const current = shownRef.current;
-      if (current.length >= target.length) return;
-      const backlog = target.length - current.length;
-      const advance = Math.max(2, Math.ceil(backlog * 0.12));
-      const next = target.slice(0, Math.min(target.length, current.length + advance));
-      setShown(next);
-      if (next.length < target.length) frame.current = requestAnimationFrame(step);
-    };
-    if (frame.current === null) frame.current = requestAnimationFrame(step);
-    return () => {
-      if (frame.current !== null) {
-        cancelAnimationFrame(frame.current);
-        frame.current = null;
-      }
-    };
-  }, [target, live]);
-  return shown;
-}
 
 export function ThreadThinkingRow(props: {
   readonly rowSizing: ReturnType<typeof deriveThreadWorkLogSizing>;

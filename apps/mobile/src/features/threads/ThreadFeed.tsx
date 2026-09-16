@@ -158,13 +158,19 @@ import {
   collapsedWorkLogHeight,
   ThreadAgentSpawnCard,
   ThreadDisclosureChevron,
-  ThreadReasoningRow,
   ThreadWorkGroupToggle,
   ThreadThinkingRow,
   ThreadWorkLog,
   THREAD_DISCLOSURE_TRANSITION_MS,
   WORK_GROUP_TOGGLE_HEIGHT,
 } from "./thread-work-log";
+import { ThreadReasoningRow } from "./thread-reasoning-row";
+import { ThreadTimelineRail } from "./thread-timeline-rail";
+import {
+  deriveTimelineRailItems,
+  resolveTimelineRailCurrentIndex,
+  type TimelineRailItem,
+} from "./thread-timeline-rail.logic";
 import { appendPendingThreadMessages, type PendingThreadFeedEntry } from "./pending-thread-feed";
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
 import { useMarkdownCodeHighlight } from "./markdownCodeHighlightState";
@@ -1418,7 +1424,7 @@ function renderFeedEntry(
       <ThreadReasoningRow
         environmentId={props.environmentId}
         threadId={props.threadId}
-        turnId={entry.turnId}
+        itemKey={entry.itemKey}
         rowId={entry.id}
         live={props.unsettledTurnId !== null && entry.turnId === props.unsettledTurnId}
         expanded={props.expandedWorkRows[entry.id] ?? false}
@@ -2448,6 +2454,62 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       ),
     [presentedFeed, props.anchorMessageId, anchorTopInset],
   );
+  // The timeline rail: ticks per user message down the right edge, replacing
+  // the scrollbar. Viewability feeds the current turn; a tap or scrub jumps.
+  const [visibleRows, setVisibleRows] = useState<readonly [number, number] | null>(null);
+  const handleViewableItemsChanged = useCallback(
+    (info: { readonly viewableItems: ReadonlyArray<{ index: number; isViewable: boolean }> }) => {
+      let first = Number.POSITIVE_INFINITY;
+      let last = Number.NEGATIVE_INFINITY;
+      for (const token of info.viewableItems) {
+        if (!token.isViewable) continue;
+        first = Math.min(first, token.index);
+        last = Math.max(last, token.index);
+      }
+      const next = first <= last ? ([first, last] as const) : null;
+      setVisibleRows((current) =>
+        current !== null && next !== null && current[0] === next[0] && current[1] === next[1]
+          ? current
+          : next,
+      );
+    },
+    [],
+  );
+  const railItems = useMemo(() => deriveTimelineRailItems(presentedFeed), [presentedFeed]);
+  const railCurrentIndex = useMemo(
+    () =>
+      visibleRows === null
+        ? null
+        : resolveTimelineRailCurrentIndex({
+            items: railItems,
+            firstVisibleRow: visibleRows[0],
+            lastVisibleRow: visibleRows[1],
+          }),
+    [railItems, visibleRows],
+  );
+  const railInViewRange = useMemo(() => {
+    if (visibleRows === null) return null;
+    let first = -1;
+    let last = -1;
+    railItems.forEach((item, index) => {
+      if (item.rowIndex < visibleRows[0] || item.rowIndex > visibleRows[1]) return;
+      if (first < 0) first = index;
+      last = index;
+    });
+    return first < 0 ? null : ([first, last] as const);
+  }, [railItems, visibleRows]);
+  const handleRailSelect = useCallback(
+    (item: TimelineRailItem) => {
+      // Jumping up is leaving the end; the follower must not drag the reader back.
+      setEndFollow(false);
+      props.listRef.current?.scrollToIndex({
+        index: item.rowIndex,
+        animated: true,
+        viewOffset: topContentInset + 8,
+      });
+    },
+    [props.listRef, setEndFollow, topContentInset],
+  );
   const terminalAssistantMessageIds = useMemo(() => {
     const terminalIdsByTurn = new Map<TurnId, string>();
     for (const entry of props.feed) {
@@ -2839,6 +2901,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             extraData={listAppearanceData}
             renderItem={renderItem}
             viewabilityConfig={THREAD_MEDIA_VIEWABILITY_CONFIG}
+            onViewableItemsChanged={handleViewableItemsChanged}
             keyExtractor={(entry) => entry.id}
             getItemType={(entry) =>
               entry.type === "message" ? `message:${entry.message.role}` : entry.type
@@ -2890,6 +2953,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             onMomentumScrollBegin={handleMomentumScrollBegin}
             onMomentumScrollEnd={handleMomentumScrollEnd}
             scrollEventThrottle={16}
+            // The timeline rail below stands in for the scrollbar.
+            showsVerticalScrollIndicator={false}
             ListHeaderComponent={
               <>
                 {usesNativeAutomaticInsets ? null : <View style={{ height: topContentInset }} />}
@@ -2913,6 +2978,12 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             }}
           />
         </View>
+        <ThreadTimelineRail
+          items={railItems}
+          currentIndex={railCurrentIndex}
+          inViewRange={railInViewRange}
+          onSelect={handleRailSelect}
+        />
         {presentedFeed.length === 0 &&
         props.activeWorkStartedAt === null &&
         props.contentPresentation.kind === "ready" ? (

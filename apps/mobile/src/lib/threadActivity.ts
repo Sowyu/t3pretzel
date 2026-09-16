@@ -37,8 +37,7 @@ import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-lo
 import { commandProgramName } from "@t3tools/client-runtime/work-log/command-label";
 import {
   isReasoningTextActivity,
-  reasoningTurnKey,
-  threadReasoningByTurn,
+  threadReasoningItems,
 } from "./threadReasoning";
 
 import * as Arr from "effect/Array";
@@ -153,15 +152,16 @@ type RawThreadFeedEntry =
     }
   | {
       /**
-       * One turn's reasoning text, built only when the experimental Thinking
-       * traces setting is on. The text is deliberately absent: the row reads
-       * the turn's reasoning activities itself, so a streamed chunk repaints
+       * One reasoning block, built only when the experimental Thinking traces
+       * setting is on. The text is deliberately absent: the row reads the
+       * block's reasoning activities itself, so a streamed chunk repaints
        * that row instead of every row the feed rebuild touches.
        */
       readonly type: "reasoning";
       readonly id: string;
       readonly createdAt: string;
       readonly turnId: TurnId | null;
+      readonly itemKey: string;
     };
 
 export type ThreadFeedEntry =
@@ -427,9 +427,11 @@ function deriveWorkLogEntries(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): DerivedWorkLogEntry[] {
   const ordered = Arr.sort(activities, activityOrder);
+  const compactedAt = latestCompactedAtByTurn(ordered);
   const entries: DerivedWorkLogEntry[] = [];
   for (const activity of foldUserInputActivities(ordered)) {
     if (activity.tone !== "error" && isWorktreeSetupActivity(activity.kind)) continue;
+    if (isSupersededCompactingActivity(activity, compactedAt)) continue;
     if (activity.kind === "tool.started") continue;
     // Like web: an agent's task.started row anchors its batch. It has a fixed
     // id and timestamp, unlike progress ticks, whose stable per-task id is
@@ -449,6 +451,44 @@ function deriveWorkLogEntries(
     entries.push(toDerivedWorkLogEntry(activity));
   }
   return collapseDerivedWorkLogEntries(entries);
+}
+
+/**
+ * A patched server (t3-thinking) records the start of a Claude Code auto
+ * compaction as a `context-compaction` row with `payload.state: "compacting"`;
+ * the stock server records only the end. The start row shimmers as the
+ * turn's trailing work until the end row lands, then drops out.
+ */
+function compactionState(activity: OrchestrationThreadActivity): string | null {
+  if (activity.kind !== "context-compaction") return null;
+  const payload =
+    activity.payload && typeof activity.payload === "object"
+      ? (activity.payload as Record<string, unknown>)
+      : null;
+  return typeof payload?.state === "string" ? payload.state : null;
+}
+
+function latestCompactedAtByTurn(
+  activities: ReadonlyArray<OrchestrationThreadActivity>,
+): ReadonlyMap<string, string> {
+  const latest = new Map<string, string>();
+  for (const activity of activities) {
+    const state = compactionState(activity);
+    if (state === null || state === "compacting") continue;
+    const turnKey = activity.turnId ?? "";
+    const current = latest.get(turnKey);
+    if (current === undefined || activity.createdAt > current) latest.set(turnKey, activity.createdAt);
+  }
+  return latest;
+}
+
+function isSupersededCompactingActivity(
+  activity: OrchestrationThreadActivity,
+  compactedAt: ReadonlyMap<string, string>,
+): boolean {
+  if (compactionState(activity) !== "compacting") return false;
+  const doneAt = compactedAt.get(activity.turnId ?? "");
+  return doneAt !== undefined && doneAt >= activity.createdAt;
 }
 
 /** Adapters forward unknown wire-only SDK messages (background_tasks_changed,
@@ -2226,17 +2266,18 @@ export function buildThreadFeed(
   );
   const reasoningEntries: Array<Extract<RawThreadFeedEntry, { readonly type: "reasoning" }>> =
     options?.thinkingTraces === true
-      ? Array.from(threadReasoningByTurn(thread.activities).values())
+      ? Array.from(threadReasoningItems(thread.activities).values())
           .filter(
-            (turn) =>
+            (item) =>
               oldestLoadedMessageCreatedAt === null ||
-              turn.createdAt >= oldestLoadedMessageCreatedAt,
+              item.createdAt >= oldestLoadedMessageCreatedAt,
           )
-          .map((turn) => ({
+          .map((item) => ({
             type: "reasoning",
-            id: `reasoning:${reasoningTurnKey(turn.turnId)}`,
-            createdAt: turn.createdAt,
-            turnId: turn.turnId,
+            id: `reasoning:${item.key}`,
+            createdAt: item.createdAt,
+            turnId: item.turnId,
+            itemKey: item.key,
           }))
       : [];
   const foldedAnswerMessageIds = new Set(

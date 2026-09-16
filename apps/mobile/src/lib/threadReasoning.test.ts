@@ -9,7 +9,7 @@ import {
 } from "@t3tools/contracts";
 
 import { buildThreadFeed, deriveThreadFeedPresentation } from "./threadActivity";
-import { threadReasoningByTurn, threadReasoningText } from "./threadReasoning";
+import { threadReasoningItem, threadReasoningItems } from "./threadReasoning";
 
 const turnId = TurnId.make("turn-1");
 
@@ -51,6 +51,22 @@ function toolActivity(id: string, createdAt: string): OrchestrationThreadActivit
   };
 }
 
+function compactionActivity(
+  id: string,
+  state: "compacting" | "compacted",
+  createdAt: string,
+): OrchestrationThreadActivity {
+  return {
+    id: EventId.make(id),
+    tone: "info",
+    kind: "context-compaction",
+    summary: state === "compacting" ? "Compacting context" : "Compacted context 998K → 12K tokens",
+    payload: { state },
+    turnId,
+    createdAt,
+  };
+}
+
 function makeThread(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): Pick<OrchestrationThread, "messages" | "activities"> {
@@ -70,14 +86,15 @@ function makeThread(
   };
 }
 
-describe("threadReasoningByTurn", () => {
-  it("joins one item's chunks in seq order regardless of arrival order", () => {
+describe("threadReasoningItems", () => {
+  it("joins one block's chunks in seq order regardless of arrival order", () => {
     const activities = [
       reasoningActivity({
         id: "r-2",
         itemId: "item-a",
         seq: 1,
-        summary: " the failing test",
+        summary: "the failing test",
+        text: " the failing test",
         createdAt: "2026-01-01T00:00:02.000Z",
       }),
       reasoningActivity({
@@ -89,13 +106,14 @@ describe("threadReasoningByTurn", () => {
       }),
     ];
 
-    expect(threadReasoningText(activities, turnId)).toBe("Let me read the failing test");
-    expect(threadReasoningByTurn(activities).get(turnId)?.createdAt).toBe(
-      "2026-01-01T00:00:01.000Z",
-    );
+    const item = threadReasoningItem(activities, "item-a");
+    expect(item?.text).toBe("Let me read the failing test");
+    expect(item?.chunks).toEqual(["Let me read", " the failing test"]);
+    expect(item?.createdAt).toBe("2026-01-01T00:00:01.000Z");
   });
 
-  it("separates several reasoning items with a blank line", () => {
+  it("keeps blocks apart and marks only the turn's last one as latest", () => {
+    const otherTurn = TurnId.make("turn-2");
     const activities = [
       reasoningActivity({
         id: "r-1",
@@ -113,41 +131,73 @@ describe("threadReasoningByTurn", () => {
       }),
       reasoningActivity({
         id: "r-3",
-        itemId: "item-b",
-        seq: 1,
-        summary: ", continued",
-        createdAt: "2026-01-01T00:00:04.000Z",
-      }),
-    ];
-
-    expect(threadReasoningText(activities, turnId)).toBe(
-      "First thought\n\nSecond thought, continued",
-    );
-  });
-
-  it("keeps turns apart and reports nothing for a turn that never reasoned", () => {
-    const otherTurn = TurnId.make("turn-2");
-    const activities = [
-      reasoningActivity({
-        id: "r-1",
-        itemId: "item-a",
+        itemId: "item-c",
         seq: 0,
-        summary: "Turn one",
-        createdAt: "2026-01-01T00:00:01.000Z",
-      }),
-      reasoningActivity({
-        id: "r-2",
-        itemId: "item-b",
-        seq: 0,
-        summary: "Turn two",
+        summary: "Other turn",
         createdAt: "2026-01-01T00:00:02.000Z",
         turnId: otherTurn,
       }),
     ];
 
-    expect(threadReasoningText(activities, turnId)).toBe("Turn one");
-    expect(threadReasoningText(activities, otherTurn)).toBe("Turn two");
-    expect(threadReasoningText(activities, TurnId.make("turn-3"))).toBe("");
+    const items = threadReasoningItems(activities);
+    expect(Array.from(items.keys())).toEqual(["item-a", "item-b", "item-c"]);
+    expect(items.get("item-a")?.latestInTurn).toBe(false);
+    expect(items.get("item-b")?.latestInTurn).toBe(true);
+    expect(items.get("item-c")?.latestInTurn).toBe(true);
+    expect(threadReasoningItem(activities, "item-d")).toBeNull();
+  });
+
+  it("keeps the spacing between chunks from payload.text and trims the block's edges", () => {
+    const activities = [
+      reasoningActivity({
+        id: "r-1",
+        itemId: "turn:turn-1:0",
+        seq: 0,
+        summary: "Let me look",
+        text: "\n\nLet me look ",
+        createdAt: "2026-09-16T00:00:01.000Z",
+      }),
+      reasoningActivity({
+        id: "r-2",
+        itemId: "turn:turn-1:0",
+        seq: 1,
+        summary: "at the file.",
+        text: "at the file.\n",
+        createdAt: "2026-09-16T00:00:02.000Z",
+      }),
+    ];
+    const item = threadReasoningItem(activities, "turn:turn-1:0");
+    expect(item?.text).toBe("Let me look at the file.");
+    expect(item?.chunks).toEqual(["Let me look ", "at the file."]);
+  });
+
+  it("reuses a block's object while its text is unchanged", () => {
+    const first = reasoningActivity({
+      id: "r-1",
+      itemId: "item-a",
+      seq: 0,
+      summary: "Stable",
+      createdAt: "2026-01-01T00:00:01.000Z",
+    });
+    const before = threadReasoningItem([first], "item-a");
+    const after = threadReasoningItem([first, toolActivity("tool-1", "2026-01-01T00:00:02.000Z")], "item-a");
+    expect(after).toBe(before);
+    const grown = threadReasoningItem(
+      [
+        first,
+        reasoningActivity({
+          id: "r-2",
+          itemId: "item-a",
+          seq: 1,
+          summary: "more",
+          text: " more",
+          createdAt: "2026-01-01T00:00:03.000Z",
+        }),
+      ],
+      "item-a",
+    );
+    expect(grown).not.toBe(before);
+    expect(grown?.text).toBe("Stable more");
   });
 });
 
@@ -161,6 +211,13 @@ describe("thinking traces in the feed", () => {
       createdAt: "2026-01-01T00:00:01.000Z",
     }),
     toolActivity("tool-1", "2026-01-01T00:00:02.000Z"),
+    reasoningActivity({
+      id: "r-2",
+      itemId: "item-b",
+      seq: 0,
+      summary: "Now the fix",
+      createdAt: "2026-01-01T00:00:03.000Z",
+    }),
   ];
 
   it("never renders reasoning as a generic work-log row", () => {
@@ -174,14 +231,21 @@ describe("thinking traces in the feed", () => {
     }
   });
 
-  it("adds one reasoning row per turn only when the setting is on", () => {
+  it("adds one row per block, in order around the tools, only when the setting is on", () => {
     expect(buildThreadFeed(makeThread(activities)).map((entry) => entry.type)).toEqual([
       "message",
       "activity-group",
     ]);
-    expect(
-      buildThreadFeed(makeThread(activities), { thinkingTraces: true }).map((entry) => entry.type),
-    ).toEqual(["message", "reasoning", "activity-group"]);
+    const entries = buildThreadFeed(makeThread(activities), { thinkingTraces: true });
+    expect(entries.map((entry) => entry.type)).toEqual([
+      "message",
+      "reasoning",
+      "activity-group",
+      "reasoning",
+    ]);
+    expect(entries.flatMap((entry) => (entry.type === "reasoning" ? [entry.itemKey] : []))).toEqual(
+      ["item-a", "item-b"],
+    );
   });
 
   it("retires the thinking shimmer once the turn has reasoning text", () => {
@@ -203,25 +267,31 @@ describe("thinking traces in the feed", () => {
     expect(rowTypes(false)).toEqual(["message", "thinking"]);
     expect(rowTypes(true)).toEqual(["message", "reasoning"]);
   });
-  it("keeps the spacing between chunks from payload.text, not the trimmed summary", () => {
+});
+
+describe("context compaction rows", () => {
+  const summaries = (activities: ReadonlyArray<OrchestrationThreadActivity>) =>
+    buildThreadFeed(makeThread(activities)).flatMap((entry) =>
+      entry.type === "activity-group"
+        ? entry.activities.map((activity) => activity.workEntry.label)
+        : [],
+    );
+
+  it("shows the start row until the server records the end, then only the end", () => {
+    const compacting = compactionActivity("c-1", "compacting", "2026-01-01T00:00:01.000Z");
+    expect(summaries([compacting])).toEqual(["Compacting context"]);
+    const compacted = compactionActivity("c-2", "compacted", "2026-01-01T00:02:31.000Z");
+    expect(summaries([compacting, compacted])).toEqual(["Compacted context 998K → 12K tokens"]);
+  });
+
+  it("keeps a start row that follows a finished compaction", () => {
     const activities = [
-      reasoningActivity({
-        id: "r-1",
-        itemId: "turn:turn-1",
-        seq: 0,
-        summary: "Let me look",
-        text: "Let me look ",
-        createdAt: "2026-09-16T00:00:01.000Z",
-      }),
-      reasoningActivity({
-        id: "r-2",
-        itemId: "turn:turn-1",
-        seq: 1,
-        summary: "at the file.",
-        text: "at the file.\n",
-        createdAt: "2026-09-16T00:00:02.000Z",
-      }),
+      compactionActivity("c-1", "compacted", "2026-01-01T00:00:01.000Z"),
+      compactionActivity("c-2", "compacting", "2026-01-01T00:05:00.000Z"),
     ];
-    expect(threadReasoningText(activities, turnId)).toBe("Let me look at the file.");
+    expect(summaries(activities)).toEqual([
+      "Compacted context 998K → 12K tokens",
+      "Compacting context",
+    ]);
   });
 });
