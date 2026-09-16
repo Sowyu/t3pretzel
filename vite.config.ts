@@ -152,6 +152,8 @@ export default defineConfig({
           "apps/mobile/src/native/T3ComposerEditor.native.tsx",
           // Reanimated needs the concrete colour to fade a text span in.
           "apps/mobile/src/features/threads/thread-reasoning-row.tsx",
+          // Reanimated interpolates the track colour between concrete values.
+          "apps/mobile/src/components/LiquidSwitch.tsx",
         ],
         rules: {
           "t3code/no-mobile-uniwind-theme-escape-hatches": ["error", { allowUniwindTheme: true }],

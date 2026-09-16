@@ -262,6 +262,15 @@ describe("describeBackgroundRefreshFailure", () => {
     );
   });
 
+  it("names an unreachable server instead of echoing its reason code", () => {
+    expect(
+      describeBackgroundRefreshFailure({
+        _tag: "ConnectionTransientError",
+        reason: "endpoint-unavailable",
+      }),
+    ).toBe("server unreachable");
+  });
+
   it("turns a connection reason into a phrase", () => {
     expect(
       describeBackgroundRefreshFailure({

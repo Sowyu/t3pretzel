@@ -2,9 +2,25 @@ import { Platform, Pressable, Switch, View, type SwitchProps } from "react-nativ
 
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { SymbolView } from "./AppSymbol";
+import { supportsLiquidGlass } from "./GlassSurface";
+import { LiquidSwitch } from "./LiquidSwitch";
 
 export function ThemedSwitch(props: SwitchProps) {
   const { materialYouStyleLayoutActive } = useAppearancePreferences();
+  // Liquid glass wins over both the Material You switch and the platform one.
+  if (Platform.OS === "android" && supportsLiquidGlass) {
+    return (
+      <LiquidSwitch
+        accessibilityHint={props.accessibilityHint}
+        accessibilityLabel={props.accessibilityLabel}
+        disabled={props.disabled}
+        onValueChange={props.onValueChange ?? undefined}
+        style={props.style}
+        testID={props.testID}
+        value={Boolean(props.value)}
+      />
+    );
+  }
   if (materialYouStyleLayoutActive) {
     return (
       <Pressable

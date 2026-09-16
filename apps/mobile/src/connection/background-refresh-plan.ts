@@ -224,6 +224,14 @@ function describeConnectionReason(error: { readonly reason?: unknown }): string 
     case "network":
     case "transport":
       return "network error";
+    case "endpoint-unavailable":
+      return "server unreachable";
+    case "relay-unavailable":
+      return "relay unreachable";
+    case "remote-unavailable":
+      return "remote unreachable";
+    case "unsupported":
+      return "unsupported server";
     default:
       return typeof error.reason === "string" ? error.reason : "blocked";
   }
