@@ -50,6 +50,12 @@ export interface Preferences {
   /** Fresh keys reset both shelves to collapsed when users update. */
   readonly threadListSettledShelfExpanded?: boolean;
   readonly threadListSnoozedShelfExpanded?: boolean;
+  /**
+   * Experimental: render the model's reasoning in the thread feed. Only a
+   * server that forwards `reasoning.text` activities has anything to show,
+   * so this stays off until the device opts in.
+   */
+  readonly thinkingTracesEnabled?: boolean;
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -112,6 +118,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     planModeEnabled?: boolean;
     threadListSettledShelfExpanded?: boolean;
     threadListSnoozedShelfExpanded?: boolean;
+    thinkingTracesEnabled?: boolean;
   } = {};
 
   if (typeof parsed.liveActivitiesEnabled === "boolean") {
@@ -196,6 +203,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.threadListSnoozedShelfExpanded === "boolean") {
     preferences.threadListSnoozedShelfExpanded = parsed.threadListSnoozedShelfExpanded;
+  }
+  if (typeof parsed.thinkingTracesEnabled === "boolean") {
+    preferences.thinkingTracesEnabled = parsed.thinkingTracesEnabled;
   }
   return preferences;
 }

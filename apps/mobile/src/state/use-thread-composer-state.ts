@@ -42,6 +42,7 @@ import {
 import type { DraftComposerImageAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { buildThreadFeed } from "../lib/threadActivity";
+import { useThinkingTracesEnabled } from "../features/threads/use-thinking-traces-enabled";
 import { acknowledgedThreadMessagesAtom } from "./acknowledged-thread-messages";
 import { appendPendingThreadMessages } from "../features/threads/pending-thread-feed";
 import { appAtomRegistry } from "../state/atom-registry";
@@ -197,18 +198,22 @@ export function useThreadComposerState() {
   // detail is usually present but empty during a worktree checkout, so this
   // cannot be an either/or with the loaded messages.
   const pendingCreationMessage = selectedThreadCreation?.message ?? null;
+  const thinkingTraces = useThinkingTracesEnabled();
   const selectedThreadFeed = useMemo(() => {
     const loadedMessages = selectedThreadMessages ?? [];
     const feed =
       (selectedThreadMessages && selectedThreadActivities) || pendingCreationMessage !== null
-        ? buildThreadFeed({
-            messages:
-              pendingCreationMessage !== null &&
-              !loadedMessages.some((message) => message.id === pendingCreationMessage.messageId)
-                ? [...loadedMessages, pendingThreadCreationMessage(pendingCreationMessage)]
-                : loadedMessages,
-            activities: selectedThreadActivities ?? [],
-          })
+        ? buildThreadFeed(
+            {
+              messages:
+                pendingCreationMessage !== null &&
+                !loadedMessages.some((message) => message.id === pendingCreationMessage.messageId)
+                  ? [...loadedMessages, pendingThreadCreationMessage(pendingCreationMessage)]
+                  : loadedMessages,
+              activities: selectedThreadActivities ?? [],
+            },
+            { thinkingTraces },
+          )
         : [];
     const pendingAcknowledgments = acknowledgedMessages.filter(
       (message) =>
@@ -226,6 +231,7 @@ export function useThreadComposerState() {
     selectedThreadKey,
     selectedThreadQueuedMessages,
     acknowledgedMessages,
+    thinkingTraces,
   ]);
   useEffect(() => {
     const echoedIds = new Set(selectedThreadMessages?.map((message) => message.id));

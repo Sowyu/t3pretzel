@@ -32,7 +32,13 @@ import {
   View,
 } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import type { EnvironmentId, ToolActivityIcon } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  OrchestrationThreadActivity,
+  ThreadId,
+  ToolActivityIcon,
+  TurnId,
+} from "@t3tools/contracts";
 import { toolActivityFaviconUrl } from "@t3tools/shared/favicon";
 
 import { AppText as Text } from "../../components/AppText";
@@ -71,6 +77,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useAssetUrl } from "../../state/assets";
+import { useAtomValue } from "@effect/atom-react";
+import { environmentThreadDetails } from "../../state/threads";
+import { threadReasoningText } from "../../lib/threadReasoning";
 
 const SHIMMER_WIDTH = 72;
 const SHIMMER_SWEEP_MS = 1_350;
@@ -1127,6 +1136,95 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
     </Animated.View>
   );
 });
+
+/** Below this, three lines almost always hold the whole block on a phone. */
+const REASONING_COLLAPSE_MIN_LENGTH = 140;
+
+/**
+ * One turn's reasoning text, shown when Settings → Experimental → Thinking
+ * traces is on. The row subscribes to the thread's activities and maps them
+ * down to this turn's text, so a chunk that changes another turn (or no text
+ * at all) never reaches React. A finished turn collapses to three lines,
+ * because the transcript keeps the text but the answer below it is the point.
+ */
+export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly turnId: TurnId | null;
+  readonly rowId: string;
+  readonly live: boolean;
+  readonly expanded: boolean;
+  readonly onToggle: (rowId: string, anchorKey: string) => void;
+}) {
+  const selectTurnText = useCallback(
+    (activities: ReadonlyArray<OrchestrationThreadActivity>) =>
+      threadReasoningText(activities, props.turnId),
+    [props.turnId],
+  );
+  const streamed = useAtomValue(
+    environmentThreadDetails.activitiesAtom({
+      environmentId: props.environmentId,
+      threadId: props.threadId,
+    }),
+    selectTurnText,
+  );
+  const text = useFrameCoalescedText(streamed);
+  if (text.length === 0) {
+    return null;
+  }
+  const collapsed = !props.live && !props.expanded;
+  return (
+    <View className="mb-2 px-1">
+      <Text
+        selectable
+        className="text-sm leading-snug text-foreground-muted opacity-90"
+        {...(collapsed ? { numberOfLines: 3 } : {})}
+      >
+        {text}
+      </Text>
+      {!props.live && text.length >= REASONING_COLLAPSE_MIN_LENGTH ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: props.expanded }}
+          hitSlop={8}
+          onPress={() => props.onToggle(props.rowId, props.rowId)}
+        >
+          <Text className="mt-0.5 font-t3-medium text-xs text-foreground-muted">
+            {props.expanded ? "Show less" : "Show more"}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+});
+
+/**
+ * Chunks can land several times between two frames. The first value paints
+ * straight away, later ones wait for the next frame, so a burst costs one
+ * text layout instead of one per chunk.
+ */
+function useFrameCoalescedText(value: string): string {
+  const [shown, setShown] = useState(value);
+  const latest = useRef(value);
+  const frame = useRef<number | null>(null);
+  useEffect(() => {
+    // The scheduled frame reads the newest chunk, so chunks that land while
+    // it is pending ride along instead of queueing a frame each.
+    latest.current = value;
+    if (value === shown || frame.current !== null) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      setShown(latest.current);
+    });
+  }, [value, shown]);
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
+  return shown;
+}
 
 export function ThreadThinkingRow(props: {
   readonly rowSizing: ReturnType<typeof deriveThreadWorkLogSizing>;

@@ -94,7 +94,7 @@ if (t3ThinkingKey !== void 0) {
   t3ThinkingBuffer.text += String(t3ThinkingPayload.delta ?? "");
   const t3ThinkingNow = Date.now();
   if (t3ThinkingBuffer.text.length >= 400 || t3ThinkingNow - t3ThinkingBuffer.lastFlushAt >= 500) {
-    yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "thinking", kind: "reasoning.text", summary: t3ThinkingBuffer.text, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingPayload.streamKind, seq: t3ThinkingBuffer.seq }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
+    yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingBuffer.text, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingPayload.streamKind, seq: t3ThinkingBuffer.seq }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
     t3ThinkingBuffer.text = "";
     t3ThinkingBuffer.seq += 1;
     t3ThinkingBuffer.lastFlushAt = t3ThinkingNow;
@@ -106,7 +106,7 @@ if (event.type === "item.completed" || event.type === "turn.completed") {
     if (!t3ThinkingKey.startsWith(thread.id + ":") || t3ThinkingBuffer.text.length === 0) continue;
     const t3ThinkingItemId = t3ThinkingKey.slice(thread.id.length + 1);
     if (event.type === "item.completed" && t3ThinkingCompletedItemId !== t3ThinkingItemId) continue;
-    yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "thinking", kind: "reasoning.text", summary: t3ThinkingBuffer.text, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingBuffer.streamKind, seq: t3ThinkingBuffer.seq }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
+    yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingBuffer.text, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingBuffer.streamKind, seq: t3ThinkingBuffer.seq }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
     t3ThinkingBuffers.delete(t3ThinkingKey);
   }
 }

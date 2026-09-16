@@ -35,6 +35,11 @@ import {
 } from "@t3tools/client-runtime/work-log/presentation";
 import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-log/tool-presentation";
 import { commandProgramName } from "@t3tools/client-runtime/work-log/command-label";
+import {
+  isReasoningTextActivity,
+  reasoningTurnKey,
+  threadReasoningByTurn,
+} from "./threadReasoning";
 
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
@@ -145,10 +150,23 @@ type RawThreadFeedEntry =
       readonly createdAt: string;
       readonly turnId: TurnId | null;
       readonly activity: ThreadFeedActivity;
+    }
+  | {
+      /**
+       * One turn's reasoning text, built only when the experimental Thinking
+       * traces setting is on. The text is deliberately absent: the row reads
+       * the turn's reasoning activities itself, so a streamed chunk repaints
+       * that row instead of every row the feed rebuild touches.
+       */
+      readonly type: "reasoning";
+      readonly id: string;
+      readonly createdAt: string;
+      readonly turnId: TurnId | null;
     };
 
 export type ThreadFeedEntry =
   | Extract<RawThreadFeedEntry, { type: "message" }>
+  | Extract<RawThreadFeedEntry, { type: "reasoning" }>
   | {
       readonly type: "activity-group";
       readonly id: string;
@@ -420,6 +438,9 @@ function deriveWorkLogEntries(
     if (activity.kind === "task.started" && !isAgentTaskStartedActivity(activity)) continue;
     if (activity.kind === "task.updated" && !isTerminalTaskUpdate(activity)) continue;
     if (activity.kind === "tool.progress") continue;
+    // Reasoning belongs to its own block, never to a work-log row: as a
+    // generic row it would render as a tool-shaped line per flush.
+    if (isReasoningTextActivity(activity)) continue;
     if (activity.kind === "context-window.updated") continue;
     if (activity.summary === "Checkpoint captured") continue;
     if (isNoContentRuntimeWarning(activity)) continue;
@@ -1822,7 +1843,10 @@ export function deriveThreadFeedPresentation(
         // what the agents are doing, so a Thinking row under it would lie.
         (row.type === "agent-spawn" &&
           row.summary.tone === "working" &&
-          row.turnId === unsettledTurnId),
+          row.turnId === unsettledTurnId) ||
+        // The turn's reasoning text is the live slot once its first chunk
+        // lands: the shimmer only covers the wait before there is text.
+        (row.type === "reasoning" && unsettledTurnId !== null && row.turnId === unsettledTurnId),
     )
   ) {
     result.push(thinkingRow(activeWorkStartedAt, unsettledTurnId));
@@ -2186,6 +2210,8 @@ export function buildThreadFeed(
   options?: {
     readonly loadedMessages?: ReadonlyArray<OrchestrationThread["messages"][number]>;
     readonly localMessages?: ReadonlyArray<OrchestrationThread["messages"][number]>;
+    /** Settings → Experimental → Thinking traces. Off means no reasoning rows. */
+    readonly thinkingTraces?: boolean;
   },
 ): ThreadFeedEntry[] {
   const loadedMessages = options?.loadedMessages ?? thread.messages;
@@ -2198,6 +2224,21 @@ export function buildThreadFeed(
     (entry) =>
       oldestLoadedMessageCreatedAt === null || entry.createdAt >= oldestLoadedMessageCreatedAt,
   );
+  const reasoningEntries: Array<Extract<RawThreadFeedEntry, { readonly type: "reasoning" }>> =
+    options?.thinkingTraces === true
+      ? Array.from(threadReasoningByTurn(thread.activities).values())
+          .filter(
+            (turn) =>
+              oldestLoadedMessageCreatedAt === null ||
+              turn.createdAt >= oldestLoadedMessageCreatedAt,
+          )
+          .map((turn) => ({
+            type: "reasoning",
+            id: `reasoning:${reasoningTurnKey(turn.turnId)}`,
+            createdAt: turn.createdAt,
+            turnId: turn.turnId,
+          }))
+      : [];
   const foldedAnswerMessageIds = new Set(
     activityEntries.flatMap((entry) =>
       entry.activity.workEntry.questionAnswer
@@ -2218,6 +2259,7 @@ export function buildThreadFeed(
           return entry;
         }),
       ...activityEntries,
+      ...reasoningEntries,
     ],
     (s) => new Date(s.createdAt),
     Order.Date,

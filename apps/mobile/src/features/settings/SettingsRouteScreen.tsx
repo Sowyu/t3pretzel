@@ -169,6 +169,8 @@ function LocalSettingsRouteScreen() {
 
         <LegacySettingsSection />
 
+        <ExperimentalSettingsSection />
+
         <ArchivedThreadsSettingsSection />
 
         <AppSettingsSection />
@@ -609,6 +611,8 @@ function ConfiguredSettingsRouteScreen() {
 
         <LegacySettingsSection />
 
+        <ExperimentalSettingsSection />
+
         <ArchivedThreadsSettingsSection />
 
         <AppSettingsSection />
@@ -822,6 +826,34 @@ function BackgroundRefreshRow() {
         </Pressable>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Opt-ins that depend on something outside the app. Thinking traces only have
+ * anything to render against a server that forwards reasoning activities, so
+ * the row stays off until someone goes looking for it.
+ */
+function ExperimentalSettingsSection() {
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const thinkingTracesEnabled =
+    AsyncResult.isSuccess(preferences) && preferences.value.thinkingTracesEnabled === true;
+
+  return (
+    <View className="gap-3">
+      <SettingsSection title="Experimental">
+        <SettingsSwitchRow
+          icon="brain"
+          label="Thinking traces"
+          value={thinkingTracesEnabled}
+          onValueChange={(value) => savePreferences({ thinkingTracesEnabled: value })}
+        />
+      </SettingsSection>
+      <Text className="px-2 text-sm text-foreground-muted">
+        {"Shows the model's reasoning as it streams. Needs a server that forwards it."}
+      </Text>
+    </View>
   );
 }
 

@@ -158,6 +158,7 @@ import {
   collapsedWorkLogHeight,
   ThreadAgentSpawnCard,
   ThreadDisclosureChevron,
+  ThreadReasoningRow,
   ThreadWorkGroupToggle,
   ThreadThinkingRow,
   ThreadWorkLog,
@@ -1344,6 +1345,7 @@ function renderFeedEntry(
   props: Pick<
     ThreadFeedProps,
     | "environmentId"
+    | "threadId"
     | "onUseArtifactTemplate"
     | "skills"
     | "dispatchingMessageId"
@@ -1409,6 +1411,20 @@ function renderFeedEntry(
 
   if (entry.type === "thinking") {
     return <ThreadThinkingRow rowSizing={props.workRowSizing} iconSubtleColor={iconSubtleColor} />;
+  }
+
+  if (entry.type === "reasoning") {
+    return (
+      <ThreadReasoningRow
+        environmentId={props.environmentId}
+        threadId={props.threadId}
+        turnId={entry.turnId}
+        rowId={entry.id}
+        live={props.unsettledTurnId !== null && entry.turnId === props.unsettledTurnId}
+        expanded={props.expandedWorkRows[entry.id] ?? false}
+        onToggle={props.onToggleWorkRow}
+      />
+    );
   }
 
   if (entry.type === "agent-spawn") {
@@ -2661,6 +2677,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         <ThreadMediaVisibility>
           {renderFeedEntry(info, {
             environmentId: props.environmentId,
+            threadId: props.threadId,
             dispatchingMessageId: props.dispatchingMessageId,
             onEditPendingMessage: props.onEditPendingMessage,
             copiedRowId,
@@ -2695,6 +2712,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     ),
     [
       props.dispatchingMessageId,
+      props.threadId,
       props.onEditPendingMessage,
       copiedRowId,
       disclosureToggleSettling,
