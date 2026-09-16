@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 
 import { cn } from "../lib/cn";
-import { useUniwindTheme } from "../lib/useUniwindTheme";
 import { GlassSurface, supportsLiquidGlass } from "./GlassSurface";
 
 /**
@@ -17,7 +16,6 @@ export function GlassControl(props: {
   /** Corner radius of the control; half its height for a capsule. */
   readonly radius: number;
 }) {
-  const colors = useUniwindTheme();
   // Callers style the flat pill with fills and shadows; on glass those would
   // paint over the material, so only the layout classes carry across.
   const layoutClassName = props.className
@@ -35,7 +33,9 @@ export function GlassControl(props: {
     <GlassSurface
       chrome="none"
       fallbackClassName={cn("border border-border-subtle", layoutClassName)}
-      fallbackColor={colors["--color-card"]}
+      // No tint: a card-coloured tint at the material's opacity read as a
+      // flat dark disc over dark content. The rim and refraction carry the
+      // shape, as they do for menus.
       glassEffectStyle="clear"
       style={[
         { borderRadius: props.radius, alignItems: "center", justifyContent: "center" },
