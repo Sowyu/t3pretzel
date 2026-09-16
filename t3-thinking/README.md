@@ -70,3 +70,24 @@ The emitted activity is:
 To verify a real turn, start the server with `./t3-thinking serve --port 3777`, open a project in the T3 client, select a Claude Code model, enable thinking, and send a prompt. Inspect the server websocket or the browser Network tab. During the turn, the stream should contain `thread.activity.append` events whose activity has `kind: "reasoning.text"`, `tone: "info"`, and the payload above. The tone stays one every released client already decodes; a new tone would fail the whole thread stream decode in the web app and on phones. Concatenate `summary` values by `payload.itemId` and ascending `payload.seq`.
 
 The runner needs only Bash, Node.js, and npm, on macOS or Linux.
+
+## Keeping a service-launcher install patched
+
+When T3 runs as the `t3code.service` user unit, its launcher keeps versions
+under `~/.t3/runtime/versions/<version>/t3`, updates itself to new nightlies
+and switches `~/.t3/runtime/service-state.json` to the new version. Install
+the hook once:
+
+```sh
+./service-hook/install.sh
+systemctl --user start t3-thinking-patch.service   # patch and restart now
+```
+
+The path unit runs `service-hook/patch-active-version.sh` whenever the state
+file changes. The script patches the active version's executable (a no-op if
+it already carries the marker), and if the running `t3 serve` child still
+executes an unpatched copy it sends it SIGTERM; the launcher exits on an
+unexpected child exit and systemd restarts the unit five seconds later with
+the patched binary. While the launcher is trialling a new version the script
+only patches the file and waits, because a child exit during a trial means
+rollback.
