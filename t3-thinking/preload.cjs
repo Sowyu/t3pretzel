@@ -48,12 +48,17 @@ function note(event, thread) {
     stats = { deltas: {}, types: {}, thinkingBlocks: 0, rawMethods: {} };
     turnStats.set(key, stats);
   }
+  const method = event.raw?.method;
+  // Live lines, so a turn can be read while it runs: each event type and raw
+  // method the first time it shows up, and every reasoning delta.
+  if (!stats.types[event.type]) log(`turn ${String(event.turnId)} first ${event.type}${typeof method === "string" ? ` via ${method}` : ""} itemId=${String(event.itemId)}`);
   stats.types[event.type] = (stats.types[event.type] ?? 0) + 1;
   if (event.type === "content.delta") {
     const kind = event.payload?.streamKind ?? "?";
     stats.deltas[kind] = (stats.deltas[kind] ?? 0) + 1;
+    if (kind !== "assistant_text") log(`turn ${String(event.turnId)} delta ${kind} #${stats.deltas[kind]} itemId=${String(event.itemId)} chars=${String(event.payload?.delta ?? "").length}`);
   }
-  const method = event.raw?.method;
+  if (typeof method === "string" && !stats.rawMethods[method]) log(`turn ${String(event.turnId)} first raw ${method} (${event.type})`);
   if (typeof method === "string") stats.rawMethods[method] = (stats.rawMethods[method] ?? 0) + 1;
   const content = event.raw?.payload?.message?.content;
   if (Array.isArray(content)) {
@@ -94,7 +99,7 @@ function* appendRawThinkingBlocks(ctx) {
 
 // Streamed thinking deltas only ever covered a turn's last block in practice;
 // complete blocks are the reliable source. Flip to true to also buffer deltas.
-const USE_DELTAS = false;
+const USE_DELTAS = true;
 
 globalThis.__t3Thinking = function* (event, thread, now, orchestrationEngine, providerCommandId, EventId, toTurnId) {
   note(event, thread);
