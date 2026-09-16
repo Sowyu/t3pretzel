@@ -26,6 +26,7 @@ import {
   NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED,
 } from "../layout/native-mail-search-toolbar";
 import { GlassControl } from "../../components/GlassControl";
+import { GlassSurface, supportsLiquidGlass } from "../../components/GlassSurface";
 import { useNightlyUpdater } from "../updates/nightly-updater-runtime";
 import type { HomeProjectSortOrder } from "./homeThreadList";
 import { WorkspaceConnectionTitle } from "./WorkspaceConnectionTitle";
@@ -227,6 +228,40 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
     [props],
   );
 
+  const searchContent = (
+    <>
+      <SymbolView
+        name="magnifyingglass"
+        size={17}
+        tintColorClassName={"accent-foreground-muted"}
+        type="monochrome"
+      />
+      <TextInput
+        accessibilityLabel="Search threads"
+        autoCapitalize="none"
+        onChangeText={props.onSearchQueryChange}
+        placeholder="Search threads"
+        placeholderTextColorClassName="accent-placeholder"
+        className="flex-1 py-2.5 text-base font-sans text-foreground"
+        value={props.searchQuery}
+      />
+      {props.searchQuery.length > 0 ? (
+        <Pressable
+          accessibilityLabel="Clear search"
+          hitSlop={10}
+          onPress={() => props.onSearchQueryChange("")}
+        >
+          <SymbolView
+            name="xmark.circle.fill"
+            size={17}
+            tintColorClassName={"accent-foreground-muted"}
+            type="monochrome"
+          />
+        </Pressable>
+      ) : null}
+    </>
+  );
+
   return (
     <>
       <NativeStackScreenOptions options={{ headerShown: false }} />
@@ -349,43 +384,31 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
             </Pressable>
           </View>
 
-          <View
-            className={
-              materialYouStyleLayoutActive
-                ? "min-h-12 flex-row items-center gap-2.5 rounded-full border border-input-border bg-input px-3.5"
-                : "min-h-12 flex-row items-center gap-2.5 rounded-2xl border border-input-border bg-input px-3.5"
-            }
-          >
-            <SymbolView
-              name="magnifyingglass"
-              size={17}
-              tintColorClassName={"accent-foreground-muted"}
-              type="monochrome"
-            />
-            <TextInput
-              accessibilityLabel="Search threads"
-              autoCapitalize="none"
-              onChangeText={props.onSearchQueryChange}
-              placeholder="Search threads"
-              placeholderTextColorClassName="accent-placeholder"
-              className="flex-1 py-2.5 text-base font-sans text-foreground"
-              value={props.searchQuery}
-            />
-            {props.searchQuery.length > 0 ? (
-              <Pressable
-                accessibilityLabel="Clear search"
-                hitSlop={10}
-                onPress={() => props.onSearchQueryChange("")}
-              >
-                <SymbolView
-                  name="xmark.circle.fill"
-                  size={17}
-                  tintColorClassName={"accent-foreground-muted"}
-                  type="monochrome"
-                />
-              </Pressable>
-            ) : null}
-          </View>
+          {supportsLiquidGlass ? (
+            // The field is glass like the controls beside it: no fill, a
+            // hairline rim, the art and list refracting through it.
+            <GlassSurface
+              chrome="none"
+              fallbackClassName="border border-input-border"
+              glassEffectStyle="regular"
+              style={{ borderRadius: materialYouStyleLayoutActive ? 24 : 16 }}
+              tintColor="transparent"
+            >
+              <View className="min-h-12 flex-row items-center gap-2.5 px-3.5">
+                {searchContent}
+              </View>
+            </GlassSurface>
+          ) : (
+            <View
+              className={
+                materialYouStyleLayoutActive
+                  ? "min-h-12 flex-row items-center gap-2.5 rounded-full border border-input-border bg-input px-3.5"
+                  : "min-h-12 flex-row items-center gap-2.5 rounded-2xl border border-input-border bg-input px-3.5"
+              }
+            >
+              {searchContent}
+            </View>
+          )}
         </View>
       </View>
     </>
