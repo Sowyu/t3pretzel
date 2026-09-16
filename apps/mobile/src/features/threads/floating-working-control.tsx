@@ -60,6 +60,8 @@ const UniwindGlassContainer = withUniwind(GlassContainer, {
 const AnimatedGlassView = Animated.createAnimatedComponent(UniwindGlassView);
 
 const CONTROL_OVERLAY_OFFSET = CONTROL_HEIGHT + CONTROL_GAP - COMPOSER_CAPSULE_INSET;
+// Left edge of the row, matching the content column's px-4.
+const CONTROL_LEFT_INSET = 16;
 export const FLOATING_WORKING_CONTROL_COVERAGE = CONTROL_OVERLAY_OFFSET + CONTROL_GAP;
 
 export function FloatingWorkingControl(props: {
@@ -67,6 +69,12 @@ export function FloatingWorkingControl(props: {
   readonly status: FloatingWorkingStatus | null;
   readonly showScrollToEnd: boolean;
   readonly onScrollToEnd: () => void;
+  /**
+   * Height of the composer's stash tab row, when there is one. The row then
+   * sits inside that row, to the left of the tab, instead of above the
+   * composer, and needs no extra list coverage.
+   */
+  readonly stashTabHeight?: number;
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const [overlayWidth, setOverlayWidth] = useState(windowWidth);
@@ -149,8 +157,14 @@ export function FloatingWorkingControl(props: {
   return (
     <Animated.View
       pointerEvents="box-none"
-      className="absolute left-0 right-0 z-20 items-center"
-      style={{ top: -CONTROL_OVERLAY_OFFSET }}
+      className="absolute left-0 right-0 z-20 items-start"
+      style={{
+        paddingLeft: CONTROL_LEFT_INSET,
+        top:
+          props.stashTabHeight !== undefined && props.stashTabHeight > 0
+            ? (props.stashTabHeight - CONTROL_HEIGHT) / 2
+            : -CONTROL_OVERLAY_OFFSET,
+      }}
       onLayout={(event) => setOverlayWidth(event.nativeEvent.layout.width)}
       entering={NATIVE_LIQUID_GLASS_SUPPORTED ? undefined : CONTROL_ENTERING}
       exiting={NATIVE_LIQUID_GLASS_SUPPORTED ? undefined : CONTROL_EXITING}

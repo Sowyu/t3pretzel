@@ -562,15 +562,19 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const userInputCardProgress = useSharedValue(1);
   const userInputInsetProgress = useSharedValue(1);
   const userInputCardCoverage = useSharedValue(0);
+  // With a stash tab the floating row docks beside the tab, inside the
+  // overlay's own height, so it covers nothing extra.
+  const [stashTabHeight, setStashTabHeight] = useState(0);
+  const floatingControlCovers = showFloatingStatus && stashTabHeight === 0;
   const floatingControlCoverage = useSharedValue(
-    showFloatingStatus ? FLOATING_WORKING_CONTROL_COVERAGE : 0,
+    floatingControlCovers ? FLOATING_WORKING_CONTROL_COVERAGE : 0,
   );
   useEffect(() => {
     floatingControlCoverage.value = withTiming(
-      showFloatingStatus ? FLOATING_WORKING_CONTROL_COVERAGE : 0,
+      floatingControlCovers ? FLOATING_WORKING_CONTROL_COVERAGE : 0,
       { duration: 180, reduceMotion: ReduceMotion.System },
     );
-  }, [floatingControlCoverage, showFloatingStatus]);
+  }, [floatingControlCoverage, floatingControlCovers]);
   // Android renders the expanded card in-flow (it cannot hit-test the iOS
   // overlay outside the bar's bounds), so its measured overlay height already
   // includes the card — the coverage extra is iOS-only.
@@ -955,7 +959,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             contentInsetEndAdjustment={combinedContentInsetEndAdjustment}
             contentTopInset={props.contentTopInset ?? 0}
             contentBottomInset={
-              estimatedOverlayHeight + (showFloatingStatus ? FLOATING_WORKING_CONTROL_COVERAGE : 0)
+              estimatedOverlayHeight + (floatingControlCovers ? FLOATING_WORKING_CONTROL_COVERAGE : 0)
             }
             contentMaxWidth={contentMaxWidth}
             layoutVariant={layoutVariant}
@@ -999,6 +1003,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 status={floatingStatus}
                 showScrollToEnd={showScrollToEndButton}
                 onScrollToEnd={handleScrollToEnd}
+                stashTabHeight={stashTabHeight}
               />
               <View className="w-full self-center" style={{ maxWidth: contentMaxWidth }}>
                 {props.feedbackSubmissions.map((submission) => (
@@ -1091,6 +1096,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 <GlassBlurTargetContext value={feedBlurTarget}>
                   <ThreadComposer
                     editorRef={composerEditorRef}
+                    onStashTabHeightChange={setStashTabHeight}
                     draftMessage={props.draftMessage}
                     draftAttachments={props.draftAttachments}
                     placeholder="Send a message…"

@@ -138,6 +138,8 @@ export const COMPOSER_COLLAPSED_CHROME = 60;
 export const COMPOSER_EXPANDED_CHROME = 156;
 
 export interface ThreadComposerProps {
+  /** Height of the closed stash tab, 0 without one; the floating capsule row docks beside it. */
+  readonly onStashTabHeightChange?: (height: number) => void;
   readonly draftMessage: string;
   readonly draftAttachments: ReadonlyArray<DraftComposerAttachment>;
   readonly placeholder: string;
@@ -439,6 +441,11 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   }, [props.serverConfig, props.selectedThread.modelSelection.instanceId]);
   const composerOwnerKey = scopedThreadKey(props.environmentId, props.selectedThread.id);
   const stashChrome = useComposerStashChrome(composerOwnerKey);
+  const { onStashTabHeightChange } = props;
+  const stashTabHeight = stashChrome.cap?.height ?? 0;
+  useEffect(() => {
+    onStashTabHeightChange?.(stashTabHeight);
+  }, [onStashTabHeightChange, stashTabHeight]);
   const openDraftDocument = (attachment: ComposerDocumentAttachment) => {
     Keyboard.dismiss();
     navigation.navigate("ThreadAttachment", {
