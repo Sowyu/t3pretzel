@@ -69,10 +69,38 @@ function note(event, thread) {
   }
 }
 
+// Complete thinking blocks ride on the raw assistant message that some
+// runtime events carry (Claude Code emits the assistant message once its
+// blocks are done, before each tool call and before the final text). Each
+// block is appended once, keyed by message id and block index.
+const seenBlocks = new Set();
+function* appendRawThinkingBlocks(ctx) {
+  const { event, thread } = ctx;
+  const raw = event.raw;
+  const message = raw && raw.payload && raw.payload.type === "assistant" ? raw.payload.message : undefined;
+  const content = message && Array.isArray(message.content) ? message.content : undefined;
+  if (!content) return;
+  const messageId = typeof message.id === "string" ? message.id : event.eventId;
+  for (let index = 0; index < content.length; index += 1) {
+    const block = content[index];
+    if (!block || block.type !== "thinking" || typeof block.thinking !== "string") continue;
+    const key = `${thread.id}:${messageId}:${index}`;
+    if (seenBlocks.has(key)) continue;
+    seenBlocks.add(key);
+    log(`raw thinking block ${key} chars=${block.thinking.length} via ${String(raw.method)} (${event.type})`);
+    yield* appendActivity(ctx, `${messageId}:${index}`, { text: block.thinking, seq: 0 }, "reasoning_text");
+  }
+}
+
+// Streamed thinking deltas only ever covered a turn's last block in practice;
+// complete blocks are the reliable source. Flip to true to also buffer deltas.
+const USE_DELTAS = false;
+
 globalThis.__t3Thinking = function* (event, thread, now, orchestrationEngine, providerCommandId, EventId, toTurnId) {
   note(event, thread);
   const ctx = { event, thread, now, orchestrationEngine, providerCommandId, EventId, turnId: toTurnId(event.turnId) };
-  const payload = event.type === "content.delta" ? event.payload : undefined;
+  yield* appendRawThinkingBlocks(ctx);
+  const payload = USE_DELTAS && event.type === "content.delta" ? event.payload : undefined;
   const isReasoning =
     payload !== undefined &&
     (payload.streamKind === "reasoning_text" || payload.streamKind === "reasoning_summary_text");
@@ -101,6 +129,7 @@ globalThis.__t3Thinking = function* (event, thread, now, orchestrationEngine, pr
     event.type === "turn.failed";
   if (terminal) {
     const completedItemId = event.type === "item.completed" ? event.itemId : undefined;
+    for (const key of seenBlocks) if (key.startsWith(`${thread.id}:`)) seenBlocks.delete(key);
     for (const [key, buffer] of buffers) {
       if (!key.startsWith(`${thread.id}:`)) continue;
       const itemId = key.slice(thread.id.length + 1);
