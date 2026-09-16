@@ -22,7 +22,7 @@ import {
   projectScriptRuntimeEnv,
   resolveProjectScripts,
 } from "@t3tools/shared/projectScripts";
-import { Alert, Platform, ScrollView, View } from "react-native";
+import { Alert, Platform, ScrollView, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWorkspaceState } from "../../state/workspace";
 import { restoredNewTaskDraftKey } from "../../state/new-task-draft-key";
@@ -703,6 +703,14 @@ function ThreadRouteContent(
     ],
     [panes.primarySidebarVisible, props.onReturnToThread, navigation, togglePrimarySidebar],
   );
+  // Android's header floats over the feed as glass, so the feed needs its
+  // height as a top inset: the first row then starts below the bar and a
+  // scroll to the top still shows the whole message.
+  const [androidHeaderHeight, setAndroidHeaderHeight] = useState(0);
+  const handleAndroidHeaderLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    setAndroidHeaderHeight((current) => (current === height ? current : height));
+  }, []);
   const androidHeaderActions = useMemo<ReadonlyArray<AndroidHeaderAction>>(() => {
     if (Platform.OS !== "android") return [];
 
@@ -895,6 +903,7 @@ function ThreadRouteContent(
           queuedMessages={composer.selectedThreadQueuedMessages}
           dispatchingMessageId={composer.dispatchingQueuedMessageId}
           layoutVariant={layout.variant}
+          contentTopInset={androidHeaderHeight}
           usesAutomaticContentInsets={usesNativeHeaderGlass}
           onOpenConnectionEditor={handleOpenConnectionEditor}
           onChangeDraftMessage={composer.onChangeDraftMessage}
@@ -964,6 +973,14 @@ function ThreadRouteContent(
         }}
       />
 
+      {/* Android surfaces the git/files/inspector actions in its floating
+          header below, so the fallback action toolbar stays iOS-only. */}
+      {renderThreadRouteBody(
+        Platform.OS !== "android" && !layout.usesSplitView && !usesNativeHeaderGlass,
+      )}
+
+      {/* After the body: the glass bar floats over the feed, so it has to be
+          drawn on top of it. */}
       {Platform.OS === "android" ? (
         <AndroidScreenHeader
           title={selectedThread.title}
@@ -979,15 +996,11 @@ function ThreadRouteContent(
                 }
           }
           actions={androidHeaderActions}
+          floating
           hideBottomBorder={materialYouStyleLayoutActive}
+          onLayout={handleAndroidHeaderLayout}
         />
       ) : null}
-
-      {/* Android surfaces the git/files/inspector actions in its in-flow
-          header above, so the fallback action toolbar stays iOS-only. */}
-      {renderThreadRouteBody(
-        Platform.OS !== "android" && !layout.usesSplitView && !usesNativeHeaderGlass,
-      )}
     </>
   );
 }

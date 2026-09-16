@@ -51,6 +51,7 @@ import {
   KeyboardController,
   KeyboardEvents,
   KeyboardStickyView,
+  useKeyboardContext,
   useKeyboardState,
 } from "react-native-keyboard-controller";
 import Animated, {
@@ -151,6 +152,8 @@ export interface ThreadDetailScreenProps {
   readonly dispatchingMessageId: MessageId | null;
   readonly serverConfig: T3ServerConfig | null;
   readonly layoutVariant?: LayoutVariant;
+  /** Height of chrome floating over the feed (Android's glass header). */
+  readonly contentTopInset?: number;
   readonly usesAutomaticContentInsets?: boolean;
   readonly onHeaderMaterialVisibilityChange?: (visible: boolean) => void;
   readonly onOpenConnectionEditor: () => void;
@@ -271,6 +274,34 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useKeyboardState((state) => state.isVisible);
   const liveKeyboardHeight = useKeyboardState((state) => state.height);
+  // KeyboardStickyView translates the composer by a shared value the keyboard
+  // library only writes while the IME animates its window insets. A keyboard
+  // that resizes without animating (a suggestion strip appearing, a numeric
+  // layout), or an animation whose end callback is lost while the app is
+  // backgrounded, leaves that value at the previous height: the composer then
+  // floats above the keyboard, or hangs mid-screen with no keyboard at all.
+  // Every settled keyboard event carries the real height, so write it back.
+  // That is a no-op when the shared value already agrees, and a snap onto the
+  // keyboard (or back down to the bottom) when it does not. RN's own hide event
+  // is a second source. It reads the root view's visible frame rather than the
+  // inset animation, so it still arrives when the library's callbacks are lost.
+  const keyboardAnimation = useKeyboardContext().reanimated;
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+    const settleAt = (height: number) => {
+      keyboardAnimation.height.value = -height;
+    };
+    const subscriptions = [
+      KeyboardEvents.addListener("keyboardDidShow", (event) => settleAt(event.height)),
+      KeyboardEvents.addListener("keyboardDidHide", () => settleAt(0)),
+      Keyboard.addListener("keyboardDidHide", () => settleAt(0)),
+    ];
+    return () => {
+      for (const subscription of subscriptions) subscription.remove();
+    };
+  }, [keyboardAnimation]);
   // Android can swallow the IME hide callbacks when the app is backgrounded
   // mid keyboard-hide (the reported repro: send — which blurs and starts the
   // hide — then Home within a second). The keyboard library's height AND
@@ -922,7 +953,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             anchorMessageId={anchorMessageId}
             submittedMessageId={submittedMessageId}
             contentInsetEndAdjustment={combinedContentInsetEndAdjustment}
-            contentTopInset={0}
+            contentTopInset={props.contentTopInset ?? 0}
             contentBottomInset={
               estimatedOverlayHeight + (showFloatingStatus ? FLOATING_WORKING_CONTROL_COVERAGE : 0)
             }
