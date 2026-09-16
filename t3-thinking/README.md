@@ -72,7 +72,7 @@ The emitted activity is:
   kind: "reasoning.text",
   tone: "info",
   summary: bufferedTextChunk.trim(),   // the contract requires a trimmed, non-empty summary
-  payload: { itemId, streamKind, seq, text: bufferedTextChunk },  // exact chunk, spacing kept
+  payload: { itemId, streamKind, seq, text: bufferedTextChunk, timelineBypass: true },  // exact chunk, spacing kept; the flag hides the row from stock clients
   turnId
 }
 ```

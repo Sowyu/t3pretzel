@@ -62,7 +62,11 @@ function* appendActivity(ctx, itemId, buffer, streamKind) {
       tone: "info",
       kind: "reasoning.text",
       summary,
-      payload: { itemId, streamKind, seq: buffer.seq, text: buffer.text },
+      // timelineBypass is the stock clients' "not for the parent chat" flag
+      // (subagent-internal rows carry it): the desktop drops the row from its
+      // work log instead of drawing every chunk as a generic line, and the
+      // phone reads the row by kind regardless.
+      payload: { itemId, streamKind, seq: buffer.seq, text: buffer.text, timelineBypass: true },
       ...(ctx.turnId ? { turnId: ctx.turnId } : {}),
     },
     createdAt: now,
