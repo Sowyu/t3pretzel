@@ -1168,7 +1168,7 @@ export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
     }),
     selectTurnText,
   );
-  const text = useFrameCoalescedText(streamed);
+  const text = useStreamingReveal(streamed, props.live);
   if (text.length === 0) {
     return null;
   }
@@ -1199,30 +1199,45 @@ export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
 });
 
 /**
- * Chunks can land several times between two frames. The first value paints
- * straight away, later ones wait for the next frame, so a burst costs one
- * text layout instead of one per chunk.
+ * Reveals the streamed text a few characters per frame instead of jumping a
+ * chunk at a time, so it reads as typing whatever size the server's chunks
+ * are. The reveal catches up with the backlog over about ten frames, and a
+ * finished turn shows everything at once.
  */
-function useFrameCoalescedText(value: string): string {
-  const [shown, setShown] = useState(value);
-  const latest = useRef(value);
+function useStreamingReveal(target: string, live: boolean): string {
+  const [shown, setShown] = useState(live ? "" : target);
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const frame = useRef<number | null>(null);
   useEffect(() => {
-    // The scheduled frame reads the newest chunk, so chunks that land while
-    // it is pending ride along instead of queueing a frame each.
-    latest.current = value;
-    if (value === shown || frame.current !== null) return;
-    frame.current = requestAnimationFrame(() => {
+    if (!live) {
+      setShown(target);
+      return;
+    }
+    // A chunk that rewrote earlier text (a replayed seq) is not an extension
+    // of what is on screen; snap rather than animate through it.
+    if (!target.startsWith(shownRef.current)) {
+      setShown(target);
+      return;
+    }
+    const step = () => {
       frame.current = null;
-      setShown(latest.current);
-    });
-  }, [value, shown]);
-  useEffect(
-    () => () => {
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
-    },
-    [],
-  );
+      const current = shownRef.current;
+      if (current.length >= target.length) return;
+      const backlog = target.length - current.length;
+      const advance = Math.max(2, Math.ceil(backlog * 0.12));
+      const next = target.slice(0, Math.min(target.length, current.length + advance));
+      setShown(next);
+      if (next.length < target.length) frame.current = requestAnimationFrame(step);
+    };
+    if (frame.current === null) frame.current = requestAnimationFrame(step);
+    return () => {
+      if (frame.current !== null) {
+        cancelAnimationFrame(frame.current);
+        frame.current = null;
+      }
+    };
+  }, [target, live]);
   return shown;
 }
 

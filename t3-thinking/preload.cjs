@@ -39,8 +39,11 @@ childProcess.spawn = function t3ThinkingSpawn(command, args, options) {
   return originalSpawn.call(this, command, args, options);
 };
 require("node:module").syncBuiltinESMExports();
-const FLUSH_CHARS = 400;
-const FLUSH_MS = 500;
+// Every delta becomes a row: Claude's summarized thinking arrives in
+// phrase-sized chunks, and the phone animates the reveal, so holding chunks
+// back only delays what the reader sees.
+const FLUSH_CHARS = 1;
+const FLUSH_MS = 0;
 
 function* appendActivity(ctx, itemId, buffer, streamKind) {
   const summary = buffer.text.trim();
