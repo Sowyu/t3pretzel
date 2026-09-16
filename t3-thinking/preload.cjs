@@ -39,11 +39,13 @@ childProcess.spawn = function t3ThinkingSpawn(command, args, options) {
   return originalSpawn.call(this, command, args, options);
 };
 require("node:module").syncBuiltinESMExports();
-// Every delta becomes a row: Claude's summarized thinking arrives in
-// phrase-sized chunks, and the phone animates the reveal, so holding chunks
-// back only delays what the reader sees.
-const FLUSH_CHARS = 1;
-const FLUSH_MS = 0;
+
+// One activity row per flush. A row costs a DB write, a websocket event and a
+// feed rebuild on every connected client, so deltas are coalesced: a flush
+// goes out once this much text is waiting or this long has passed since the
+// last one. The phone fades each row in, so a flush is also the fade unit.
+const FLUSH_CHARS = 48;
+const FLUSH_MS = 120;
 
 function* appendActivity(ctx, itemId, buffer, streamKind) {
   const summary = buffer.text.trim();
@@ -69,6 +71,31 @@ function* appendActivity(ctx, itemId, buffer, streamKind) {
   buffer.seq += 1;
 }
 
+// Claude Code reports the start of an automatic context compaction as a
+// status message, which the adapter forwards as a session state change; the
+// stock server only records the end (a `context-compaction` row with the
+// token counts). This row fills the minutes in between. Same kind, so the
+// phone renders it as the compaction row until the real one replaces it.
+function* appendCompactingActivity(ctx) {
+  const { event, thread, now, orchestrationEngine, providerCommandId, EventId } = ctx;
+  log(`compacting turn=${String(event.turnId)}`);
+  yield* orchestrationEngine.dispatch({
+    type: "thread.activity.append",
+    commandId: yield* providerCommandId(event, "context-compaction"),
+    threadId: thread.id,
+    activity: {
+      id: EventId.make(`${event.eventId}:context-compaction:compacting`),
+      createdAt: now,
+      tone: "info",
+      kind: "context-compaction",
+      summary: "Compacting context",
+      payload: { state: "compacting", detail: event.payload?.detail },
+      ...(ctx.turnId ? { turnId: ctx.turnId } : {}),
+    },
+    createdAt: now,
+  });
+}
+
 // Debug: what each turn actually delivers, so a silent path can be found
 // without guessing. Logged once per turn at its terminal event.
 const turnStats = new Map();
@@ -77,7 +104,7 @@ function note(event, thread) {
   const key = `${thread.id}:${String(event.turnId)}`;
   let stats = turnStats.get(key);
   if (!stats) {
-    stats = { deltas: {}, types: {}, thinkingBlocks: 0, rawMethods: {} };
+    stats = { deltas: {}, types: {}, rawMethods: {} };
     turnStats.set(key, stats);
   }
   const method = event.raw?.method;
@@ -92,58 +119,66 @@ function note(event, thread) {
   }
   if (trace && typeof method === "string" && !stats.rawMethods[method]) log(`turn ${String(event.turnId)} first raw ${method} (${event.type})`);
   if (typeof method === "string") stats.rawMethods[method] = (stats.rawMethods[method] ?? 0) + 1;
-  const content = event.raw?.payload?.message?.content;
-  if (Array.isArray(content)) {
-    const blocks = content.filter((b) => b && b.type === "thinking").length;
-    if (blocks > 0) {
-      stats.thinkingBlocks += blocks;
-      log(`thinking blocks in raw ${String(method)} (${event.type}): ${blocks}`);
-    }
-  }
   if (event.type === "turn.completed" || event.type === "turn.aborted" || event.type === "turn.failed") {
-    log(`turn ${String(event.turnId)} summary: deltas=${JSON.stringify(stats.deltas)} types=${JSON.stringify(stats.types)} raw=${JSON.stringify(stats.rawMethods)} thinkingBlocks=${stats.thinkingBlocks}`);
+    log(`turn ${String(event.turnId)} summary: deltas=${JSON.stringify(stats.deltas)} types=${JSON.stringify(stats.types)} raw=${JSON.stringify(stats.rawMethods)}`);
     turnStats.delete(key);
   }
 }
 
-// Complete thinking blocks ride on the raw assistant message that some
-// runtime events carry (Claude Code emits the assistant message once its
-// blocks are done, before each tool call and before the final text). Each
-// block is appended once, keyed by message id and block index.
-const seenBlocks = new Set();
-function* appendRawThinkingBlocks(ctx) {
-  const { event, thread } = ctx;
-  const raw = event.raw;
-  const message = raw && raw.payload && raw.payload.type === "assistant" ? raw.payload.message : undefined;
-  const content = message && Array.isArray(message.content) ? message.content : undefined;
-  if (!content) return;
-  const messageId = typeof message.id === "string" ? message.id : event.eventId;
-  for (let index = 0; index < content.length; index += 1) {
-    const block = content[index];
-    if (!block || block.type !== "thinking" || typeof block.thinking !== "string") continue;
-    const key = `${thread.id}:${messageId}:${index}`;
-    if (seenBlocks.has(key)) continue;
-    seenBlocks.add(key);
-    log(`raw thinking block ${key} chars=${block.thinking.length} via ${String(raw.method)} (${event.type})`);
-    yield* appendActivity(ctx, `${messageId}:${index}`, { text: block.thinking, seq: 0 }, "reasoning_text");
+// Claude Code's thinking deltas carry no item id, so a turn's thinking is
+// keyed per segment: the segment advances whenever something else happens in
+// the turn (a tool call, an assistant message, a compaction), which keeps a
+// block that came after a tool call ordered after that tool in the feed.
+// Codex reasoning items carry their own ids and never touch this.
+const segments = new Map();
+function turnSegmentKey(thread, event) {
+  return `${thread.id}:${String(event.turnId ?? "none")}`;
+}
+function reasoningItemId(thread, event) {
+  if (event.itemId) return event.itemId;
+  const segment = segments.get(turnSegmentKey(thread, event)) ?? 0;
+  return `turn:${String(event.turnId ?? "none")}:${segment}`;
+}
+function* flushThread(ctx, filter) {
+  const { thread } = ctx;
+  for (const [key, buffer] of buffers) {
+    if (!key.startsWith(`${thread.id}:`)) continue;
+    const itemId = key.slice(thread.id.length + 1);
+    if (!filter(itemId)) continue;
+    if (buffer.text.length > 0) yield* appendActivity(ctx, itemId, buffer, buffer.streamKind);
+    buffers.delete(key);
   }
 }
+function* advanceSegment(ctx) {
+  const { thread, event } = ctx;
+  const key = turnSegmentKey(thread, event);
+  // Nothing to separate until the turn has produced thinking.
+  if (!segments.has(key)) return;
+  yield* flushThread(ctx, (itemId) => itemId.startsWith("turn:"));
+  segments.set(key, segments.get(key) + 1);
+}
 
-// Streamed thinking deltas only ever covered a turn's last block in practice;
-// complete blocks are the reliable source. Flip to true to also buffer deltas.
-const USE_DELTAS = true;
+function isCompactingStatus(event) {
+  return (
+    event.type === "session.state.changed" &&
+    typeof event.payload?.reason === "string" &&
+    event.payload.reason === "status:compacting"
+  );
+}
 
 globalThis.__t3Thinking = function* (event, thread, now, orchestrationEngine, providerCommandId, EventId, toTurnId) {
   note(event, thread);
   const ctx = { event, thread, now, orchestrationEngine, providerCommandId, EventId, turnId: toTurnId(event.turnId) };
-  yield* appendRawThinkingBlocks(ctx);
-  const payload = USE_DELTAS && event.type === "content.delta" ? event.payload : undefined;
+  const payload = event.type === "content.delta" ? event.payload : undefined;
   const isReasoning =
     payload !== undefined &&
     (payload.streamKind === "reasoning_text" || payload.streamKind === "reasoning_summary_text");
   if (isReasoning) {
-    // Claude Code's thinking deltas carry no item id; key those per turn.
-    const itemId = event.itemId ?? `turn:${String(event.turnId ?? "none")}`;
+    if (!event.itemId) {
+      const segmentKey = turnSegmentKey(thread, event);
+      if (!segments.has(segmentKey)) segments.set(segmentKey, 0);
+    }
+    const itemId = reasoningItemId(thread, event);
     const key = `${thread.id}:${itemId}`;
     let buffer = buffers.get(key);
     if (!buffer) {
@@ -158,6 +193,18 @@ globalThis.__t3Thinking = function* (event, thread, now, orchestrationEngine, pr
       yield* appendActivity(ctx, itemId, buffer, payload.streamKind);
       buffer.lastFlushAt = at;
     }
+    return;
+  }
+  // Anything else starting inside the turn ends the current thinking block.
+  if (event.type === "item.started") {
+    yield* advanceSegment(ctx);
+  }
+  if (isCompactingStatus(event)) {
+    yield* advanceSegment(ctx);
+    yield* appendCompactingActivity(ctx);
+  }
+  if (event.type === "thread.state.changed" && event.payload?.state === "compacted") {
+    yield* advanceSegment(ctx);
   }
   const terminal =
     event.type === "item.completed" ||
@@ -165,14 +212,11 @@ globalThis.__t3Thinking = function* (event, thread, now, orchestrationEngine, pr
     event.type === "turn.aborted" ||
     event.type === "turn.failed";
   if (terminal) {
-    const completedItemId = event.type === "item.completed" ? event.itemId : undefined;
-    for (const key of seenBlocks) if (key.startsWith(`${thread.id}:`)) seenBlocks.delete(key);
-    for (const [key, buffer] of buffers) {
-      if (!key.startsWith(`${thread.id}:`)) continue;
-      const itemId = key.slice(thread.id.length + 1);
-      if (event.type === "item.completed" && completedItemId !== itemId) continue;
-      if (buffer.text.length > 0) yield* appendActivity(ctx, itemId, buffer, buffer.streamKind);
-      buffers.delete(key);
+    if (event.type === "item.completed") {
+      yield* flushThread(ctx, (itemId) => itemId === event.itemId);
+    } else {
+      yield* flushThread(ctx, () => true);
+      segments.delete(turnSegmentKey(thread, event));
     }
   }
 };
