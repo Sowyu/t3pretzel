@@ -183,6 +183,9 @@ export interface ThreadComposerProps {
 // KeyboardStickyView (frame-synced to the IME), and a time-based morph
 // running alongside that translate reads as jitter. Snapping the layout and
 // letting the keyboard-synced slide be the only motion looks native there.
+// Long enough to outlast an IME show/hide blip, short enough that a real
+// dismissal still collapses the card promptly.
+const KEYBOARD_HIDE_CONFIRM_MS = 300;
 export const COMPOSER_TRANSITION_DURATION_MS = 220;
 // Side panes already animate the dock's width. Nested horizontal layout
 // transitions would leave the surface trailing its toolbar's new position.
@@ -512,14 +515,45 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   // it like a tap on the feed does. Navigating away and app switches also hide
   // the keyboard; those keep focus so typing resumes on return, and dictation
   // owns the keyboard while it is presented.
+  //
+  // The hide is confirmed after a short wait: the IME can report a hide and
+  // show again within a frame while the composer relayouts around it, and a
+  // blur on that blip is what turns a keyboard flicker into a dismissed
+  // keyboard.
+  const keyboardVisibleRef = useRef(false);
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const shown = KeyboardEvents.addListener("keyboardDidShow", () => {
+      keyboardVisibleRef.current = true;
+    });
+    const hidden = KeyboardEvents.addListener("keyboardDidHide", () => {
+      keyboardVisibleRef.current = false;
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
   useEffect(() => {
     if (Platform.OS !== "android" || !isFocused || isVoiceInputPresented) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const subscription = KeyboardEvents.addListener("keyboardDidHide", () => {
-      if (navigation.isFocused() && AppState.currentState === "active") {
-        inputRef.current?.blur();
-      }
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        if (
+          !keyboardVisibleRef.current &&
+          navigation.isFocused() &&
+          AppState.currentState === "active"
+        ) {
+          inputRef.current?.blur();
+        }
+      }, KEYBOARD_HIDE_CONFIRM_MS);
     });
-    return () => subscription.remove();
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      subscription.remove();
+    };
   }, [inputRef, isFocused, isVoiceInputPresented, navigation]);
   // An open draft stays visible; only a collapsed composer becomes a voice strip.
   const isExpanded = isFocused || settingsSheetPresentation.keepsComposerExpanded;
