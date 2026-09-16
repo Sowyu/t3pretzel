@@ -3,7 +3,8 @@ import type { EnvironmentId, SidebarThreadSortOrder } from "@t3tools/contracts";
 import Constants from "expo-constants";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { useCallback, useMemo, useRef } from "react";
-import { Platform, Pressable, Text as RNText, TextInput, View } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
+import { Platform, Pressable, Text as RNText, StatusBar, TextInput, View } from "react-native";
 import type { SearchBarCommands } from "react-native-screens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -11,7 +12,9 @@ import type { AndroidMenuAction } from "../../components/AndroidAnchoredMenu";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { SymbolView } from "../../components/AppSymbol";
 import { ProjectFavicon } from "../../components/ProjectFavicon";
+import { NightlySkyBackdrop, stageBackdropVariant } from "../../components/StageBackdrop";
 import { T3Wordmark } from "../../components/T3Wordmark";
+import { cn } from "../../lib/cn";
 import { HOME_HORIZONTAL_INSET } from "../../lib/layoutMetrics";
 import { resolveMobileStageLabel } from "../../lib/mobileBranding";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
@@ -38,6 +41,15 @@ import {
 } from "./home-list-options";
 
 export type HomeHeaderEnvironment = HomeListFilterMenuEnvironment;
+
+// Brand row height (the size-11 controls). Stage art stays clear behind the
+// status bar and this row, then fades into the header above the search field.
+const BRAND_ROW_HEIGHT = 44;
+const BACKDROP_FADE_HEIGHT = 56;
+// Desktop renders the brand white on stage art; "Code" and status at 70%.
+const ON_BACKDROP_TEXT = { color: "#FFFFFF" };
+const ON_BACKDROP_MUTED_TEXT = { color: "rgba(255,255,255,0.7)" };
+const ON_BACKDROP_ICON = "rgba(255,255,255,0.9)";
 
 export function HomeHeader(props: {
   readonly environments: ReadonlyArray<HomeHeaderEnvironment>;
@@ -73,6 +85,10 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
   const { materialYouStyleLayoutActive } = useAppearancePreferences();
   const insets = useSafeAreaInsets();
   const stageLabel = resolveMobileStageLabel(Constants.expoConfig?.extra?.appVariant);
+  const backdrop = stageBackdropVariant(stageLabel);
+  const focused = useIsFocused();
+  const theme = useUniwindTheme();
+  const paddingTop = Math.max(insets.top, 12);
   // Also where the nightly updater starts: this header mounts with the app.
   const nightly = useNightlyUpdater();
   // Thread List v2 lays the list out in fixed creation order, so the
@@ -222,9 +238,21 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
         }
         style={{
           paddingHorizontal: HOME_HORIZONTAL_INSET,
-          paddingTop: Math.max(insets.top, 12),
+          paddingTop,
         }}
       >
+        {backdrop ? (
+          <>
+            {/* Dark sky under the status bar: light icons while Home is on screen. */}
+            {focused ? <StatusBar barStyle="light-content" /> : null}
+            <NightlySkyBackdrop
+              clearHeight={paddingTop + BRAND_ROW_HEIGHT}
+              headerColor={theme["--color-header"]}
+              screenColor={theme["--color-screen"]}
+              height={paddingTop + BRAND_ROW_HEIGHT + BACKDROP_FADE_HEIGHT}
+            />
+          </>
+        ) : null}
         <View className="w-full max-w-[720px] self-center gap-3">
           <View className="flex-row items-center gap-2.5">
             {/* Brand slot doubles as the connection status surface: while an
@@ -232,19 +260,33 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
                 place (no layout shift in the list below). */}
             <WorkspaceConnectionTitle
               grow
+              onBackdrop={backdrop !== null}
               onPress={props.onOpenEnvironments}
               brand={
                 <View className="flex-row items-center gap-2">
-                  {/* Mirrors the desktop SidebarBrand: T3 mark + muted "Code". */}
-                  <T3Wordmark colorClassName="accent-icon" height={15} />
-                  <RNText className="-ml-0.5 text-[21px] font-t3-medium tracking-[-0.5px] text-foreground-muted">
+                  {/* Mirrors the desktop SidebarBrand: T3 mark + muted "Code".
+                      Stage art replaces the pill, as on desktop. */}
+                  <T3Wordmark
+                    color={backdrop ? ON_BACKDROP_TEXT.color : undefined}
+                    colorClassName={backdrop ? undefined : "accent-icon"}
+                    height={15}
+                  />
+                  <RNText
+                    className={cn(
+                      "-ml-0.5 text-[21px] font-t3-medium tracking-[-0.5px]",
+                      backdrop ? undefined : "text-foreground-muted",
+                    )}
+                    style={backdrop ? ON_BACKDROP_MUTED_TEXT : undefined}
+                  >
                     Code
                   </RNText>
-                  <View className="rounded-full bg-subtle px-2 py-0.75">
-                    <RNText className="text-[11px] font-t3-bold tracking-[1.1px] text-foreground-muted uppercase">
-                      {stageLabel}
-                    </RNText>
-                  </View>
+                  {backdrop ? null : (
+                    <View className="rounded-full bg-subtle px-2 py-0.75">
+                      <RNText className="text-[11px] font-t3-bold tracking-[1.1px] text-foreground-muted uppercase">
+                        {stageLabel}
+                      </RNText>
+                    </View>
+                  )}
                 </View>
               }
             />
@@ -256,7 +298,12 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
                 onPress={nightly.update}
               >
                 <GlassControl className="h-11 items-center justify-center px-3.5" radius={22}>
-                  <RNText className="text-[13px] font-t3-medium text-foreground">Update</RNText>
+                  <RNText
+                    className={cn("text-[13px] font-t3-medium", backdrop ? undefined : "text-foreground")}
+                    style={backdrop ? ON_BACKDROP_TEXT : undefined}
+                  >
+                    Update
+                  </RNText>
                 </GlassControl>
               </Pressable>
             ) : null}
@@ -275,7 +322,8 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
                         : "line.3.horizontal.decrease.circle"
                     }
                     size={16}
-                    tintColorClassName={"accent-icon"}
+                    tintColor={backdrop ? ON_BACKDROP_ICON : undefined}
+                    tintColorClassName={backdrop ? undefined : "accent-icon"}
                     type="monochrome"
                   />
                 </GlassControl>
@@ -293,7 +341,8 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
                 <SymbolView
                   name="gearshape"
                   size={18}
-                  tintColorClassName={"accent-icon"}
+                  tintColor={backdrop ? ON_BACKDROP_ICON : undefined}
+                  tintColorClassName={backdrop ? undefined : "accent-icon"}
                   type="monochrome"
                 />
               </GlassControl>

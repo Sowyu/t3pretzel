@@ -118,9 +118,12 @@ export function WorkspaceConnectionTitle(props: {
   readonly statusOffset?: number;
   /** Space available beside the native header actions. */
   readonly maxWidth?: number;
+  /** Status sits on stage artwork (dark sky): render it white like the brand. */
+  readonly onBackdrop?: boolean;
 }) {
   const status = useDelayedConnectionStatus();
   const size = props.size ?? "navbar";
+  const backdropColor = props.onBackdrop ? "rgba(255,255,255,0.7)" : undefined;
 
   if (status === null) {
     return props.grow ? (
@@ -145,12 +148,17 @@ export function WorkspaceConnectionTitle(props: {
         style={{ flexShrink: 1, marginLeft: props.statusOffset ?? 0 }}
       >
         {status.showsProgress ? (
-          <ActivityIndicator colorClassName={"accent-icon-muted"} size="small" />
+          <ActivityIndicator
+            color={backdropColor}
+            colorClassName={props.onBackdrop ? undefined : "accent-icon-muted"}
+            size="small"
+          />
         ) : (
           <SymbolView
             name="wifi.slash"
             size={size === "pageTitle" ? 17 : 15}
-            tintColorClassName={"accent-icon-muted"}
+            tintColor={backdropColor}
+            tintColorClassName={props.onBackdrop ? undefined : "accent-icon-muted"}
             type="monochrome"
           />
         )}
@@ -161,7 +169,7 @@ export function WorkspaceConnectionTitle(props: {
               : "text-[16px] font-t3-bold text-foreground-muted"
           }
           numberOfLines={1}
-          style={{ flexShrink: 1 }}
+          style={props.onBackdrop ? { color: backdropColor, flexShrink: 1 } : { flexShrink: 1 }}
         >
           {status.label}
         </Text>
