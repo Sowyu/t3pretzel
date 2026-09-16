@@ -11,7 +11,7 @@ here="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 patcher="$here/../patch.mjs"
 node_bin="${T3_THINKING_NODE:-$(command -v node || printf '/usr/bin/node')}"
 state="$t3_home/runtime/service-state.json"
-marker='/\* t3-thinking \*/'
+marker='/\* t3-thinking v2 \*/'
 
 [ -f "$state" ] || exit 0
 read -r active pending < <("$node_bin" -e '
@@ -22,6 +22,26 @@ bin="$t3_home/runtime/versions/$active/t3"
 [ -f "$bin" ] || exit 0
 
 if ! "$node_bin" "$patcher" "$bin" --check >/dev/null 2>&1; then
+  # Exit 3 means an older patch revision is in the file. The original is gone
+  # (patching renames over it), so fetch the pristine build for this exact
+  # version and platform, put it back, then patch that.
+  set +e
+  "$node_bin" "$patcher" "$bin" --check >/dev/null 2>&1
+  check_status=$?
+  set -e
+  if [ "$check_status" -eq 3 ]; then
+    platform="$("$node_bin" -p "process.platform + '-' + process.arch")"
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/t3-thinking.XXXXXX")"
+    if (cd "$tmp" && npm pack "@t3code/t3-$platform@$active" --silent >/dev/null 2>&1 && tar xzf ./*.tgz && [ -f package/t3 ]); then
+      cp "$tmp/package/t3" "$bin.pristine" && chmod --reference="$bin" "$bin.pristine" && mv "$bin.pristine" "$bin"
+      echo "t3-thinking: restored the pristine $active before re-patching"
+    else
+      echo "t3-thinking: could not fetch the pristine $active; leaving the older patch in place" >&2
+      rm -rf "$tmp"
+      exit 0
+    fi
+    rm -rf "$tmp"
+  fi
   if ! "$node_bin" "$patcher" "$bin"; then
     echo "t3-thinking: could not patch $active; the server runs unpatched" >&2
     exit 0

@@ -4,7 +4,11 @@ import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
-const marker = "/* t3-thinking */";
+// The revision is part of the marker: a binary carrying an older patch fails
+// --check, and the service hook restores the pristine build and re-patches.
+const PATCH_REVISION = 2;
+const marker = `/* t3-thinking v${PATCH_REVISION} */`;
+const anyMarker = /\/\* t3-thinking(?: v\d+)? \*\//g;
 const file = process.argv[2];
 const checkOnly = process.argv[3] === "--check";
 
@@ -27,6 +31,7 @@ if (source.includes(marker)) {
   if (!binaryMode) checkSyntax(file);
   process.exit(0);
 }
+if (anyMarker.test(source)) fail(`patched with an older t3-thinking revision; restore the pristine build and patch again (exit 3)`, 3);
 
 const event = String.raw`([A-Za-z_$][\w$]*)`;
 const filter = new RegExp(
@@ -81,9 +86,9 @@ const injectedBranch = `${marker}
 const t3ThinkingBuffers = ${binaryMode ? "(globalThis.__t3ThinkingBuffers ??= new Map())" : "t3ThinkingBuffersModule"};
 const t3ThinkingPayload = event.type === "content.delta" ? event.payload : void 0;
 const t3ThinkingIsReasoning = t3ThinkingPayload && (t3ThinkingPayload.streamKind === "reasoning_text" || t3ThinkingPayload.streamKind === "reasoning_summary_text");
-const t3ThinkingItemId = event.itemId;
 const t3ThinkingTurnId = ${toTurnIdName}(event.turnId);
-const t3ThinkingKey = t3ThinkingIsReasoning && t3ThinkingItemId != null ? thread.id + ":" + t3ThinkingItemId : void 0;
+const t3ThinkingItemId = event.itemId ?? ("turn:" + String(event.turnId ?? "none"));
+const t3ThinkingKey = t3ThinkingIsReasoning ? thread.id + ":" + t3ThinkingItemId : void 0;
 if (t3ThinkingKey !== void 0) {
   let t3ThinkingBuffer = t3ThinkingBuffers.get(t3ThinkingKey);
   if (!t3ThinkingBuffer) {
@@ -100,7 +105,7 @@ if (t3ThinkingKey !== void 0) {
     t3ThinkingBuffer.lastFlushAt = t3ThinkingNow;
   }
 }
-if (event.type === "item.completed" || event.type === "turn.completed") {
+if (event.type === "item.completed" || event.type === "turn.completed" || event.type === "turn.aborted" || event.type === "turn.failed") {
   const t3ThinkingCompletedItemId = event.type === "item.completed" ? event.itemId : void 0;
   for (const [t3ThinkingKey, t3ThinkingBuffer] of t3ThinkingBuffers) {
     if (!t3ThinkingKey.startsWith(thread.id + ":") || t3ThinkingBuffer.text.length === 0) continue;
@@ -203,9 +208,9 @@ function one(name, matches) {
   if (matches.length !== 1) fail(`${name}: expected exactly one match, found ${matches.length}`);
 }
 
-function fail(message) {
+function fail(message, code = 1) {
   console.error(`t3-thinking: ${message}`);
-  process.exit(1);
+  process.exit(code);
 }
 
 function checkSyntax(path) {
