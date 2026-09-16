@@ -262,8 +262,11 @@ export function ComposerStashPanel(props: {
 
   // Laid out inside the composer's own glass (see ComposerSurface's crown), so
   // the tab is a plain view: the surface shapes the material around it.
+  // The closed tab keeps a strip of clear space above it: the floating working
+  // capsule and the scroll-to-end button hang 8 above the composer's top edge,
+  // which is this tab, and two glass chips that close leave them looking fused.
   return (
-    <View className={listOpen ? "items-stretch" : "items-end"}>
+    <View className={listOpen ? "items-stretch" : "items-end pt-2"}>
       <View onLayout={props.onTabLayout}>
         <Pressable
           accessibilityLabel={listOpen ? "Close stash" : `Open stash, ${entries.length} saved`}

@@ -423,7 +423,7 @@ index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e
    private val entries = HashMap<View, Entry>()
  
    /**
-@@ -40,26 +53,45 @@ internal object SharedBackdropCapture {
+@@ -40,26 +53,52 @@ internal object SharedBackdropCapture {
    var captureInProgress = false
      private set
  
@@ -431,7 +431,14 @@ index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e
 +  fun register(source: View, consumer: View) {
      val entry = entries.getOrPut(source) { Entry() }
 -    entry.refCount++
-+    if (!entry.consumers.contains(consumer)) entry.consumers.add(consumer)
++    if (entry.consumers.contains(consumer)) return
++    entry.consumers.add(consumer)
++    // The frame's capture may already have run for the other glass views,
++    // without a band for this one; a menu opening over a static screen would
++    // then read an area that was never rasterized and draw as a flat tint
++    // until something else repaints. Forget the frame so the next request
++    // captures its band too.
++    entry.lastFrameTimeMs = -1L
    }
  
 -  fun unregister(source: View) {
