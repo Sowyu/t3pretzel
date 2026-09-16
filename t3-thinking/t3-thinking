@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+shopt -s inherit_errexit
+
+store_dir="${T3_THINKING_HOME:-$HOME/.t3-thinking}"
+patcher="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/patch.mjs"
+
+die() {
+  printf 't3-thinking: %s\n' "$*" >&2
+  exit 1
+}
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+# What the patcher edits inside an installed package: the native executable
+# of a compiled build (0.0.41+), else the JavaScript bundle. The bin.mjs
+# loader of a compiled build spawns that executable, so `serve` needs no
+# special case.
+patch_target() {
+  local root="$1" platform
+  platform="$(node -p "process.platform + '-' + process.arch")"
+  if [ -f "$root/node_modules/@t3code/t3-$platform/t3" ]; then
+    printf '%s\n' "$root/node_modules/@t3code/t3-$platform/t3"
+  else
+    printf '%s\n' "$root/node_modules/t3/dist/bin.mjs"
+  fi
+}
+
+install_version() {
+  local spec="$1"
+  local tmp package_dir resolved
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/t3-thinking.XXXXXX")"
+  trap 'rm -rf "$tmp"' RETURN
+
+  npm install --prefix "$tmp" --no-package-lock --no-save "t3@$spec" >/dev/null
+  package_dir="$tmp/node_modules/t3"
+  [ -f "$package_dir/dist/bin.mjs" ] || die "installed t3 has no dist/bin.mjs"
+  resolved="$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).version" "$package_dir/package.json")"
+  [ -n "$resolved" ] || die "could not resolve installed t3 version"
+
+  if [ -e "$store_dir/$resolved" ]; then
+    node "$patcher" "$(patch_target "$store_dir/$resolved")" --check ||
+      die "installed t3 $resolved is not patched; remove $store_dir/$resolved and install again"
+    mkdir -p "$store_dir"
+    printf '%s\n' "$resolved" > "$store_dir/.active"
+    printf '%s\n' "$resolved"
+    return
+  fi
+
+  mkdir -p "$store_dir"
+  mkdir "$store_dir/.install-$resolved"
+  cp -a "$tmp/node_modules" "$store_dir/.install-$resolved/node_modules"
+  # A build whose code moved must not land in the store unpatched: the server
+  # would run and silently never send reasoning.
+  if ! node "$patcher" "$(patch_target "$store_dir/.install-$resolved")"; then
+    rm -rf "$store_dir/.install-$resolved"
+    die "t3 $resolved could not be patched; the previously installed version stays active"
+  fi
+  mv "$store_dir/.install-$resolved" "$store_dir/$resolved"
+  printf '%s\n' "$resolved" > "$store_dir/.active"
+  printf '%s\n' "$resolved"
+}
+
+# Installed versions, oldest first. Sorted in node: BSD sort has no -V and
+# BSD find has no -printf, and the server usually runs on a Mac.
+installed_versions() {
+  node -e '
+    const fs = require("node:fs");
+    const dir = process.argv[1];
+    const key = (v) => v.split(/[.-]/).map((p) => (/^\d+$/.test(p) ? p.padStart(12, "0") : p)).join(".");
+    let names = [];
+    try { names = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith(".")).map((d) => d.name); } catch {}
+    for (const name of names.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0))) console.log(name);
+  ' "$store_dir"
+}
+
+newest_version() {
+  local version
+  version="$(installed_versions | tail -n 1)"
+  [ -n "$version" ] || die "no installed version; run: t3-thinking install --tag nightly"
+  printf '%s\n' "$version"
+}
+
+need_cmd node
+need_cmd npm
+
+case "${1:-}" in
+  install)
+    shift
+    tag="nightly"
+    if [ "${1:-}" = "--tag" ]; then
+      tag="${2:-}"
+      [ -n "$tag" ] || die "--tag needs nightly, latest, or a version"
+      shift 2
+    fi
+    [ "$#" -eq 0 ] || die "usage: t3-thinking install [--tag nightly|latest|<version>]"
+    version="$(install_version "$tag")"
+    printf 'installed and patched t3 %s\n' "$version"
+    ;;
+  update)
+    shift
+    tag="nightly"
+    if [ "${1:-}" = "--tag" ]; then
+      tag="${2:-}"
+      [ -n "$tag" ] || die "--tag needs nightly, latest, or a version"
+      shift 2
+    fi
+    [ "$#" -eq 0 ] || die "usage: t3-thinking update [--tag nightly|latest|<version>]"
+    version="$(install_version "$tag")"
+    printf 'installed and patched t3 %s; previous versions kept\n' "$version"
+    ;;
+rollback)
+    [ "$#" -eq 1 ] || die "usage: t3-thinking rollback"
+    current="$(sed -n '1p' "$store_dir/.active" 2>/dev/null || true)"
+    versions="$(installed_versions)"
+    if [ -n "$current" ]; then
+      previous="$(printf '%s\n' "$versions" | awk -v current="$current" '$0 == current { print previous; exit } { previous = $0 }')"
+    else
+      previous="$(printf '%s\n' "$versions" | tail -n 2 | head -n 1)"
+    fi
+    [ -n "$previous" ] || die "no previous installed version"
+    printf '%s\n' "$previous" > "$store_dir/.active"
+    printf 'rolled back to t3 %s\n' "$previous"
+    ;;
+  serve)
+    shift
+    version="${T3_THINKING_VERSION:-$(sed -n '1p' "$store_dir/.active" 2>/dev/null || true)}"
+    version="${version:-$(newest_version)}"
+    server="$store_dir/$version/node_modules/t3/dist/bin.mjs"
+    [ -f "$server" ] || die "installed version is missing: $version"
+    exec node "$server" serve "$@"
+    ;;
+  *)
+    die "usage: t3-thinking {install [--tag nightly|latest|<version>]|serve <t3 serve args>|update|rollback}"
+    ;;
+esac
