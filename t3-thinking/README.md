@@ -103,3 +103,11 @@ unexpected child exit and systemd restarts the unit five seconds later with
 the patched binary. While the launcher is trialling a new version the script
 only patches the file and waits, because a child exit during a trial means
 rollback.
+
+## What you will actually see
+
+Claude returns most thinking blocks empty: on this server's transcript only
+7% of 1,120 blocks carried any text, and those were short summaries of longer
+reasoning stretches. That is the model, not the pipeline: the same summaries
+are what Claude's own desktop app shows. Expect one grey block on some turns,
+none on most.

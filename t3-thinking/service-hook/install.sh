@@ -34,7 +34,6 @@ mkdir -p "$units/t3code.service.d"
 cat > "$units/t3code.service.d/t3-thinking.conf" <<UNIT
 [Service]
 Environment=NODE_OPTIONS=--require=$here/../preload.cjs
-Environment=T3_THINKING_DEBUG=1
 UNIT
 systemctl --user daemon-reload
 systemctl --user enable --now t3-thinking-patch.path
