@@ -44,6 +44,18 @@ This replaces `npx t3@nightly serve --port 3777`. The newest installed version i
 
 `update` installs and patches a build before moving it into the version store; a build the patcher cannot handle is discarded and the active version stays. Older versions remain in place. `rollback` selects the previous installed version for subsequent `serve` commands.
 
+## How the patch is split
+
+`preload.cjs` holds the logic: buffering reasoning deltas per turn and
+appending `reasoning.text` activities. It is loaded into the server with
+`NODE_OPTIONS=--require=<path>/preload.cjs` (`t3-thinking serve` sets it; the
+service hook installs a drop-in for `t3code.service`). The patched server only
+gains a one-line hook after its assistant-text handling that calls
+`globalThis.__t3Thinking(...)` when the preload is present, so the logic can
+be changed and the server restarted without patching again. Set
+`T3_THINKING_DEBUG=1` to log the first delta of each turn and every flush to
+the server's stderr.
+
 ## Patch anchors and wire shape
 
 The patcher requires exactly one match for each of these anchors (variable names may differ between builds; the string literals may not):
@@ -65,7 +77,7 @@ The emitted activity is:
 }
 ```
 
-`seq` starts at zero for each `(threadId, itemId)` and increments after every flush. Flushes happen at 400 characters, on the next reasoning event after 500 ms, and when an item or turn completes. Each edit carries `/* t3-thinking */`; a second patch run is a no-op. For a bundle the patcher checks syntax before its atomic rename and verifies three markers; for an executable it verifies one marker and an unchanged byte length.
+`seq` starts at zero for each `(threadId, itemId)` and increments after every flush. Flushes happen at 400 characters, on the next reasoning event after 500 ms, and when an item or turn completes. Each edit carries a revisioned `/* t3-thinking vN */` marker; a second patch run is a no-op and an older revision makes `--check` exit 3 so the hook re-patches from the pristine build. For a bundle the patcher checks syntax before its atomic rename and verifies two markers; for an executable it verifies one marker, an unchanged byte length, and that the few lines it re-indents contain no template literal.
 
 To verify a real turn, start the server with `./t3-thinking serve --port 3777`, open a project in the T3 client, select a Claude Code model, enable thinking, and send a prompt. Inspect the server websocket or the browser Network tab. During the turn, the stream should contain `thread.activity.append` events whose activity has `kind: "reasoning.text"`, `tone: "info"`, and the payload above. The tone stays one every released client already decodes; a new tone would fail the whole thread stream decode in the web app and on phones. Concatenate `payload.text` (falling back to `summary`) by `payload.itemId` and ascending `payload.seq`. Claude Code's thinking deltas carry no item id; those chunks are keyed `turn:<turnId>`.
 

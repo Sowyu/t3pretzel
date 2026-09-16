@@ -27,6 +27,15 @@ Unit=t3-thinking-patch.service
 [Install]
 WantedBy=default.target
 UNIT
+# The server child inherits the launcher's environment, and the launcher
+# rewrites t3code.service on every update, so the preload goes in a drop-in
+# that survives those rewrites.
+mkdir -p "$units/t3code.service.d"
+cat > "$units/t3code.service.d/t3-thinking.conf" <<UNIT
+[Service]
+Environment=NODE_OPTIONS=--require=$here/../preload.cjs
+Environment=T3_THINKING_DEBUG=1
+UNIT
 systemctl --user daemon-reload
 systemctl --user enable --now t3-thinking-patch.path
 echo "installed; the active version is patched on the next activation, or now with:"

@@ -4,6 +4,7 @@ shopt -s inherit_errexit
 
 store_dir="${T3_THINKING_HOME:-$HOME/.t3-thinking}"
 patcher="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/patch.mjs"
+preload="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/preload.cjs"
 
 die() {
   printf 't3-thinking: %s\n' "$*" >&2
@@ -130,6 +131,8 @@ rollback)
     version="${version:-$(newest_version)}"
     server="$store_dir/$version/node_modules/t3/dist/bin.mjs"
     [ -f "$server" ] || die "installed version is missing: $version"
+    # The reasoning logic is a preload; the patched server calls into it.
+    export NODE_OPTIONS="--require=$preload${NODE_OPTIONS:+ $NODE_OPTIONS}"
     exec node "$server" serve "$@"
     ;;
   *)

@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 
 // The revision is part of the marker: a binary carrying an older patch fails
 // --check, and the service hook restores the pristine build and re-patches.
-const PATCH_REVISION = 3;
+const PATCH_REVISION = 4;
 const marker = `/* t3-thinking v${PATCH_REVISION} */`;
 const anyMarker = /\/\* t3-thinking(?: v\d+)? \*\//g;
 if (process.argv[2] === "--revision") {
@@ -30,7 +30,7 @@ const binaryMode = !file.endsWith(".mjs");
 const source = await readFile(file, binaryMode ? "latin1" : "utf8");
 if (source.includes(marker)) {
   const count = source.split(marker).length - 1;
-  const expected = binaryMode ? 1 : 3;
+  const expected = binaryMode ? 1 : 2;
   if (count !== expected) fail(`marker count (expected ${expected}, found ${count})`);
   if (!binaryMode) checkSyntax(file);
   process.exit(0);
@@ -85,45 +85,8 @@ const turnIdHelper = /\bconst\s+turnId\s*=\s*([A-Za-z_$][\w$]*)\(\s*event\.turnI
 if (!turnIdHelper) fail("assistant delta block: turn id helper not found");
 const toTurnIdName = turnIdHelper[1];
 
-const injectedState = `${marker}\nconst t3ThinkingBuffersModule = new Map();\n`;
-const injectedBranch = `${marker}
-const t3ThinkingBuffers = ${binaryMode ? "(globalThis.__t3ThinkingBuffers ??= new Map())" : "t3ThinkingBuffersModule"};
-const t3ThinkingPayload = event.type === "content.delta" ? event.payload : void 0;
-const t3ThinkingIsReasoning = t3ThinkingPayload && (t3ThinkingPayload.streamKind === "reasoning_text" || t3ThinkingPayload.streamKind === "reasoning_summary_text");
-const t3ThinkingTurnId = ${toTurnIdName}(event.turnId);
-const t3ThinkingItemId = event.itemId ?? ("turn:" + String(event.turnId ?? "none"));
-const t3ThinkingKey = t3ThinkingIsReasoning ? thread.id + ":" + t3ThinkingItemId : void 0;
-if (t3ThinkingKey !== void 0) {
-  let t3ThinkingBuffer = t3ThinkingBuffers.get(t3ThinkingKey);
-  if (!t3ThinkingBuffer) {
-    t3ThinkingBuffer = { text: "", streamKind: t3ThinkingPayload.streamKind, seq: 0, lastFlushAt: Date.now() };
-    t3ThinkingBuffers.set(t3ThinkingKey, t3ThinkingBuffer);
-  }
-  t3ThinkingBuffer.streamKind = t3ThinkingPayload.streamKind;
-  t3ThinkingBuffer.text += String(t3ThinkingPayload.delta ?? "");
-  const t3ThinkingNow = Date.now();
-  if (t3ThinkingBuffer.text.length >= 400 || t3ThinkingNow - t3ThinkingBuffer.lastFlushAt >= 500) {
-    const t3ThinkingSummary = t3ThinkingBuffer.text.trim();
-    if (t3ThinkingSummary.length > 0) {
-      yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingSummary, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingPayload.streamKind, seq: t3ThinkingBuffer.seq, text: t3ThinkingBuffer.text }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
-      t3ThinkingBuffer.text = "";
-      t3ThinkingBuffer.seq += 1;
-    }
-    t3ThinkingBuffer.lastFlushAt = t3ThinkingNow;
-  }
-}
-if (event.type === "item.completed" || event.type === "turn.completed" || event.type === "turn.aborted" || event.type === "turn.failed") {
-  const t3ThinkingCompletedItemId = event.type === "item.completed" ? event.itemId : void 0;
-  for (const [t3ThinkingKey, t3ThinkingBuffer] of t3ThinkingBuffers) {
-    if (!t3ThinkingKey.startsWith(thread.id + ":") || t3ThinkingBuffer.text.length === 0) continue;
-    const t3ThinkingItemId = t3ThinkingKey.slice(thread.id.length + 1);
-    if (event.type === "item.completed" && t3ThinkingCompletedItemId !== t3ThinkingItemId) continue;
-    const t3ThinkingFinal = t3ThinkingBuffer.text.trim();
-    if (t3ThinkingFinal.length > 0) yield* orchestrationEngine.dispatch({ type: "thread.activity.append", commandId: yield* providerCommandId(event, "reasoning.text"), threadId: thread.id, activity: { id: EventId.make(event.eventId + ":reasoning.text:" + t3ThinkingBuffer.seq), createdAt: now, tone: "info", kind: "reasoning.text", summary: t3ThinkingFinal, payload: { itemId: t3ThinkingItemId, streamKind: t3ThinkingBuffer.streamKind, seq: t3ThinkingBuffer.seq, text: t3ThinkingBuffer.text }, ...(t3ThinkingTurnId ? { turnId: t3ThinkingTurnId } : {}) }, createdAt: now });
-    t3ThinkingBuffers.delete(t3ThinkingKey);
-  }
-}
-`;
+// One line in the bundle; the logic lives in preload.cjs (NODE_OPTIONS=--require).
+const injectedBranch = `${marker} if (globalThis.__t3Thinking) yield* globalThis.__t3Thinking(event, thread, now, orchestrationEngine, providerCommandId, EventId, ${toTurnIdName});`;
 
 let patched;
 if (binaryMode) {
@@ -131,9 +94,8 @@ if (binaryMode) {
 } else {
   patched = source.slice(0, blockEnd) + "\n" + injectedBranch + source.slice(blockEnd);
   patched = patched.replace(filter, `${marker} ${replacement}`);
-  patched = patched.slice(0, patched.indexOf("\n")) + "\n" + injectedState + patched.slice(patched.indexOf("\n") + 1);
 }
-const expectedMarkers = binaryMode ? 1 : 3;
+const expectedMarkers = binaryMode ? 1 : 2;
 if ((patched.match(new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length !== expectedMarkers) fail("internal marker count");
 if (checkOnly) process.exit(0);
 
@@ -170,46 +132,38 @@ function patchInPlace(text) {
   if (swapped.length !== filterText.length) fail("binary filter swap changed length");
   let out = text.slice(0, filterMatches[0].index) + swapped + text.slice(filterMatches[0].index + filterText.length);
 
-  // Window: from the end of the assistant block to the end of a later line,
-  // as far as needed for its indentation to absorb the branch. Indentation is
-  // stripped only outside template literals, the one place a newline's
-  // leading whitespace is content.
-  const branch = `\n${marker}${injectedBranch.slice(marker.length)}`.replace(/\n\s+/g, "\n");
+  // The hook is ~150 bytes. Free them by stripping indentation inside the
+  // assistant block itself and, if needed, a few lines after it; refuse any
+  // window containing a backtick so no template literal can be touched.
+  const hook = `\n${injectedBranch}`;
+  const windowStart = declaration.index;
   let windowEnd = blockEnd;
-  let stripped = "";
-  for (let step = 0; step < 20000; step += 1) {
+  let freed = 0;
+  for (let step = 0; step < 400; step += 1) {
+    const before = stripIndentation(out.slice(windowStart, blockEnd));
+    const after = stripIndentation(out.slice(blockEnd, windowEnd));
+    freed = windowEnd - windowStart - before.length - after.length;
+    if (freed >= hook.length) break;
     const nextNewline = out.indexOf("\n", windowEnd + 1);
     if (nextNewline < 0) break;
     windowEnd = nextNewline;
-    stripped = stripIndentation(out.slice(blockEnd, windowEnd));
-    if (windowEnd - blockEnd - stripped.length >= branch.length) break;
   }
-  const window = out.slice(blockEnd, windowEnd);
-  if (window.length - stripped.length < branch.length) {
-    fail(`binary patch: freed ${window.length - stripped.length} bytes after the assistant block, branch needs ${branch.length}`);
-  }
-  const filled = branch + stripped + " ".repeat(window.length - branch.length - stripped.length);
-  if (filled.length !== window.length) fail("binary patch: window length mismatch");
-  out = out.slice(0, blockEnd) + filled + out.slice(windowEnd);
+  const window = out.slice(windowStart, windowEnd);
+  if (window.includes("`")) fail("binary patch: a template literal sits inside the hook window");
+  if (freed < hook.length) fail(`binary patch: freed ${freed} bytes, hook needs ${hook.length}`);
+  const filled =
+    stripIndentation(out.slice(windowStart, blockEnd)) +
+    hook +
+    stripIndentation(out.slice(blockEnd, windowEnd));
+  const padded = filled + " ".repeat(window.length - filled.length);
+  if (padded.length !== window.length) fail("binary patch: window length mismatch");
+  out = out.slice(0, windowStart) + padded + out.slice(windowEnd);
   if (out.length !== text.length) fail("binary patch: total length mismatch");
   return out;
 }
 
 function stripIndentation(text) {
-  let out = "";
-  let inTemplate = false;
-  let i = 0;
-  while (i < text.length) {
-    const ch = text[i];
-    if (ch === "\\" && inTemplate) { out += text.slice(i, i + 2); i += 2; continue; }
-    if (ch === "`") inTemplate = !inTemplate;
-    out += ch;
-    i += 1;
-    if (ch === "\n" && !inTemplate) {
-      while (i < text.length && (text[i] === "\t" || text[i] === " ")) i += 1;
-    }
-  }
-  return out;
+  return text.replace(/\n[\t ]+/g, "\n");
 }
 
 function one(name, matches) {
