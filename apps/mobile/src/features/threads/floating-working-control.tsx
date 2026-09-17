@@ -44,7 +44,7 @@ const CONTROL_TIMING = {
   reduceMotion: ReduceMotion.System,
 } as const;
 const CONTROL_SEPARATION = (16 + CONTROL_HEIGHT) / 2;
-// Both rows share the same centered anchor, so the outgoing one clears fast and
+// Both labels share the same left anchor, so the outgoing one clears fast and
 // the incoming one waits for it to be mostly gone before it starts to show.
 const LABEL_ENTERING = FadeIn.duration(160).delay(80).reduceMotion(ReduceMotion.System);
 const LABEL_EXITING = FadeOut.duration(100).reduceMotion(ReduceMotion.System);
@@ -116,9 +116,6 @@ export function FloatingWorkingControl(props: {
       capsuleWidth.value = null;
     }
   }, [capsuleWidth, hasStatus]);
-  const capsuleStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: CONTROL_SEPARATION * (1 - separationProgress.value) }],
-  }));
   // Zero until the first measurement lands, so the capsule never paints around
   // a label it has not sized to yet.
   const capsuleSizerStyle = useAnimatedStyle(() => ({ width: capsuleWidth.value ?? 0 }));
@@ -138,7 +135,9 @@ export function FloatingWorkingControl(props: {
         <Animated.View className="h-11" style={capsuleSizerStyle} />
         <View
           pointerEvents="box-none"
-          className="absolute h-11 items-center justify-center"
+          // Anchored to the capsule's left edge so the text holds still while
+          // the capsule animates its width; the capsule clips the rest.
+          className="absolute left-0 h-11 items-start justify-center"
           style={{ width: labelWidth }}
         >
           <FloatingStatusLabel
@@ -173,7 +172,7 @@ export function FloatingWorkingControl(props: {
         <UniwindGlassContainer
           spacing={GLASS_MERGE_SPACING}
           pointerEvents="box-none"
-          className="flex-row items-center gap-4"
+          className="flex-row items-center gap-2"
         >
           <AnimatedGlassView
             colorScheme={props.colorScheme}
@@ -181,7 +180,6 @@ export function FloatingWorkingControl(props: {
             isInteractive={statusInteractive}
             pointerEvents={statusInteractive ? "box-none" : "none"}
             className="h-11 items-center justify-center overflow-hidden rounded-full"
-            style={capsuleStyle}
           >
             {statusContent}
           </AnimatedGlassView>
@@ -202,7 +200,7 @@ export function FloatingWorkingControl(props: {
           </AnimatedGlassView>
         </UniwindGlassContainer>
       ) : props.status !== null ? (
-        <View pointerEvents="box-none" className="flex-row items-center gap-4">
+        <View pointerEvents="box-none" className="flex-row items-center gap-2">
           <Animated.View
             pointerEvents={statusInteractive ? "box-none" : "none"}
             className={
@@ -210,7 +208,6 @@ export function FloatingWorkingControl(props: {
                 ? "h-11 items-center justify-center overflow-hidden rounded-full"
                 : "h-11 items-center justify-center overflow-hidden rounded-full border border-border bg-card shadow-md shadow-black/10"
             }
-            style={capsuleStyle}
           >
             {supportsLiquidGlass ? (
               // Same glass as the scroll-to-end button beside it: the capsule
