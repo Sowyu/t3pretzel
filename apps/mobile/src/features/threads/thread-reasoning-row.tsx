@@ -71,19 +71,22 @@ export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
   readonly expanded: boolean;
   readonly onToggle: (rowId: string, anchorKey: string) => void;
 }) {
+  // The server keeps the provider's paragraph breaks, so a block ends in a
+  // blank line or two; those would render as empty lines under the text.
+  const text = props.text.trim();
   const [fade, setFade] = useState<FadeState>(() => ({
-    shown: props.text,
-    prefix: props.text,
+    shown: text,
+    prefix: text,
     chunks: [],
     next: 0,
   }));
   // Growth is only visible by comparing against the last render, and React
   // renders again with the new state before this one paints.
-  if (fade.shown !== props.text) {
+  if (fade.shown !== text) {
     setFade(
       props.live
-        ? advanceFade(fade, props.text)
-        : { shown: props.text, prefix: props.text, chunks: [], next: fade.next },
+        ? advanceFade(fade, text)
+        : { shown: text, prefix: text, chunks: [], next: fade.next },
     );
   }
   const collapsed = !props.live && !props.expanded;
@@ -99,7 +102,7 @@ export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
           <FadingChunk key={chunk.position} text={chunk.text} />
         ))}
       </Text>
-      {!props.live && reasoningOverflowsCollapsed(props.text) ? (
+      {!props.live && reasoningOverflowsCollapsed(text) ? (
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: props.expanded }}
