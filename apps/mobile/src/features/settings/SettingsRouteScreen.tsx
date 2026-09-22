@@ -831,8 +831,8 @@ function BackgroundRefreshRow() {
 
 /**
  * Opt-ins that depend on something outside the app. Thinking traces only have
- * anything to render against a server that forwards reasoning activities, so
- * the row stays off until someone goes looking for it.
+ * anything to render against a server that sends reasoning messages, so the
+ * row stays off until someone goes looking for it.
  */
 function ExperimentalSettingsSection() {
   const savePreferences = useAtomSet(updateMobilePreferencesAtom);
@@ -851,7 +851,7 @@ function ExperimentalSettingsSection() {
         />
       </SettingsSection>
       <Text className="px-2 text-sm text-foreground-muted">
-        {"Shows the model's reasoning as it streams. Needs a server that forwards it."}
+        {"Shows the model's reasoning as it streams. Needs a server from 0.0.43 (nightlies from 2026-09-16)."}
       </Text>
     </View>
   );

@@ -35,10 +35,6 @@ import {
 } from "@t3tools/client-runtime/work-log/presentation";
 import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-log/tool-presentation";
 import { commandProgramName } from "@t3tools/client-runtime/work-log/command-label";
-import {
-  isReasoningTextActivity,
-  threadReasoningItems,
-} from "./threadReasoning";
 
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
@@ -149,24 +145,10 @@ type RawThreadFeedEntry =
       readonly createdAt: string;
       readonly turnId: TurnId | null;
       readonly activity: ThreadFeedActivity;
-    }
-  | {
-      /**
-       * One reasoning block, built only when the experimental Thinking traces
-       * setting is on. The text is deliberately absent: the row reads the
-       * block's reasoning activities itself, so a streamed chunk repaints
-       * that row instead of every row the feed rebuild touches.
-       */
-      readonly type: "reasoning";
-      readonly id: string;
-      readonly createdAt: string;
-      readonly turnId: TurnId | null;
-      readonly itemKey: string;
     };
 
 export type ThreadFeedEntry =
   | Extract<RawThreadFeedEntry, { type: "message" }>
-  | Extract<RawThreadFeedEntry, { type: "reasoning" }>
   | {
       readonly type: "activity-group";
       readonly id: string;
@@ -427,11 +409,9 @@ function deriveWorkLogEntries(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
 ): DerivedWorkLogEntry[] {
   const ordered = Arr.sort(activities, activityOrder);
-  const compactedAt = latestCompactedAtByTurn(ordered);
   const entries: DerivedWorkLogEntry[] = [];
   for (const activity of foldUserInputActivities(ordered)) {
     if (activity.tone !== "error" && isWorktreeSetupActivity(activity.kind)) continue;
-    if (isSupersededCompactingActivity(activity, compactedAt)) continue;
     if (activity.kind === "tool.started") continue;
     // Like web: an agent's task.started row anchors its batch. It has a fixed
     // id and timestamp, unlike progress ticks, whose stable per-task id is
@@ -440,9 +420,9 @@ function deriveWorkLogEntries(
     if (activity.kind === "task.started" && !isAgentTaskStartedActivity(activity)) continue;
     if (activity.kind === "task.updated" && !isTerminalTaskUpdate(activity)) continue;
     if (activity.kind === "tool.progress") continue;
-    // Reasoning belongs to its own block, never to a work-log row: as a
-    // generic row it would render as a tool-shaped line per flush.
-    if (isReasoningTextActivity(activity)) continue;
+    // Thinking arrives as a message now; a local patch once wrote it as
+    // activities, and those rows would render as tools in old threads.
+    if (activity.kind === "reasoning.text") continue;
     if (activity.kind === "context-window.updated") continue;
     if (activity.summary === "Checkpoint captured") continue;
     if (isNoContentRuntimeWarning(activity)) continue;
@@ -451,44 +431,6 @@ function deriveWorkLogEntries(
     entries.push(toDerivedWorkLogEntry(activity));
   }
   return collapseDerivedWorkLogEntries(entries);
-}
-
-/**
- * A patched server (t3-thinking) records the start of a Claude Code auto
- * compaction as a `context-compaction` row with `payload.state: "compacting"`;
- * the stock server records only the end. The start row shimmers as the
- * turn's trailing work until the end row lands, then drops out.
- */
-function compactionState(activity: OrchestrationThreadActivity): string | null {
-  if (activity.kind !== "context-compaction") return null;
-  const payload =
-    activity.payload && typeof activity.payload === "object"
-      ? (activity.payload as Record<string, unknown>)
-      : null;
-  return typeof payload?.state === "string" ? payload.state : null;
-}
-
-function latestCompactedAtByTurn(
-  activities: ReadonlyArray<OrchestrationThreadActivity>,
-): ReadonlyMap<string, string> {
-  const latest = new Map<string, string>();
-  for (const activity of activities) {
-    const state = compactionState(activity);
-    if (state === null || state === "compacting") continue;
-    const turnKey = activity.turnId ?? "";
-    const current = latest.get(turnKey);
-    if (current === undefined || activity.createdAt > current) latest.set(turnKey, activity.createdAt);
-  }
-  return latest;
-}
-
-function isSupersededCompactingActivity(
-  activity: OrchestrationThreadActivity,
-  compactedAt: ReadonlyMap<string, string>,
-): boolean {
-  if (compactionState(activity) !== "compacting") return false;
-  const doneAt = compactedAt.get(activity.turnId ?? "");
-  return doneAt !== undefined && doneAt >= activity.createdAt;
 }
 
 /** Adapters forward unknown wire-only SDK messages (background_tasks_changed,
@@ -1656,7 +1598,11 @@ function maxIsoTimestamp(a: string | null, b: string | null): string | null {
   return bMs > aMs ? b : a;
 }
 
-function deriveUnsettledTurnId(latestTurn: ThreadFeedLatestTurn | null): TurnId | null {
+/**
+ * One definition of "still live", shared with the feed's rows: two copies of
+ * this test are what let a row and the fold beside it disagree.
+ */
+export function deriveUnsettledTurnId(latestTurn: ThreadFeedLatestTurn | null): TurnId | null {
   if (!latestTurn) {
     return null;
   }
@@ -1697,8 +1643,13 @@ function deriveThreadFeedTurnFolds(
       pendingUserBoundary = entry.message.createdAt;
       continue;
     }
+    // Thinking is work, so it folds with the rest of it. A provider that
+    // interleaves a block with every tool call would otherwise leave dozens of
+    // thinking rows standing beside the "Worked for ..." summary.
+    // Nothing folds while the turn is live, which is when traces are watched.
     const turnId =
-      entry.type === "message" && entry.message.role === "assistant"
+      entry.type === "message" &&
+      (entry.message.role === "assistant" || entry.message.role === "reasoning")
         ? entry.message.turnId
         : entry.type === "activity-group"
           ? entry.turnId
@@ -1725,7 +1676,15 @@ function deriveThreadFeedTurnFolds(
     if (turnId === unsettledTurnId) {
       continue;
     }
-    if (entries.some((entry) => entry.type === "message" && entry.message.streaming)) {
+    // A live turn is already excluded above, so only an answer still being
+    // written may hold a fold open. A thinking block stranded by a crashed
+    // provider keeps its streaming flag forever and must not.
+    if (
+      entries.some(
+        (entry) =>
+          entry.type === "message" && entry.message.streaming && entry.message.role !== "reasoning",
+      )
+    ) {
       continue;
     }
 
@@ -1745,13 +1704,16 @@ function deriveThreadFeedTurnFolds(
       continue;
     }
     // A lone compaction row stays visible on its own; it only folds away as
-    // part of a turn that already folds other work.
-    const hidesNonCompactionWork = entries.some(
+    // part of a turn that already folds other work. Thinking is the same: a
+    // question answered by thought alone keeps its trace rather than
+    // collapsing behind a "Worked for ..." that hides nothing else.
+    const hidesFoldableWork = entries.some(
       (entry) =>
         hiddenEntryIds.has(entry.id) &&
-        !(entry.type === "activity-group" && isContextCompactionActivityGroup(entry)),
+        !(entry.type === "activity-group" && isContextCompactionActivityGroup(entry)) &&
+        !(entry.type === "message" && entry.message.role === "reasoning"),
     );
-    if (!hidesNonCompactionWork) {
+    if (!hidesFoldableWork) {
       continue;
     }
 
@@ -1884,9 +1846,15 @@ export function deriveThreadFeedPresentation(
         (row.type === "agent-spawn" &&
           row.summary.tone === "working" &&
           row.turnId === unsettledTurnId) ||
-        // The turn's reasoning text is the live slot once its first chunk
-        // lands: the shimmer only covers the wait before there is text.
-        (row.type === "reasoning" && unsettledTurnId !== null && row.turnId === unsettledTurnId),
+        // A live thinking message is the real version of this row, so it takes
+        // the slot instead of sitting under a second "Thinking". Scoped to the
+        // live turn: a block stranded by a killed server must not silence this
+        // row for every turn that follows.
+        (row.type === "message" &&
+          row.message.role === "reasoning" &&
+          row.message.streaming &&
+          row.message.turnId !== null &&
+          row.message.turnId === unsettledTurnId),
     )
   ) {
     result.push(thinkingRow(activeWorkStartedAt, unsettledTurnId));
@@ -2250,7 +2218,7 @@ export function buildThreadFeed(
   options?: {
     readonly loadedMessages?: ReadonlyArray<OrchestrationThread["messages"][number]>;
     readonly localMessages?: ReadonlyArray<OrchestrationThread["messages"][number]>;
-    /** Settings → Experimental → Thinking traces. Off means no reasoning rows. */
+    /** Settings → Experimental → Thinking traces. Off hides reasoning messages. */
     readonly thinkingTraces?: boolean;
   },
 ): ThreadFeedEntry[] {
@@ -2264,22 +2232,6 @@ export function buildThreadFeed(
     (entry) =>
       oldestLoadedMessageCreatedAt === null || entry.createdAt >= oldestLoadedMessageCreatedAt,
   );
-  const reasoningEntries: Array<Extract<RawThreadFeedEntry, { readonly type: "reasoning" }>> =
-    options?.thinkingTraces === true
-      ? Array.from(threadReasoningItems(thread.activities).values())
-          .filter(
-            (item) =>
-              oldestLoadedMessageCreatedAt === null ||
-              item.createdAt >= oldestLoadedMessageCreatedAt,
-          )
-          .map((item) => ({
-            type: "reasoning",
-            id: `reasoning:${item.key}`,
-            createdAt: item.createdAt,
-            turnId: item.turnId,
-            itemKey: item.key,
-          }))
-      : [];
   const foldedAnswerMessageIds = new Set(
     activityEntries.flatMap((entry) =>
       entry.activity.workEntry.questionAnswer
@@ -2290,7 +2242,11 @@ export function buildThreadFeed(
   const entries = Arr.sortWith(
     [
       ...messages
-        .filter((message) => message.role !== "user" || !foldedAnswerMessageIds.has(message.id))
+        .filter(
+          (message) =>
+            (message.role !== "reasoning" || options?.thinkingTraces === true) &&
+            (message.role !== "user" || !foldedAnswerMessageIds.has(message.id)),
+        )
         .map((message) => {
           let entry = messageEntriesCache.get(message);
           if (!entry) {
@@ -2300,7 +2256,6 @@ export function buildThreadFeed(
           return entry;
         }),
       ...activityEntries,
-      ...reasoningEntries,
     ],
     (s) => new Date(s.createdAt),
     Order.Date,

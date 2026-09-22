@@ -144,6 +144,7 @@ import {
 } from "@t3tools/mobile-markdown-text/links";
 import {
   deriveThreadFeedPresentation,
+  deriveUnsettledTurnId,
   isContextCompactionActivityGroup,
   type ThreadFeedEntry,
   type ThreadFeedLatestTurn,
@@ -1368,6 +1369,7 @@ function renderFeedEntry(
     readonly workGroupScrollPositions: Map<string, ThreadWorkGroupScrollPosition>;
     readonly terminalAssistantMessageIds: ReadonlySet<string>;
     readonly unsettledTurnId: TurnId | null;
+    readonly isWorking: boolean;
     readonly onCopyWorkRow: (rowId: string, value: string) => void;
     readonly onToggleWorkGroup: (groupId: string, anchorKey: string) => void;
     readonly onToggleWorkRow: (rowId: string, anchorKey: string) => void;
@@ -1422,20 +1424,6 @@ function renderFeedEntry(
 
   if (entry.type === "thinking") {
     return <ThreadThinkingRow rowSizing={props.workRowSizing} iconSubtleColor={iconSubtleColor} />;
-  }
-
-  if (entry.type === "reasoning") {
-    return (
-      <ThreadReasoningRow
-        environmentId={props.environmentId}
-        threadId={props.threadId}
-        itemKey={entry.itemKey}
-        rowId={entry.id}
-        live={props.unsettledTurnId !== null && entry.turnId === props.unsettledTurnId}
-        expanded={props.expandedWorkRows[entry.id] ?? false}
-        onToggle={props.onToggleWorkRow}
-      />
-    );
   }
 
   if (entry.type === "agent-spawn") {
@@ -1497,6 +1485,25 @@ function renderFeedEntry(
 
   if (entry.type === "message") {
     const { message } = entry;
+    if (message.role === "reasoning") {
+      // Only the live turn may claim to still be thinking, and only while the
+      // thread is actually working: a block left open by a crashed provider
+      // must not keep fading on a turn that settled long ago.
+      const live =
+        message.streaming &&
+        props.isWorking &&
+        message.turnId !== null &&
+        message.turnId === props.unsettledTurnId;
+      return (
+        <ThreadReasoningRow
+          rowId={message.id}
+          text={message.text}
+          live={live}
+          expanded={props.expandedWorkRows[message.id] ?? false}
+          onToggle={props.onToggleWorkRow}
+        />
+      );
+    }
     const isUser = message.role === "user";
     const renderedText = renderAssistantCitationsAsText(message.text);
     const styles = isUser ? markdownStyles.user : markdownStyles.assistant;
@@ -2262,11 +2269,9 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   );
   const markdownStyles = useMarkdownStyles(onMarkdownLinkPress, renderMarkdownImage);
   const reviewCommentColors = useReviewCommentColors();
-  const unsettledTurnId =
-    props.latestTurn &&
-    (props.latestTurn.completedAt === null || props.latestTurn.state === "running")
-      ? props.latestTurn.turnId
-      : null;
+  // One definition of "still live", shared with the fold derivation: two
+  // copies of this test are what let a row and the fold beside it disagree.
+  const unsettledTurnId = deriveUnsettledTurnId(props.latestTurn);
   // LegendList does not invalidate visible rows when only the renderItem closure changes.
   // Include turn completion so unchanged message rows reveal their footer and spacing
   // even when the final message update arrives before the turn settles.
@@ -2767,6 +2772,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             workGroupScrollPositions,
             terminalAssistantMessageIds,
             unsettledTurnId,
+            isWorking: props.activeWorkStartedAt !== null,
             onCopyWorkRow,
             onToggleWorkGroup,
             onToggleWorkRow,
@@ -2802,6 +2808,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       workGroupScrollPositions,
       terminalAssistantMessageIds,
       unsettledTurnId,
+      props.activeWorkStartedAt,
       iconSubtleColor,
       screenColor,
       userBubbleColor,

@@ -1,6 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId, OrchestrationThreadActivity, ThreadId } from "@t3tools/contracts";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   interpolateColor,
@@ -10,60 +8,76 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { AppText as Text } from "../../components/AppText";
-import { threadReasoningItem } from "../../lib/threadReasoning";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
-import { environmentThreadDetails } from "../../state/threads";
 
 /** Below this, three lines almost always hold the whole block on a phone. */
 const REASONING_COLLAPSE_MIN_LENGTH = 140;
-/** Older chunks than this render as one static string; their fade is long done. */
+/** Older chunks than this fold into the static prefix; their fade is long done. */
 const FADING_CHUNKS = 6;
 const CHUNK_FADE_MS = 320;
 
+interface FadeState {
+  /** The text this state was built for. */
+  readonly shown: string;
+  /** Text whose fade is over, rendered as one static string. */
+  readonly prefix: string;
+  /** Recent arrivals, oldest first; each one fades in where it landed. */
+  readonly chunks: ReadonlyArray<{ readonly position: number; readonly text: string }>;
+  /** Positions only grow, so a chunk keeps its span, and its finished fade. */
+  readonly next: number;
+}
+
 /**
- * One reasoning block, shown when Settings → Experimental → Thinking traces
- * is on. The row subscribes to the thread's activities and maps them down to
- * its own block, so a chunk that changes another block never reaches React.
- * While the block streams each new chunk fades in where it lands; a finished
- * block collapses to three lines, because the answer below it is the point.
+ * Splits the text a streaming reasoning message has grown to into the spans
+ * that still owe a fade. Deltas only ever append, so the new suffix is the new
+ * chunk; text that is not an extension of what was shown (a resumed thread, a
+ * provider replacing its block) snaps instead of animating a diff.
+ */
+function advanceFade(fade: FadeState, text: string): FadeState {
+  if (!text.startsWith(fade.shown)) {
+    return { shown: text, prefix: text, chunks: [], next: fade.next };
+  }
+  const chunks = [...fade.chunks, { position: fade.next, text: text.slice(fade.shown.length) }];
+  const folded = chunks.slice(0, Math.max(0, chunks.length - FADING_CHUNKS));
+  return {
+    shown: text,
+    prefix: fade.prefix + folded.map((chunk) => chunk.text).join(""),
+    chunks: chunks.slice(folded.length),
+    next: fade.next + 1,
+  };
+}
+
+/**
+ * One thinking trace: a `role: "reasoning"` message, shown when Settings →
+ * Experimental → Thinking traces is on. While it streams each new delta fades
+ * in where it lands; a finished block collapses to three lines, because the
+ * answer below it is the point. Text already there when the row mounted never
+ * fades, so a thread opened mid-turn shows what exists without a light show.
+ * `expanded` lives on the feed so it survives row recycling.
  */
 export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
-  readonly environmentId: EnvironmentId;
-  readonly threadId: ThreadId;
-  readonly itemKey: string;
   readonly rowId: string;
+  readonly text: string;
   readonly live: boolean;
   readonly expanded: boolean;
   readonly onToggle: (rowId: string, anchorKey: string) => void;
 }) {
-  const selectItem = useCallback(
-    (activities: ReadonlyArray<OrchestrationThreadActivity>) =>
-      threadReasoningItem(activities, props.itemKey),
-    [props.itemKey],
-  );
-  const item = useAtomValue(
-    environmentThreadDetails.activitiesAtom({
-      environmentId: props.environmentId,
-      threadId: props.threadId,
-    }),
-    selectItem,
-  );
-  // Chunks already there when the row mounted never fade: a thread opened
-  // mid-turn shows what exists, and only what arrives afterwards animates.
-  const [settledAtMount] = useState(() => item?.chunks.length ?? 0);
-  if (!item) {
-    return null;
+  const [fade, setFade] = useState<FadeState>(() => ({
+    shown: props.text,
+    prefix: props.text,
+    chunks: [],
+    next: 0,
+  }));
+  // Growth is only visible by comparing against the last render, and React
+  // renders again with the new state before this one paints.
+  if (fade.shown !== props.text) {
+    setFade(
+      props.live
+        ? advanceFade(fade, props.text)
+        : { shown: props.text, prefix: props.text, chunks: [], next: fade.next },
+    );
   }
-  const live = props.live && item.latestInTurn;
-  const collapsed = !live && !props.expanded;
-  const stableCount = live
-    ? Math.max(settledAtMount, item.chunks.length - FADING_CHUNKS)
-    : item.chunks.length;
-  // Keyed by absolute position: a chunk keeps its span, and its finished
-  // fade, until it folds into the static string ahead of it.
-  const fading = item.chunks
-    .slice(stableCount)
-    .map((text, offset) => ({ position: stableCount + offset, text }));
+  const collapsed = !props.live && !props.expanded;
   return (
     <View className="mb-2 px-1">
       <Text
@@ -71,12 +85,12 @@ export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
         className="text-sm leading-snug text-foreground-muted opacity-90"
         {...(collapsed ? { numberOfLines: 3 } : {})}
       >
-        {item.chunks.slice(0, stableCount).join("")}
-        {fading.map((chunk) => (
+        {fade.prefix}
+        {fade.chunks.map((chunk) => (
           <FadingChunk key={chunk.position} text={chunk.text} />
         ))}
       </Text>
-      {!live && item.text.length >= REASONING_COLLAPSE_MIN_LENGTH ? (
+      {!props.live && props.text.length >= REASONING_COLLAPSE_MIN_LENGTH ? (
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: props.expanded }}
