@@ -181,6 +181,7 @@ import {
   useAssetUrl,
   useAssetUrlState,
   useRefreshAssetUrl,
+  useRetainedAssetUrlState,
 } from "../../state/assets";
 import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
 import { usePreparedConnection } from "../../state/session";
@@ -298,9 +299,19 @@ function MessageAttachmentImage(props: {
     }),
     [props.attachmentId, props.name, props.mimeType],
   );
-  const uri = useAssetUrl(props.environmentId, resource);
+  const assetUrl = useRetainedAssetUrlState(props.environmentId, resource);
+  const uri = assetUrl._tag === "Success" ? assetUrl.url : null;
   const refreshAssetUrl = useRefreshAssetUrl(props.environmentId, resource);
   const retriedImage = useRef(false);
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+
+  if (assetUrl._tag === "Failure" || (uri !== null && failedUri === uri)) {
+    return (
+      <View className={`${props.className} items-center justify-center bg-md-code-bg`}>
+        <Text className="text-xs text-foreground-muted">Image unavailable</Text>
+      </View>
+    );
+  }
 
   if (uri === null) {
     return (
@@ -340,7 +351,10 @@ function MessageAttachmentImage(props: {
             retriedImage.current = false;
           }}
           onError={() => {
-            if (retriedImage.current) return;
+            if (retriedImage.current) {
+              setFailedUri(uri);
+              return;
+            }
             retriedImage.current = true;
             void refreshAssetUrl();
           }}
@@ -1944,7 +1958,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const previousLatestTurnRef = useRef(props.latestTurn);
   const userScrollSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { width: windowWidth, fontScale } = useWindowDimensions();
-  const { appearance } = useAppearancePreferences();
+  const { appearance, materialYouStyleLayoutActive } = useAppearancePreferences();
   const workRowSizing = useMemo(
     () => deriveThreadWorkLogSizing({ baseFontSize: appearance.baseFontSize, fontScale }),
     [appearance.baseFontSize, fontScale],
@@ -2064,7 +2078,10 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
 
   const theme = useUniwindTheme();
   const iconSubtleColor = theme["--color-icon-subtle"];
-  const screenColor = theme["--color-screen"];
+  // Work-log edge fades blend into whatever the feed sits on; ThreadDetailScreen
+  // paints the Material You layout on the thread canvas, not the screen color.
+  const screenColor =
+    theme[materialYouStyleLayoutActive ? "--color-thread-canvas" : "--color-screen"];
   const userBubbleColor = theme["--color-user-bubble"];
   const onMarkdownLinkPress = useCallback(
     (href: string) => {
@@ -3015,6 +3032,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           currentIndex={railCurrentIndex}
           inViewRange={railInViewRange}
           onSelect={handleRailSelect}
+          topInset={topContentInset}
+          bottomInset={bottomContentInset}
         />
         {presentedFeed.length === 0 &&
         props.activeWorkStartedAt === null &&

@@ -192,6 +192,19 @@ function deriveEmptyState(props: {
     };
   }
 
+  // Connected but the first shell snapshot has not landed: an empty list here
+  // means "not loaded yet", not "no threads".
+  if (
+    !catalogState.hasLoadedShellSnapshot &&
+    (catalogState.hasPendingShellSnapshot || catalogState.hasReadyEnvironment)
+  ) {
+    return {
+      title: "Connecting to environment",
+      detail: "Loading projects and threads from the saved environment.",
+      loading: true,
+    };
+  }
+
   if (props.projectCount === 0 && catalogState.hasLoadedShellSnapshot) {
     return {
       title: "No projects found",
@@ -563,7 +576,8 @@ export function HomeScreen(props: HomeScreenProps) {
     toggleSettledShelf,
     toggleSnoozedShelf,
   } = useThreadListV2ShelfPreferences();
-  // The queued-start and snooze helpers need a clock while the list stays open.
+  // The queued-start and snooze helpers and every row's relative time need a
+  // clock while the list stays open.
   const [nowMinute, setNowMinute] = useState(() => new Date().toISOString().slice(0, 16));
   // Snooze wake times are second-precise; a counter bumped exactly at the
   // next wake boundary re-runs the partition with a fresh clock so a woken
@@ -571,12 +585,11 @@ export function HomeScreen(props: HomeScreenProps) {
   const [snoozeWakeTick, bumpSnoozeWakeTick] = useState(0);
   useFocusEffect(
     useCallback(() => {
-      if (!threadListV2Enabled) return;
-      // Refresh immediately on enable or focus because the previous value can be hours old.
+      // Refresh immediately on focus because the previous value can be hours old.
       setNowMinute(new Date().toISOString().slice(0, 16));
       const id = setInterval(() => setNowMinute(new Date().toISOString().slice(0, 16)), 60_000);
       return () => clearInterval(id);
-    }, [threadListV2Enabled]),
+    }, []),
   );
   // Threads on servers without the settlement capability never classify as
   // settled (the user could neither un-settle nor pin them).
@@ -958,11 +971,12 @@ export function HomeScreen(props: HomeScreenProps) {
 
   const extraData = useMemo(
     () => ({
+      clockMinute: nowMinute,
       savedConnectionsById: props.savedConnectionsById,
       searchQuery: props.searchQuery,
       threadSearchMatchByKey,
     }),
-    [props.savedConnectionsById, props.searchQuery, threadSearchMatchByKey],
+    [nowMinute, props.savedConnectionsById, props.searchQuery, threadSearchMatchByKey],
   );
 
   const renderItem = useCallback(
@@ -992,6 +1006,7 @@ export function HomeScreen(props: HomeScreenProps) {
             <PendingTaskListRow
               variant="compact"
               pendingTask={item.pendingTask}
+              clockMinute={nowMinute}
               environmentLabel={
                 props.savedConnectionsById[item.pendingTask.environmentId]?.environmentLabel ?? null
               }
@@ -1008,6 +1023,7 @@ export function HomeScreen(props: HomeScreenProps) {
               onNewThreadOnBranch={props.onNewThreadOnBranch}
               variant="compact"
               thread={thread}
+              clockMinute={nowMinute}
               hasQueuedMessages={queuedThreadKeys.has(`${thread.environmentId}:${thread.id}`)}
               environmentLabel={
                 props.savedConnectionsById[thread.environmentId]?.environmentLabel ?? null
@@ -1050,6 +1066,7 @@ export function HomeScreen(props: HomeScreenProps) {
       handleRegenerateThreadTitle,
       handleRenameThread,
       machineByEnvironmentId,
+      nowMinute,
       queuedThreadKeys,
       props.onArchiveThread,
       props.onDeletePendingTask,

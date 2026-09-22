@@ -14,17 +14,29 @@ export interface ThreadRowProviderInstance {
   readonly showBadge: boolean;
 }
 
+// Rows are memoized, so the same provider list must hand back the same object.
+// A new server config brings a new providers array, which drops its cache entry.
+const resolvedByProviders = new WeakMap<
+  ServerConfig["providers"],
+  Map<string, ThreadRowProviderInstance>
+>();
+
 /**
  * Resolve the provider instance a thread runs on, scoped to the thread's own
  * environment: default instance ids are the driver slug, so the same id
- * names a different account on every server.
+ * names a different account on every server. Returns the same object for the
+ * same provider list and instance id.
  */
 export function resolveThreadProviderInstance(
   serverConfigs: ReadonlyMap<EnvironmentId, ServerConfig>,
   thread: EnvironmentThreadShell,
 ): ThreadRowProviderInstance | null {
-  const providers = serverConfigs.get(thread.environmentId)?.providers ?? [];
+  const providers = serverConfigs.get(thread.environmentId)?.providers;
+  if (!providers) return null;
   const instanceId = thread.session?.providerInstanceId ?? thread.modelSelection.instanceId;
+  let resolved = resolvedByProviders.get(providers);
+  const cached = resolved?.get(instanceId);
+  if (cached) return cached;
   const snapshot = providers.find((provider) => provider.instanceId === instanceId);
   if (!snapshot) return null;
   const entry = {
@@ -32,11 +44,17 @@ export function resolveThreadProviderInstance(
     displayName: resolveProviderInstanceDisplayName(snapshot),
     accentColor: normalizeProviderAccentColor(snapshot.accentColor),
   };
-  return {
+  const instance = {
     ...entry,
     showBadge: shouldShowInstanceBadge(
       entry,
       providers.map((provider) => ({ driverKind: provider.driver })),
     ),
   };
+  if (!resolved) {
+    resolved = new Map();
+    resolvedByProviders.set(providers, resolved);
+  }
+  resolved.set(instanceId, instance);
+  return instance;
 }

@@ -12,6 +12,15 @@ import { useUniwindTheme } from "../../lib/useUniwindTheme";
 
 /** Below this, three lines almost always hold the whole block on a phone. */
 const REASONING_COLLAPSE_MIN_LENGTH = 140;
+/** Short text still overflows three lines once it has this many line breaks. */
+const REASONING_COLLAPSE_MIN_BREAKS = 3;
+
+function reasoningOverflowsCollapsed(text: string): boolean {
+  return (
+    text.length >= REASONING_COLLAPSE_MIN_LENGTH ||
+    text.split("\n").length > REASONING_COLLAPSE_MIN_BREAKS
+  );
+}
 /** Older chunks than this fold into the static prefix; their fade is long done. */
 const FADING_CHUNKS = 6;
 const CHUNK_FADE_MS = 320;
@@ -90,7 +99,7 @@ export const ThreadReasoningRow = memo(function ThreadReasoningRow(props: {
           <FadingChunk key={chunk.position} text={chunk.text} />
         ))}
       </Text>
-      {!props.live && props.text.length >= REASONING_COLLAPSE_MIN_LENGTH ? (
+      {!props.live && reasoningOverflowsCollapsed(props.text) ? (
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: props.expanded }}

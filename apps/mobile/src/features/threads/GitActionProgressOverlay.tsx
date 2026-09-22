@@ -2,7 +2,14 @@ import { errorHaptic, successHaptic } from "../../lib/haptics";
 import { GlassView } from "expo-glass-effect";
 import { SymbolView } from "../../components/AppSymbol";
 import { useCallback, useEffect, useRef } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, useColorScheme, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  useColorScheme,
+  View,
+} from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -142,14 +149,22 @@ function OverlayContent(props: { readonly progress: GitActionProgress }) {
     );
   }
 
+  // Dark bg-danger is translucent, so on Android the error toast sits on an opaque
+  // bg-card with the danger tint layered inside; otherwise chat text shows through.
+  const opaqueErrorBase = Platform.OS === "android" && progress.phase === "error";
   const bgClass =
-    progress.phase === "error" ? "border-danger-border bg-danger" : "bg-card border-border";
+    progress.phase !== "error"
+      ? "bg-card border-border"
+      : opaqueErrorBase
+        ? "overflow-hidden border-danger-border bg-card"
+        : "border-danger-border bg-danger";
 
   return (
     <Animated.View
       layout={OVERLAY_LAYOUT_TRANSITION}
       className={`flex-row items-center gap-2.5 rounded-[26px] border border-continuous px-3.5 py-3 shadow-lg shadow-black/10 ${bgClass}`}
     >
+      {opaqueErrorBase ? <View className="absolute inset-0 bg-danger" /> : null}
       {content}
     </Animated.View>
   );

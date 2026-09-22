@@ -116,9 +116,9 @@ export function useFileTreeEntries(input: {
     return { revision, entries: [...merged.values()], reachableDirectories };
   }, [directories, revision, rootData, searchData, searching]);
 
-  const refresh = useCallback(() => {
-    refreshRoot();
-    if (searching) refreshSearch();
+  // Resolves once the root, the search, and every reloaded folder settle.
+  const refresh = useCallback(async () => {
+    const queries = [refreshRoot(), searching ? refreshSearch() : undefined];
     const paths = new Set(
       [...directories.requested].filter((path) => snapshot.reachableDirectories.has(path)),
     );
@@ -134,8 +134,9 @@ export function useFileTreeEntries(input: {
         await loadDirectory(next.value, true);
       }
     };
-    for (let index = 0; index < Math.min(4, paths.size); index++) void worker();
+    const workers = Array.from({ length: Math.min(4, paths.size) }, worker);
     render();
+    await Promise.all([...queries, ...workers]);
   }, [
     directories,
     loadDirectory,

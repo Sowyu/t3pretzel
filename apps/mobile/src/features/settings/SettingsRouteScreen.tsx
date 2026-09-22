@@ -222,8 +222,13 @@ function ConfiguredSettingsRouteScreen() {
     setNotificationStatus(result.value.granted ? "enabled" : "disabled");
   }, []);
 
+  // Permission changes happen in system Settings, so re-read on every return.
   useEffect(() => {
     void refreshNotifications();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshNotifications();
+    });
+    return () => subscription.remove();
   }, [refreshNotifications]);
 
   useEffect(() => {
@@ -309,7 +314,7 @@ function ConfiguredSettingsRouteScreen() {
   const promptSignIn = useCallback(() => {
     Alert.alert(
       "Sign in to T3 Connect",
-      "Live Activity updates require T3 Connect so relay can deliver updates to this device.",
+      "Agent notifications and activity updates require T3 Connect so relay can deliver them to this device.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -771,6 +776,12 @@ function BackgroundRefreshRow() {
     backgroundRefreshStatusSnapshot,
   );
   const [batteryRestricted, setBatteryRestricted] = useState(isBatteryOptimizationRestricted);
+  // "12m ago" is computed at render; this tick keeps it true while Settings stays open.
+  const [, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setMinuteTick((tick) => tick + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Granting the exemption happens in the system settings app, so the answer
   // only ever changes while this screen is away.
@@ -851,7 +862,9 @@ function ExperimentalSettingsSection() {
         />
       </SettingsSection>
       <Text className="px-2 text-sm text-foreground-muted">
-        {"Shows the model's reasoning as it streams. Needs a server from 0.0.43 (nightlies from 2026-09-16)."}
+        {
+          "Shows the model's reasoning as it streams. Needs a server from 0.0.43 (nightlies from 2026-09-16)."
+        }
       </Text>
     </View>
   );

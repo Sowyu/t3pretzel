@@ -281,7 +281,7 @@ export function formatRefreshDuration(durationMs: number): string {
 }
 
 // Long enough for "Could not authorize the environment request", short enough
-// that the Settings row stays two lines on a narrow phone.
+// that the Settings row stays at most three lines on a narrow phone.
 const MAX_REASON_LENGTH = 48;
 
 function truncateReason(reason: string): string {

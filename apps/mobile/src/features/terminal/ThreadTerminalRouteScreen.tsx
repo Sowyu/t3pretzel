@@ -531,6 +531,10 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
   const terminalBottomInset =
     (isKeyboardAnimationUsable ? keyboardState.height : insets.bottom) +
     (isAccessoryVisible ? TERMINAL_ACCESSORY_HEIGHT : 0);
+  const isAttachRowVisible = Boolean(selectedThread) && hasNativeTerminalSurface();
+  // Android draws edge to edge, so the attach row must sit above the bottom
+  // inset or it lands under the nav bar or the keyboard.
+  const isAttachRowBelowInset = Platform.OS === "android" && isAttachRowVisible;
 
   useEffect(() => {
     const keyboardWillShow = KeyboardEvents.addListener("keyboardWillShow", () => {
@@ -1313,7 +1317,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
               ref={terminalBlurTarget}
               style={{
                 flex: 1,
-                paddingBottom: terminalBottomInset,
+                paddingBottom: isAttachRowBelowInset ? 0 : terminalBottomInset,
               }}
             >
               <View
@@ -1344,7 +1348,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
               />
             </BlurTargetView>
 
-            {selectedThread && hasNativeTerminalSurface() ? (
+            {isAttachRowVisible ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => {
@@ -1352,6 +1356,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   setCaptureRequest((value) => value + 1);
                 }}
                 className="px-4 py-2"
+                style={isAttachRowBelowInset ? { marginBottom: terminalBottomInset } : undefined}
               >
                 <Text style={{ color: terminalTheme.foreground }}>Attach visible output</Text>
               </Pressable>

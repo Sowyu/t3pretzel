@@ -46,7 +46,7 @@ export function connectionFloatingStatus(input: {
       return {
         kind: "connection",
         tone: "reconnecting",
-        label: `Reconnecting to ${environmentLabel}...`,
+        label: `${input.connectionState === "connecting" ? "Connecting" : "Reconnecting"} to ${environmentLabel}...`,
         onPress: input.onReconnect,
       };
     case "offline":

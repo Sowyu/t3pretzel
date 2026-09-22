@@ -289,6 +289,8 @@ export const PendingTaskListRow = memo(function PendingTaskListRow(props: {
   readonly variant: ThreadListVariant;
   readonly pendingTask: PendingNewTask;
   readonly environmentLabel: string | null;
+  /** Current UTC minute; a new value re-renders the memoized row so its relative time moves. */
+  readonly clockMinute: string;
   readonly environmentMachine?: EnvironmentMachineKind;
   readonly isLast: boolean;
   readonly onSelectPendingTask: (pendingTask: PendingNewTask) => void;
@@ -446,6 +448,8 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
   readonly variant: ThreadListVariant;
   readonly thread: EnvironmentThreadShell;
   readonly environmentLabel: string | null;
+  /** Current UTC minute; a new value re-renders the memoized row so its relative time moves. */
+  readonly clockMinute: string;
   readonly environmentMachine?: EnvironmentMachineKind;
   /** A message for this thread is waiting in the outbox. */
   readonly hasQueuedMessages?: boolean;

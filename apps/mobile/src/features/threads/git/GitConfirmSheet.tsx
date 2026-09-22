@@ -4,7 +4,7 @@ import * as Arr from "effect/Array";
 import * as Result from "effect/Result";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useCallback, useMemo } from "react";
-import { Platform, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -57,7 +57,7 @@ export function GitConfirmSheet(props: GitConfirmSheetProps) {
 
   const continuePendingAction = useCallback(async () => {
     if (!confirmAction) return;
-    navigation.dispatch(StackActions.replace("Thread", { environmentId, threadId }));
+    navigation.dispatch(StackActions.popTo("Thread", { environmentId, threadId }));
     await gitActions.onRunSelectedThreadGitAction({
       action: confirmAction,
       ...(params.commitMessage ? { commitMessage: params.commitMessage } : {}),
@@ -67,7 +67,7 @@ export function GitConfirmSheet(props: GitConfirmSheetProps) {
 
   const movePendingActionToFeatureBranch = useCallback(async () => {
     if (!confirmAction) return;
-    navigation.dispatch(StackActions.replace("Thread", { environmentId, threadId }));
+    navigation.dispatch(StackActions.popTo("Thread", { environmentId, threadId }));
 
     if (includesCommit) {
       await gitActions.onRunSelectedThreadGitAction({
@@ -88,7 +88,8 @@ export function GitConfirmSheet(props: GitConfirmSheetProps) {
         branch.isRemote ? Result.failVoid : Result.succeed(branch.name),
       ),
     );
-    await gitActions.onCreateSelectedThreadBranch(newBranchName);
+    const createdBranch = await gitActions.onCreateSelectedThreadBranch(newBranchName);
+    if (createdBranch === null) return;
     await gitActions.onRunSelectedThreadGitAction({ action: confirmAction });
   }, [
     confirmAction,
@@ -109,31 +110,38 @@ export function GitConfirmSheet(props: GitConfirmSheetProps) {
         <View className="min-h-4 pt-2" />
       )}
 
-      <View className="items-center gap-1 px-5 pb-3 pt-4">
-        <Text className="text-xs font-t3-bold tracking-[1px] uppercase text-foreground-muted">
-          Confirm
-        </Text>
-        <Text className="text-center text-3xl font-t3-bold">
-          {copy?.title ?? "Run action on default branch?"}
-        </Text>
-        <Text className="text-center text-foreground-secondary text-sm font-medium leading-normal">
-          {copy?.description ?? "Choose how to continue."}
-        </Text>
-      </View>
+      {/* Scrolls so both actions stay reachable at the short 0.45 detent. */}
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 8 }}
+      >
+        <View className="items-center gap-1 px-5 pb-3 pt-4">
+          <Text className="text-xs font-t3-bold tracking-[1px] uppercase text-foreground-muted">
+            Confirm
+          </Text>
+          <Text className="text-center text-3xl font-t3-bold">
+            {copy?.title ?? "Run action on default branch?"}
+          </Text>
+          <Text className="text-center text-foreground-secondary text-sm font-medium leading-normal">
+            {copy?.description ?? "Choose how to continue."}
+          </Text>
+        </View>
 
-      <View className="gap-3 px-5 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 18) + 8 }}>
-        <SheetActionButton
-          icon="arrow.right.circle"
-          label={copy?.continueLabel ?? "Continue"}
-          onPress={() => void continuePendingAction()}
-        />
-        <SheetActionButton
-          icon="arrow.branch"
-          label="Feature branch & continue"
-          tone="primary"
-          onPress={() => void movePendingActionToFeatureBranch()}
-        />
-      </View>
+        <View className="gap-3 px-5 pt-2">
+          <SheetActionButton
+            icon="arrow.right.circle"
+            label={copy?.continueLabel ?? "Continue"}
+            onPress={() => void continuePendingAction()}
+          />
+          <SheetActionButton
+            icon="arrow.branch"
+            label="Feature branch & continue"
+            tone="primary"
+            onPress={() => void movePendingActionToFeatureBranch()}
+          />
+        </View>
+      </ScrollView>
     </View>
   );
 }

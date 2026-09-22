@@ -1,7 +1,14 @@
 import { QuestionAttachments } from "./QuestionAttachments";
 import type { ApprovalRequestId, UserInputQuestion } from "@t3tools/contracts";
-import { useCallback, useRef } from "react";
-import { Platform, Pressable, ScrollView, View, type LayoutChangeEvent } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
 import Animated, {
   Easing,
   FadeInUp,
@@ -90,6 +97,9 @@ const CARD_LAYOUT_TRANSITION = LinearTransition.duration(200);
 
 export function PendingUserInputCard(props: PendingUserInputCardProps) {
   const questionCount = props.pendingUserInput.questions.length;
+  const responding = props.respondingUserInputId === props.pendingUserInput.requestId;
+  // Which button sent the in-flight response, so only that one shows a spinner.
+  const [pressedAction, setPressedAction] = useState<"submit" | "dismiss" | null>(null);
 
   const cardCoverage = props.cardCoverage;
   const barHeightRef = useRef(0);
@@ -310,7 +320,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
                 requestId={props.pendingUserInput.requestId}
                 question={question}
                 questions={props.pendingUserInput.questions}
-                disabled={props.respondingUserInputId === props.pendingUserInput.requestId}
+                disabled={responding}
                 value={draft?.customAnswer ?? ""}
                 onChangeText={(value) =>
                   props.onChangeCustomAnswer(props.pendingUserInput.requestId, question.id, value)
@@ -323,14 +333,19 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
       </ScrollView>
       <Pressable
         className={cn(
-          "items-center justify-center rounded-2xl px-4 py-3.5",
+          "flex-row items-center justify-center gap-2 rounded-2xl px-4 py-3.5",
           props.answers ? "bg-primary" : "bg-subtle-strong",
+          responding && pressedAction !== "submit" && "opacity-50",
         )}
-        disabled={
-          props.answers === null || props.respondingUserInputId === props.pendingUserInput.requestId
-        }
-        onPress={() => void props.onSubmit()}
+        disabled={props.answers === null || responding}
+        onPress={() => {
+          setPressedAction("submit");
+          void props.onSubmit();
+        }}
       >
+        {responding && pressedAction === "submit" ? (
+          <ActivityIndicator colorClassName="accent-primary-foreground" size="small" />
+        ) : null}
         <Text
           className={cn(
             "font-t3-extrabold text-sm",
@@ -343,10 +358,19 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
       {props.pendingUserInput.dismissible ? (
         <Pressable
           accessibilityRole="button"
-          className="items-center justify-center rounded-2xl px-4 py-2.5 active:opacity-70"
-          disabled={props.respondingUserInputId === props.pendingUserInput.requestId}
-          onPress={() => void props.onDismiss()}
+          className={cn(
+            "flex-row items-center justify-center gap-2 rounded-2xl px-4 py-2.5 active:opacity-70",
+            responding && pressedAction !== "dismiss" && "opacity-50",
+          )}
+          disabled={responding}
+          onPress={() => {
+            setPressedAction("dismiss");
+            void props.onDismiss();
+          }}
         >
+          {responding && pressedAction === "dismiss" ? (
+            <ActivityIndicator colorClassName="accent-foreground-muted" size="small" />
+          ) : null}
           <Text className="font-t3-bold text-sm text-foreground-muted">
             Dismiss without answering
           </Text>

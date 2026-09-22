@@ -100,10 +100,7 @@ import { useScaledTextRole } from "../settings/appearance/useScaledTextRole";
 import type { RemoteClientConnectionState } from "../../lib/connection";
 import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
-import {
-  ComposerStashButton,
-  useComposerStashChrome,
-} from "./ComposerStashControl";
+import { ComposerStashButton, useComposerStashChrome } from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import {
   ComposerDictationCancelAction,
@@ -631,7 +628,8 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
 
   const handleBlur = useCallback(() => {
     setIsFocused(false);
-    if (!settingsSheetPresentation.keepsComposerExpanded) {
+    // Android's card stays open without focus (see isExpanded), so a blur is not a collapse.
+    if (Platform.OS !== "android" && !settingsSheetPresentation.keepsComposerExpanded) {
       onExpandedChange?.(false);
     }
     onEditorFocusChange?.(false);
@@ -831,8 +829,8 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
         <ComposerSurface
           crown={stashChrome.crown}
           crownCap={stashChrome.cap}
-          style={{
-            ...(isExpanded
+          style={
+            isExpanded
               ? {
                   borderRadius: 26,
                   minHeight: 140,
@@ -846,8 +844,8 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                   borderRadius: 27,
                   overflow: "hidden" as const,
                   paddingVertical: 2,
-                }),
-          }}
+                }
+          }
         >
           <ComposerDictationDraftContent
             className={isExpanded ? undefined : "flex-row items-center"}

@@ -95,4 +95,16 @@ describe("resolveThreadProviderInstance", () => {
 
     expect(resolveThreadProviderInstance(serverConfigs, thread)?.showBadge).toBe(false);
   });
+
+  it("returns the same object for the same provider list so memoized rows skip re-renders", () => {
+    const environmentId = EnvironmentId.make("environment-a");
+    const serverConfigs = new Map<EnvironmentId, ServerConfig>([
+      [environmentId, makeConfig([{ instanceId: "codex", driver: "codex" }])],
+    ]);
+    const first = resolveThreadProviderInstance(serverConfigs, makeThread(environmentId, "codex"));
+    const second = resolveThreadProviderInstance(serverConfigs, makeThread(environmentId, "codex"));
+
+    expect(first).not.toBeNull();
+    expect(second).toBe(first);
+  });
 });

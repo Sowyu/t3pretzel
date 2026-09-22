@@ -4,12 +4,14 @@ import type { ComponentType } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  Platform,
   RefreshControl,
   ScrollView,
   Text as NativeText,
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
 import { LoadingStrip } from "../../components/LoadingStrip";
@@ -236,6 +238,12 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
     [props.selectable, tokens],
   );
   const listRef = useRef<FlatList<string>>(null);
+  const insets = useSafeAreaInsets();
+  // Android draws under the nav bar, so the last line needs the bottom inset to clear it.
+  const contentPaddingBottom =
+    Platform.OS === "android"
+      ? Math.max(insets.bottom, 8) + codeSurface.rowHeight
+      : codeSurface.rowHeight;
   const { isPullRefreshing, handlePullToRefresh } = useSourceFileRefresh(props.onRefresh);
   const refreshControl = props.onRefresh ? (
     <RefreshControl refreshing={isPullRefreshing} onRefresh={() => void handlePullToRefresh()} />
@@ -334,7 +342,7 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
           })}
       contentContainerStyle={{
         minWidth: codeWordBreak ? undefined : "100%",
-        paddingBottom: codeSurface.rowHeight,
+        paddingBottom: contentPaddingBottom,
         paddingTop: 8,
       }}
       renderItem={renderLine}
@@ -349,7 +357,7 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
       refreshControl={refreshControl}
       className="flex-1"
       contentContainerStyle={{
-        paddingBottom: codeSurface.rowHeight,
+        paddingBottom: contentPaddingBottom,
         paddingHorizontal: 12,
         paddingTop: 8,
       }}

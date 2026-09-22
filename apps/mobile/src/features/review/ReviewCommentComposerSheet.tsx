@@ -60,6 +60,11 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
     isKeyboardVisible,
     isQuarantined: isKeyboardStateQuarantined,
   });
+  // The keyboard already clears the gesture bar, so the Android action bar only
+  // pads for the safe area while the keyboard is down.
+  const androidBarPaddingBottom = isKeyboardAnimationUsable ? 10 : Math.max(insets.bottom, 10);
+  // pt-2 + h-11 pill + 1dp top border, plus the bottom padding.
+  const androidBarHeight = 53 + androidBarPaddingBottom;
   const { width } = useWindowDimensions();
   const { themeAppearance: selectedTheme } = useAppearancePreferences();
   const target = useReviewCommentTarget();
@@ -175,7 +180,11 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
           className="flex-1 px-5"
           style={{
             paddingTop: isAndroid ? insets.top + 8 : 8,
-            paddingBottom: target ? (isAndroid ? 72 : 0) : Math.max(insets.bottom, 18),
+            paddingBottom: target
+              ? isAndroid
+                ? androidBarHeight
+                : 0
+              : Math.max(insets.bottom, 18),
           }}
         >
           <View className="flex-row items-center justify-between py-2">
@@ -332,7 +341,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
         >
           <View
             className="flex-row items-center gap-3 border-t border-border bg-sheet px-5 pt-2"
-            style={{ paddingBottom: Math.max(insets.bottom, 10) }}
+            style={{ paddingBottom: androidBarPaddingBottom }}
           >
             <ControlPill
               accessibilityLabel="Add image"

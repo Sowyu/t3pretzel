@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { View } from "react-native";
 
 export type ThreadInspectorMode = "route" | "git" | "files";
@@ -32,11 +32,13 @@ function InspectorContentPane(props: {
   );
 }
 
+// Panes take render functions, not component types: a new function identity
+// re-renders the pane in place instead of remounting it and losing its state.
 export function ThreadInspectorContentStack(props: {
-  readonly Files: ComponentType;
-  readonly Git: ComponentType;
+  readonly renderFiles: () => ReactNode;
+  readonly renderGit: () => ReactNode;
   readonly mode: ThreadInspectorMode;
-  readonly Route?: ComponentType;
+  readonly renderRoute?: () => ReactNode;
 }) {
   const [mountedModes, setMountedModes] = useState<ReadonlySet<ThreadInspectorMode>>(
     () => new Set([props.mode]),
@@ -70,30 +72,26 @@ export function ThreadInspectorContentStack(props: {
     return () => clearTimeout(timeout);
   }, [props.mode]);
 
-  const Files = props.Files;
-  const Git = props.Git;
-  const Route = props.Route;
-
   return (
     <View className="flex-1">
       <InspectorContentPane
         mounted={mountedModes.has("files") || props.mode === "files"}
         visible={props.mode === "files"}
       >
-        <Files />
+        {props.renderFiles()}
       </InspectorContentPane>
       <InspectorContentPane
         mounted={mountedModes.has("git") || props.mode === "git"}
         visible={props.mode === "git"}
       >
-        <Git />
+        {props.renderGit()}
       </InspectorContentPane>
-      {Route ? (
+      {props.renderRoute ? (
         <InspectorContentPane
           mounted={mountedModes.has("route") || props.mode === "route"}
           visible={props.mode === "route"}
         >
-          <Route />
+          {props.renderRoute()}
         </InspectorContentPane>
       ) : null}
     </View>

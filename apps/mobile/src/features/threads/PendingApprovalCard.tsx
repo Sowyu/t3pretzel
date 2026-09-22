@@ -3,7 +3,8 @@ import type {
   ProviderApprovalDecision,
   ProviderApprovalOption,
 } from "@t3tools/contracts";
-import { Pressable, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
 import type { PendingApproval } from "../../lib/threadActivity";
@@ -27,6 +28,9 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
   const options: ReadonlyArray<ProviderApprovalOption> =
     props.approval.options ?? DEFAULT_APPROVAL_OPTIONS;
   const warning = options.find((option) => option.warning)?.warning;
+  const responding = props.respondingApprovalId === props.approval.requestId;
+  // The decision in flight, so only its button shows a spinner.
+  const [pressedDecision, setPressedDecision] = useState<ProviderApprovalDecision | null>(null);
   // Opaque for the same reason as PendingUserInputCard: nothing blurs the feed
   // behind this card, so a translucent surface bleeds messages through it.
   return (
@@ -49,16 +53,31 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
         {options.map((option) => (
           <Pressable
             key={option.decision}
-            className={`items-center justify-center rounded-[14px] px-3.5 py-3 ${
+            className={`flex-row items-center justify-center gap-2 rounded-[14px] px-3.5 py-3 ${
               option.decision === "accept"
                 ? "bg-primary"
                 : option.decision === "decline"
                   ? "bg-danger"
                   : "bg-subtle-strong"
-            }`}
-            disabled={props.respondingApprovalId === props.approval.requestId}
-            onPress={() => void props.onRespond(props.approval.requestId, option.decision)}
+            } ${responding && pressedDecision !== option.decision ? "opacity-50" : ""}`}
+            disabled={responding}
+            onPress={() => {
+              setPressedDecision(option.decision);
+              void props.onRespond(props.approval.requestId, option.decision);
+            }}
           >
+            {responding && pressedDecision === option.decision ? (
+              <ActivityIndicator
+                colorClassName={
+                  option.decision === "accept"
+                    ? "accent-primary-foreground"
+                    : option.decision === "decline"
+                      ? "accent-danger-foreground"
+                      : "accent-foreground"
+                }
+                size="small"
+              />
+            ) : null}
             <Text
               className={`text-sm ${
                 option.decision === "accept"

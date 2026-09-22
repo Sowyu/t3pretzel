@@ -1,4 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
+import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { SymbolView } from "../../components/AppSymbol";
 import { useCallback, useMemo, useState, type ComponentProps } from "react";
 import { Platform, Pressable, View, type NativeSyntheticEvent } from "react-native";
@@ -163,29 +164,16 @@ export function ThreadFileNavigatorPane(props: {
               {props.projectName}
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
+          <AndroidHeaderIconButton
             accessibilityLabel="Refresh files"
-            hitSlop={8}
-            className="h-8 w-8 items-center justify-center rounded-full active:bg-subtle"
+            icon="arrow.clockwise"
             onPress={entriesQuery.refresh}
-          >
-            <SymbolView
-              name="arrow.clockwise"
-              size={14}
-              tintColorClassName={"accent-icon-muted"}
-              type="monochrome"
-            />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
+          />
+          <AndroidHeaderIconButton
             accessibilityLabel="Close files"
-            hitSlop={8}
-            className="h-8 w-8 items-center justify-center rounded-full active:bg-subtle"
+            icon="xmark"
             onPress={toggleAuxiliaryPane}
-          >
-            <SymbolView name="xmark" size={14} tintColorClassName="accent-icon-muted" />
-          </Pressable>
+          />
         </View>
         <View className="flex-row items-center gap-2 border-t border-border px-3 py-2">
           <SymbolView
@@ -198,12 +186,25 @@ export function ThreadFileNavigatorPane(props: {
             accessibilityLabel="Search files"
             autoCapitalize="none"
             autoCorrect={false}
-            clearButtonMode="while-editing"
             className={cn(EMBEDDED_TEXT_INPUT, "min-h-10 flex-1 py-2 text-sm")}
             placeholder="Search files"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 ? (
+            <Pressable
+              accessibilityLabel="Clear search"
+              hitSlop={10}
+              onPress={() => setSearchQuery("")}
+            >
+              <SymbolView
+                name="xmark.circle.fill"
+                size={15}
+                tintColorClassName={"accent-icon-muted"}
+                type="monochrome"
+              />
+            </Pressable>
+          ) : null}
         </View>
       </View>
       {fileTree}

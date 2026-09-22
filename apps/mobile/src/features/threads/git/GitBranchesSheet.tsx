@@ -67,6 +67,12 @@ export function GitBranchesSheet(_props: GitBranchesSheetProps) {
         showsVerticalScrollIndicator={false}
         contentInset={{ bottom: Math.max(insets.bottom, 18) + 18 }}
         contentContainerClassName="gap-4 px-5 pt-2"
+        // contentInset is iOS-only; Android needs the same bottom room as padding.
+        contentContainerStyle={
+          Platform.OS === "android"
+            ? { paddingBottom: Math.max(insets.bottom, 18) + 18 }
+            : undefined
+        }
       >
         <View className="gap-2 rounded-[18px] border border-border bg-card px-4 py-4">
           <Text className="text-foreground-secondary text-2xs font-t3-bold tracking-[1px] uppercase">

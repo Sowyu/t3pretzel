@@ -54,7 +54,7 @@ export function useSelectedThreadGitActions() {
     }),
     [selectedThread?.environmentId, selectedThreadGitRootCwd],
   );
-  const branchState = useBranches(branchTarget);
+  const { data: branchData, refresh: refreshBranches } = useBranches(branchTarget);
   const updateThreadGitContext = useCallback(
     async (
       thread: NonNullable<typeof selectedThread>,
@@ -165,11 +165,11 @@ export function useSelectedThreadGitActions() {
   );
 
   const refreshSelectedThreadBranches = useCallback(async (): Promise<ReadonlyArray<VcsRef>> => {
-    branchState.refresh();
-    return dedupeRemoteBranchesWithLocalMatches(branchState.data?.refs ?? []).filter(
+    refreshBranches();
+    return dedupeRemoteBranchesWithLocalMatches(branchData?.refs ?? []).filter(
       (branch) => !branch.isRemote,
     );
-  }, [branchState]);
+  }, [branchData, refreshBranches]);
 
   const syncSelectedThreadBranchState = useCallback(
     async (input: {
@@ -186,11 +186,11 @@ export function useSelectedThreadGitActions() {
           return AsyncResult.failure(updateResult.cause);
         }
       }
-      branchState.refresh();
+      refreshBranches();
       await refreshSelectedThreadGitStatus({ quiet: true, cwd: input.cwd });
       return AsyncResult.success(undefined);
     },
-    [branchState, refreshSelectedThreadGitStatus, updateThreadGitContext],
+    [refreshBranches, refreshSelectedThreadGitStatus, updateThreadGitContext],
   );
 
   const onCheckoutSelectedThreadBranch = useCallback(
@@ -226,9 +226,10 @@ export function useSelectedThreadGitActions() {
     ],
   );
 
+  // Resolves to null when the branch was not created, so callers can stop a follow-up action.
   const onCreateSelectedThreadBranch = useCallback(
     async (branch: string) => {
-      await runSelectedThreadGitMutation(
+      return await runSelectedThreadGitMutation(
         "create_ref",
         "Creating branch",
         async ({ thread, cwd }) => {
@@ -374,13 +375,24 @@ export function useSelectedThreadGitActions() {
     ],
   );
 
-  return {
-    refreshSelectedThreadGitStatus,
-    refreshSelectedThreadBranches,
-    onCheckoutSelectedThreadBranch,
-    onCreateSelectedThreadBranch,
-    onCreateSelectedThreadWorktree,
-    onPullSelectedThreadBranch,
-    onRunSelectedThreadGitAction,
-  };
+  return useMemo(
+    () => ({
+      refreshSelectedThreadGitStatus,
+      refreshSelectedThreadBranches,
+      onCheckoutSelectedThreadBranch,
+      onCreateSelectedThreadBranch,
+      onCreateSelectedThreadWorktree,
+      onPullSelectedThreadBranch,
+      onRunSelectedThreadGitAction,
+    }),
+    [
+      refreshSelectedThreadGitStatus,
+      refreshSelectedThreadBranches,
+      onCheckoutSelectedThreadBranch,
+      onCreateSelectedThreadBranch,
+      onCreateSelectedThreadWorktree,
+      onPullSelectedThreadBranch,
+      onRunSelectedThreadGitAction,
+    ],
+  );
 }

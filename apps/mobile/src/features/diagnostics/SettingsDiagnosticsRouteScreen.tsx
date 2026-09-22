@@ -86,6 +86,12 @@ export function SettingsDiagnosticsRouteScreen() {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentInset={{ bottom: Math.max(insets.bottom, 18) }}
+        // contentInset is iOS-only; Android draws edge to edge under the nav bar.
+        contentContainerStyle={
+          Platform.OS === "android"
+            ? { paddingBottom: Math.max(insets.bottom, 18) + 18 }
+            : undefined
+        }
         showsVerticalScrollIndicator={false}
         className="flex-1"
         contentContainerClassName="gap-6 px-5 pt-4 pb-[18px]"
@@ -100,7 +106,11 @@ export function SettingsDiagnosticsRouteScreen() {
             <EmptyState
               icon="exclamationmark.triangle"
               title="Crash log unavailable"
-              detail="Startup crash records are only kept in store and TestFlight builds."
+              detail={
+                Platform.OS === "ios"
+                  ? "Startup crash records are only kept in store and TestFlight builds."
+                  : "Startup crash records are only kept in release builds."
+              }
             />
           ) : records.length === 0 ? (
             <EmptyState

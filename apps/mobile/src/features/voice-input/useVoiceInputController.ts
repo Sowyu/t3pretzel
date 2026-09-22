@@ -9,7 +9,7 @@ import {
 import { File } from "expo-file-system";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 
 import type { ComposerEditorSelection } from "../../components/ComposerEditor";
@@ -97,13 +97,21 @@ export function useVoiceInputController(input: {
   }, []);
   const recorder = useAudioRecorder(VOICE_RECORDING_OPTIONS, handleRecorderStatus);
 
+  // Android's permission dialog is its own activity, so asking for the mic
+  // pauses ours and AppState reports `background` until the user answers.
+  const permissionRequestInFlightRef = useRef(false);
   if (!controllerRef.current) {
     controllerRef.current = new VoiceInputController({
       recorder,
       getTranscriber: getLocalVoiceTranscriber,
       requestPermission: async () => {
-        const permission = await requestRecordingPermissionsAsync();
-        return { granted: permission.granted, canAskAgain: permission.canAskAgain };
+        permissionRequestInFlightRef.current = true;
+        try {
+          const permission = await requestRecordingPermissionsAsync();
+          return { granted: permission.granted, canAskAgain: permission.canAskAgain };
+        } finally {
+          permissionRequestInFlightRef.current = false;
+        }
       },
       configureRecording: configureVoiceRecordingAudio,
       releaseRecording: releaseVoiceRecordingAudio,
@@ -149,7 +157,9 @@ export function useVoiceInputController(input: {
       // iOS reports `inactive` while its permission dialog is open. Only the
       // real background state cancels preparation; recorder status handles
       // calls and route interruptions during capture.
-      if (nextState === "background") controller.appMovedToBackground();
+      if (nextState !== "background") return;
+      if (Platform.OS === "android" && permissionRequestInFlightRef.current) return;
+      controller.appMovedToBackground();
     });
     return () => subscription.remove();
   }, [controller]);

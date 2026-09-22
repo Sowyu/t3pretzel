@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
+import { Platform, useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import { AppText as Text } from "../../components/AppText";
@@ -35,6 +35,9 @@ export function ThreadTimelineRail(props: {
   readonly currentIndex: number | null;
   readonly inViewRange: readonly [number, number] | null;
   readonly onSelect: (item: TimelineRailItem) => void;
+  /** Header and composer (plus keyboard) heights over the feed; Android keeps the rail between them. */
+  readonly topInset: number;
+  readonly bottomInset: number;
 }) {
   const { height: windowHeight } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -49,7 +52,14 @@ export function ThreadTimelineRail(props: {
     setPreviewHeight((current) => (current === height ? current : height));
   }, []);
   const { items, onSelect } = props;
-  const railHeight = resolveTimelineRailHeight(items.length, viewportHeight - RAIL_VERTICAL_RESERVE);
+  // iOS keeps the full-height strip and the desktop reserve. Android lays the
+  // strip out between the insets, so the reserve only tops up what they leave.
+  const insetTop = Platform.OS === "android" ? props.topInset : 0;
+  const insetBottom = Platform.OS === "android" ? props.bottomInset : 0;
+  const railHeight = resolveTimelineRailHeight(
+    items.length,
+    viewportHeight - Math.max(0, RAIL_VERTICAL_RESERVE - insetTop - insetBottom),
+  );
 
   const indexAt = useCallback(
     (y: number) => resolveTimelineRailIndexFromY({ itemCount: items.length, railHeight, y }),
@@ -103,11 +113,11 @@ export function ThreadTimelineRail(props: {
       pointerEvents="box-none"
       style={{
         alignItems: "flex-end",
-        bottom: 0,
+        bottom: insetBottom,
         justifyContent: "center",
         position: "absolute",
         right: 0,
-        top: 0,
+        top: insetTop,
         width: HIT_WIDTH + PREVIEW_WIDTH,
       }}
     >
@@ -133,7 +143,9 @@ export function ThreadTimelineRail(props: {
                   opacity: distance === 0 ? 0.85 : inView ? 0.8 : 0.35,
                   position: "absolute",
                   right: TICK_RIGHT,
-                  top: resolveTimelineRailTickOffset(index, items.length, railHeight) - TICK_HEIGHT / 2,
+                  top:
+                    resolveTimelineRailTickOffset(index, items.length, railHeight) -
+                    TICK_HEIGHT / 2,
                   width: resolveTimelineRailTickWidth(distance),
                 }}
               />

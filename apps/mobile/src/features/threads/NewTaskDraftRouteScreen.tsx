@@ -123,7 +123,9 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
       : null;
   // The native-stack guard covers iOS swipe dismissal as well as back actions.
   // A replaced request must settle too before the shared checkout is left behind.
-  const checkoutPending = pendingCheckouts > 0 || (needsPreparation && result === null);
+  // No checkout starts while the project is still loading, so Back stays free then.
+  const checkoutPending =
+    pendingCheckouts > 0 || (needsPreparation && result === null && !waitingForProject);
   usePreventRemove(checkoutPending, () => undefined);
   useEffect(() => {
     if (checkoutPending || result?._tag !== "Failure") return;
@@ -156,7 +158,9 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
       />
       {preparingBranch ? (
         <View className="flex-1 items-center justify-center bg-screen">
-          <Text className="text-foreground">Switching branch...</Text>
+          <Text className="text-foreground">
+            {waitingForProject ? "Loading project..." : "Switching branch..."}
+          </Text>
         </View>
       ) : (
         <NewTaskDraftScreen

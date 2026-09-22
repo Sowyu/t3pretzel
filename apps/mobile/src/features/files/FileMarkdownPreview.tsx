@@ -8,7 +8,8 @@ import {
   type NodeStyleOverrides,
   type PartialMarkdownTheme,
 } from "react-native-nitro-markdown";
-import { RefreshControl, ScrollView, Text as NativeText, View } from "react-native";
+import { Platform, RefreshControl, ScrollView, Text as NativeText, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { useFontFamily } from "../../lib/useFontFamily";
@@ -199,6 +200,7 @@ export function FileMarkdownPreview(props: {
   readonly threadId: ThreadId | null;
   readonly onRefresh?: () => Promise<void> | void;
 }) {
+  const insets = useSafeAreaInsets();
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const handlePullToRefresh = useCallback(async () => {
     if (!props.onRefresh) {
@@ -253,7 +255,11 @@ export function FileMarkdownPreview(props: {
   return (
     <ScrollView
       className="flex-1 bg-sheet"
-      contentContainerStyle={{ padding: 18 }}
+      contentContainerStyle={{
+        padding: 18,
+        // Android draws under the nav bar, so the end of the document needs the bottom inset.
+        paddingBottom: Platform.OS === "android" ? Math.max(insets.bottom, 8) + 18 : 18,
+      }}
       refreshControl={
         props.onRefresh ? (
           <RefreshControl

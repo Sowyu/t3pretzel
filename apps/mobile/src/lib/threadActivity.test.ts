@@ -3034,8 +3034,8 @@ describe("quiet timeline: nested agents", () => {
         status: "Grepping",
         tone: "working",
         members: [
-          { title: "Agent a", status: "completed", tone: "completed" },
-          { title: "Agent b", status: "working", tone: "working", detail: "Grepping" },
+          { id: "a", title: "Agent a", status: "completed", tone: "completed" },
+          { id: "b", title: "Agent b", status: "working", tone: "working", detail: "Grepping" },
         ],
       },
     });

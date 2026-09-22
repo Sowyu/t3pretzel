@@ -76,6 +76,12 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
         showsVerticalScrollIndicator={false}
         contentInset={{ bottom: Math.max(insets.bottom, 18) + 18 }}
         contentContainerClassName="gap-4 px-5 pt-2"
+        // contentInset is iOS-only; Android needs the same bottom room as padding.
+        contentContainerStyle={
+          Platform.OS === "android"
+            ? { paddingBottom: Math.max(insets.bottom, 18) + 18 }
+            : undefined
+        }
       >
         <View className="gap-3 rounded-[22px] border border-border bg-card px-4 py-4">
           <View className="flex-row items-center justify-between gap-3">

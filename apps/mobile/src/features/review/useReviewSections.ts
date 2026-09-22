@@ -156,10 +156,10 @@ export function useReviewSections(input: {
       return;
     }
     if (selectedSection?.kind === "turn") {
-      activeTurnDiff.refresh();
+      await activeTurnDiff.refresh();
       return;
     }
-    diffPreview.refresh();
+    await diffPreview.refresh();
   }, [activeTurnDiff, diffPreview, enabled, selectedSection?.kind]);
 
   const selectSection = useCallback(

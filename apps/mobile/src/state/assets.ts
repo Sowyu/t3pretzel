@@ -12,7 +12,7 @@ import {
 import type { AssetResource, EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import { environmentCatalog } from "../connection/catalog";
 import { connectionAtomRuntime } from "../connection/runtime";
@@ -67,6 +67,30 @@ export function useAssetUrlState(
     // on the file, so it reads as loading rather than a false "unavailable".
     shared: shared._tag === "Failure" && result.waiting ? { _tag: "Loading" } : shared,
   });
+}
+
+/**
+ * useAssetUrlState for images already on screen. Once a URL resolves it stays
+ * in use through a reconnect or re-query of the same resource, so a drawn image
+ * does not flip to a spinner or "Image unavailable" when the socket drops.
+ */
+export function useRetainedAssetUrlState(
+  environmentId: EnvironmentId | null,
+  resource: AssetResource | null,
+): AssetUrlState {
+  const state = useAssetUrlState(environmentId, resource);
+  const key = `${environmentId}:${JSON.stringify(resource)}`;
+  const [lastSuccess, setLastSuccess] = useState<{ key: string; state: AssetUrlState } | null>(
+    null,
+  );
+  if (state._tag === "Success") {
+    const last = lastSuccess?.state;
+    if (lastSuccess?.key !== key || last?._tag !== "Success" || last.url !== state.url) {
+      setLastSuccess({ key, state });
+    }
+    return state;
+  }
+  return lastSuccess?.key === key ? lastSuccess.state : state;
 }
 
 export function useAssetUrl(

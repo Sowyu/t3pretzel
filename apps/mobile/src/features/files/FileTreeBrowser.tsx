@@ -116,7 +116,7 @@ export function FileTreeBrowser(props: {
   readonly loadedDirectories: ReadonlySet<string>;
   readonly onLoadDirectory: (path: string) => void;
   readonly onPreviewFile?: (path: string) => void;
-  readonly onRefresh: () => void;
+  readonly onRefresh: () => Promise<void> | void;
   readonly onSelectFile: (path: string) => void;
 }) {
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(() => new Set());
@@ -125,6 +125,17 @@ export function FileTreeBrowser(props: {
     readonly selectedPathAtPress: string | null;
   } | null>(null);
   const insets = useSafeAreaInsets();
+  // Folder expands and search debounces also set isPending; only a pull shows the spinner.
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const { onRefresh } = props;
+  const handlePullToRefresh = useCallback(async () => {
+    setIsPullRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsPullRefreshing(false);
+    }
+  }, [onRefresh]);
   // Native transparent-header height ≈ safe-area top + nav bar (~44). Matches the
   // observed adjustedContentInset bottom (~102) seen in the native trace.
   const headerInset = NATIVE_LIQUID_GLASS_SUPPORTED ? insets.top + IOS_NAV_BAR_HEIGHT : 0;
@@ -272,7 +283,12 @@ export function FileTreeBrowser(props: {
         // that prop and need the inset here.
         paddingBottom: NATIVE_LIQUID_GLASS_SUPPORTED ? 8 : Math.max(insets.bottom, 8) + 8,
       }}
-      refreshControl={<RefreshControl refreshing={props.isPending} onRefresh={props.onRefresh} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={isPullRefreshing}
+          onRefresh={() => void handlePullToRefresh()}
+        />
+      }
       renderItem={renderItem}
       ListHeaderComponent={
         <>

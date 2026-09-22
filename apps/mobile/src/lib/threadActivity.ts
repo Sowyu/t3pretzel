@@ -215,6 +215,8 @@ export interface AgentSpawnSummary {
   readonly status: string;
   readonly tone: "working" | "completed" | "failed" | "stopped";
   readonly members: ReadonlyArray<{
+    /** The member's taskId; titles repeat across a batch, so rows key by this. */
+    readonly id: string;
     readonly title: string;
     readonly status: string;
     readonly tone: "working" | "completed" | "failed" | "stopped";
@@ -1112,9 +1114,12 @@ export function agentSpawnSummary(
   spawn: NonNullable<WorkLogEntry["agentSpawn"]>,
   batchStatus: WorkLogToolLifecycleStatus | undefined,
 ): AgentSpawnSummary {
-  const members = agentSpawnMembers(spawn).map((agent) => {
+  const members = spawn.agents.flatMap((agent, index) => {
+    const id = spawn.agentTaskIds[index] ?? `${index}`;
+    if (id === spawn.workflowId) return [];
     const tone = agentSpawnTone(agent.status);
     return {
+      id,
       title: agent.title,
       status: tone === "working" ? "working" : (agent.status ?? tone),
       tone,

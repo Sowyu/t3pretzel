@@ -443,7 +443,7 @@ function ThreadRouteContent(
   // bar); elsewhere the pane content pads itself below the top inset.
   const safeAreaInsets = useSafeAreaInsets();
   const inspectorHeaderInset = Platform.OS === "ios" ? 0 : safeAreaInsets.top;
-  const GitInspector = useCallback(
+  const renderGitInspector = useCallback(
     () => (
       <GitOverviewSheet
         headerInset={inspectorHeaderInset}
@@ -453,7 +453,7 @@ function ThreadRouteContent(
     ),
     [inspectorHeaderInset, props.route.params],
   );
-  const FilesInspector = useCallback(
+  const renderFilesInspector = useCallback(
     () =>
       selectedThread !== null && selectedThreadCwd !== null ? (
         <ThreadFileNavigatorPane
@@ -473,7 +473,7 @@ function ThreadRouteContent(
       selectedThreadProject?.title,
     ],
   );
-  const RouteInspector = useCallback(
+  const renderRouteInspector = useCallback(
     () => props.renderInspector?.(inspectorHeaderInset),
     [inspectorHeaderInset, props.renderInspector],
   );
@@ -481,13 +481,19 @@ function ThreadRouteContent(
     () =>
       inspectorMode === null ? null : (
         <ThreadInspectorContentStack
-          Files={FilesInspector}
-          Git={GitInspector}
+          renderFiles={renderFilesInspector}
+          renderGit={renderGitInspector}
           mode={inspectorMode}
-          Route={props.renderInspector ? RouteInspector : undefined}
+          renderRoute={props.renderInspector ? renderRouteInspector : undefined}
         />
       ),
-    [FilesInspector, GitInspector, RouteInspector, inspectorMode, props.renderInspector],
+    [
+      renderFilesInspector,
+      renderGitInspector,
+      renderRouteInspector,
+      inspectorMode,
+      props.renderInspector,
+    ],
   );
   const activeInspectorRenderer = inspectorMode === null ? undefined : renderInspectorStack;
   // Hand the inspector to the workspace so it renders beside the navigator,

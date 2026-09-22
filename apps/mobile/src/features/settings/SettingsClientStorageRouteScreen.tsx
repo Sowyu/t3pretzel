@@ -2,7 +2,7 @@ import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { type EnvironmentMachineKind, resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useMemo } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
@@ -75,6 +75,12 @@ export function SettingsClientStorageRouteScreen() {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentInset={{ bottom: Math.max(insets.bottom, 18) }}
+        // contentInset is iOS-only; Android draws edge to edge under the nav bar.
+        contentContainerStyle={
+          Platform.OS === "android"
+            ? { paddingBottom: Math.max(insets.bottom, 18) + 18 }
+            : undefined
+        }
         showsVerticalScrollIndicator={false}
         className="flex-1"
         contentContainerClassName="gap-6 px-5 pt-4 pb-[18px]"

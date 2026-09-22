@@ -383,7 +383,7 @@ function ChartCard(props: {
             ? formatHourShort(props.days[0] ?? "", props.timeZone)
             : formatDayShort(props.sinceDay)}
         </Text>
-        <View className="flex-row items-center gap-4">
+        <View className="flex-1 flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2">
           {merged.providers.map((provider) => (
             <View key={provider.provider} className="flex-row items-center gap-1.5">
               <View

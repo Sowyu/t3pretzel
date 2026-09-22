@@ -311,7 +311,8 @@ function CloudEnvironmentRowShell(props: {
 }) {
   const isRetrying =
     props.connectionState === "connecting" || props.connectionState === "reconnecting";
-  const shouldPulse = isRetrying;
+  // Backoff can last forever on an offline host; only a live attempt pulses.
+  const shouldPulse = props.connectionState === "connecting";
   const statusText =
     props.statusText ??
     connectionStatusText({

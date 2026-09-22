@@ -124,6 +124,7 @@ function FileContent(props: {
   readonly initialLine: number | null;
   readonly truncated: boolean;
   readonly onRefresh?: () => Promise<void> | void;
+  readonly onOpenPdf: (uri: string) => void;
 }) {
   // Reopening a mutable host file must not reuse a poster from an earlier visit.
   const thumbnailInstanceId = useId();
@@ -181,6 +182,27 @@ function FileContent(props: {
         uri={props.previewUri}
         actionsSource={props.mediaSource}
       />
+    );
+  }
+
+  // Android's WebView renders a PDF as a blank page, so hand it to the system viewer.
+  if (
+    Platform.OS === "android" &&
+    props.activeMode === "preview" &&
+    props.previewUri !== null &&
+    isPdfFile({ name: props.relativePath })
+  ) {
+    const pdfUri = props.previewUri;
+    return (
+      <View className="flex-1 items-center justify-center bg-sheet px-6">
+        <EmptyState
+          variant="plain"
+          title={basename(props.relativePath)}
+          detail="PDFs open in your device's PDF viewer."
+          actionLabel="Open PDF"
+          onAction={() => props.onOpenPdf(pdfUri)}
+        />
+      </View>
     );
   }
 
@@ -1062,6 +1084,9 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
         threadId={threadId}
         truncated={fileData?.truncated ?? false}
         onRefresh={() => fileQuery.refresh()}
+        onOpenPdf={(uri) =>
+          setFullScreenPreview({ kind: "pdf", uri, name: basename(relativePath) })
+        }
       />
       <FilePreviewModal
         source={fullScreenPreview}

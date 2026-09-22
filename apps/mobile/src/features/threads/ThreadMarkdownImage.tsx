@@ -14,7 +14,7 @@ import type { FilePreviewSource } from "../../components/FilePreviewModal";
 import { MediaActionsMenu } from "../../components/MediaActionsMenu";
 import { PresentationSource } from "../../components/NativePresentation";
 import { useMediaActions, type MediaActionsSource } from "../../lib/mediaActions";
-import { useAssetUrlState } from "../../state/assets";
+import { useRetainedAssetUrlState } from "../../state/assets";
 import {
   MARKDOWN_IMAGE_MAX_WIDTH,
   type MarkdownImageDisplaySize,
@@ -184,7 +184,7 @@ export function ThreadMarkdownImage(props: {
   readonly actionsSource?: MediaActionsSource;
   readonly onPressPreview: (source: FilePreviewSource) => void;
 }) {
-  const assetUrl = useAssetUrlState(props.environmentId, props.resource);
+  const assetUrl = useRetainedAssetUrlState(props.environmentId, props.resource);
 
   return (
     <ThreadMarkdownImageView

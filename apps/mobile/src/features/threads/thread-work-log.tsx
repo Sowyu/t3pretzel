@@ -32,10 +32,7 @@ import {
   View,
 } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import type {
-  EnvironmentId,
-  ToolActivityIcon,
-} from "@t3tools/contracts";
+import type { EnvironmentId, ToolActivityIcon } from "@t3tools/contracts";
 import { toolActivityFaviconUrl } from "@t3tools/shared/favicon";
 
 import { AppText as Text } from "../../components/AppText";
@@ -1102,7 +1099,7 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
             className="ml-8 mt-1.5 gap-1.5 border-l border-adaptive-neutral-300-a60-white-a12 pl-3"
           >
             {summary.members.map((member) => (
-              <View key={member.title} className="gap-px">
+              <View key={member.id} className="gap-px">
                 <View className="flex-row items-center gap-1.5">
                   <View
                     className={cn(

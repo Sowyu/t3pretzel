@@ -402,19 +402,17 @@ function ThreadNavigationSidebarPane(
     toggleSettledShelf,
     toggleSnoozedShelf,
   } = useThreadListV2ShelfPreferences();
-  // The queued-start and snooze helpers need a clock while the pane stays open.
+  // The queued-start and snooze helpers and every row's relative time need a
+  // clock while the pane stays open.
   const [nowMinute, setNowMinute] = useState(() => new Date().toISOString().slice(0, 16));
   // Snooze wake times are second-precise; a counter bumped exactly at the
   // next wake boundary re-runs the partition with a fresh clock so a woken
   // thread reappears immediately instead of on the next minute tick.
   const [snoozeWakeTick, bumpSnoozeWakeTick] = useState(0);
   useEffect(() => {
-    if (!threadListV2Enabled) return;
-    // Refresh immediately because the mount-time value can be hours old.
-    setNowMinute(new Date().toISOString().slice(0, 16));
     const id = setInterval(() => setNowMinute(new Date().toISOString().slice(0, 16)), 60_000);
     return () => clearInterval(id);
-  }, [threadListV2Enabled]);
+  }, []);
   // Threads on servers without the settlement capability never classify as
   // settled (the user could neither un-settle nor pin them).
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
@@ -1025,6 +1023,7 @@ function ThreadNavigationSidebarPane(
             <PendingTaskListRow
               variant={materialYouStyleLayoutActive ? "compact" : "sidebar"}
               pendingTask={item.pendingTask}
+              clockMinute={nowMinute}
               environmentLabel={
                 savedConnectionsById[item.pendingTask.environmentId]?.environmentLabel ?? null
               }
@@ -1041,6 +1040,7 @@ function ThreadNavigationSidebarPane(
               onNewThreadOnBranch={props.onNewThreadOnBranch}
               variant="sidebar"
               thread={thread}
+              clockMinute={nowMinute}
               hasQueuedMessages={queuedThreadKeys.has(`${thread.environmentId}:${thread.id}`)}
               environmentLabel={
                 savedConnectionsById[thread.environmentId]?.environmentLabel ?? null
@@ -1176,7 +1176,9 @@ function ThreadNavigationSidebarPane(
   // even while collapsed.
   const listEmpty = (
     <Text className="px-2 py-4 text-sm text-foreground-muted">
-      {catalogState.isLoadingConnections
+      {catalogState.isLoadingConnections ||
+      (!catalogState.hasLoadedShellSnapshot &&
+        (catalogState.hasPendingShellSnapshot || catalogState.hasReadyEnvironment))
         ? "Loading threads…"
         : props.searchQuery.trim().length > 0
           ? threadSearch.isPending
@@ -1378,7 +1380,8 @@ function ThreadNavigationSidebarPane(
             }
             value={props.searchQuery}
           />
-          {materialYouStyleLayoutActive && props.searchQuery.length > 0 ? (
+          {/* clearButtonMode is iOS-only, so Android draws its own clear button. */}
+          {Platform.OS === "android" && props.searchQuery.length > 0 ? (
             <Pressable
               accessibilityLabel="Clear search"
               hitSlop={10}

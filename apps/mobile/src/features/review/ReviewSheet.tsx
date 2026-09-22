@@ -851,6 +851,10 @@ export function ReviewSheet(props: ReviewSheetProps) {
           <ScrollView
             contentInsetAdjustmentBehavior="never"
             contentInset={{ top: topContentInset, bottom: Math.max(insets.bottom, 18) + 18 }}
+            // contentInset is iOS-only; Android reserves the same bottom space as padding.
+            contentContainerStyle={
+              isAndroid ? { paddingBottom: Math.max(insets.bottom, 18) + 18 } : undefined
+            }
             contentOffset={{ x: 0, y: -topContentInset }}
             scrollIndicatorInsets={{
               top: topContentInset,

@@ -103,6 +103,8 @@ function ConfiguredConnectOnboardingRouteScreen() {
           gap: 16,
           paddingHorizontal: 20,
           paddingTop: 16,
+          // contentInset is iOS-only; Android draws edge to edge under the nav bar.
+          ...(Platform.OS === "android" ? { paddingBottom: Math.max(insets.bottom, 18) + 18 } : {}),
         }}
         refreshControl={
           <RefreshControl refreshing={isPullRefreshing} onRefresh={handlePullRefresh} />

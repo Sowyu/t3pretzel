@@ -6,15 +6,8 @@ import {
   type CustomSnoozeInput,
 } from "@t3tools/client-runtime/state/thread-settled";
 import { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  View,
-} from "react-native";
+import { Modal, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { AppText } from "../../components/AppText";
 import { SegmentedControl } from "../../components/SegmentedControl";
 
@@ -32,7 +25,9 @@ export function CustomSnoozeSheet(props: {
     <Modal visible transparent animationType="fade" onRequestClose={props.onClose}>
       <KeyboardAvoidingView
         className="flex-1 items-center justify-center bg-black/40 px-6"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // The keyboard-controller variant tracks the IME inside the edge-to-edge
+        // Android modal window, where adjustResize no longer shrinks it.
+        behavior="padding"
       >
         <ScrollView
           className="max-h-[80%] w-full max-w-md grow-0 rounded-3xl bg-screen"

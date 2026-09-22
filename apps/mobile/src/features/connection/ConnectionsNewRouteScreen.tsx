@@ -232,6 +232,8 @@ export function ConnectionsNewRouteScreen({
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 16,
+          // contentInset is iOS-only; Android draws edge to edge under the nav bar.
+          ...(Platform.OS === "android" ? { paddingBottom: Math.max(insets.bottom, 18) + 18 } : {}),
         }}
       >
         <View collapsable={false} className="gap-5">
