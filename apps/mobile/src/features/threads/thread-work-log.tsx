@@ -825,7 +825,9 @@ const ThreadWorkLogRow = memo(function ThreadWorkLogRow(
               </View>
               <Text
                 className={cn(
-                  "min-w-0 flex-1 text-sm text-foreground-muted",
+                  // Tool rows read in the body colour so they stand apart
+                  // from the muted thinking text around them.
+                  "min-w-0 flex-1 text-sm text-foreground",
                   iconIsDestructive && "font-t3-medium text-adaptive-rose-600-400",
                 )}
                 numberOfLines={expanded ? undefined : 1}
@@ -979,7 +981,7 @@ export function ThreadWorkGroupToggle(props: {
             </View>
             <Text
               key={props.rowSizing.textSizeKey}
-              className="min-w-0 flex-1 text-sm text-foreground-muted"
+              className="min-w-0 flex-1 text-sm text-foreground"
               numberOfLines={1}
             >
               {props.summary}

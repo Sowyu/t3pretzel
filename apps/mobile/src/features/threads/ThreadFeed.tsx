@@ -150,6 +150,7 @@ import {
 } from "../../lib/threadActivity";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import {
+  resolveScrollToEndVisible,
   resolveThreadFeedLiveFollow,
   type ThreadFeedLiveFollowEvent,
   type ThreadWorkGroupScrollPosition,
@@ -267,6 +268,8 @@ export interface ThreadFeedProps {
   readonly usesAutomaticContentInsets?: boolean;
   readonly onHeaderMaterialVisibilityChange?: (visible: boolean) => void;
   readonly onEndFollowEnabledChange?: (enabled: boolean) => void;
+  /** True while the reader is away from the end: the scroll-to-end button's cue. */
+  readonly onAwayFromEndChange?: (away: boolean) => void;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill>;
   readonly onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
   /** Non-null when older turns exist beyond the loaded window. */
@@ -1974,11 +1977,25 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     },
     [props.onEndFollowEnabledChange],
   );
+  const awayFromEndRef = useRef(false);
   const transitionEndFollow = useCallback(
     (event: ThreadFeedLiveFollowEvent) => {
       setEndFollow(resolveThreadFeedLiveFollow(endFollowEnabledRef.current, event));
+      // Follow pauses on touch-down, but a touch that starts and stays at the
+      // end must not surface the scroll-to-end button; only leaving the end does.
+      const isAtEnd =
+        "isAtEnd" in event ? event.isAtEnd : (props.listRef.current?.getState().isAtEnd ?? false);
+      const away = resolveScrollToEndVisible({
+        followEnabled: endFollowEnabledRef.current,
+        userScrollSessionActive: userScrollSessionRef.current,
+        isAtEnd,
+      });
+      if (away !== awayFromEndRef.current) {
+        awayFromEndRef.current = away;
+        props.onAwayFromEndChange?.(away);
+      }
     },
-    [setEndFollow],
+    [props.listRef, props.onAwayFromEndChange, setEndFollow],
   );
   const [interactionState, setInteractionState] = useState<{
     readonly copiedRowId: string | null;

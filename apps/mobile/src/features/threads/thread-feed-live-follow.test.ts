@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  resolveScrollToEndVisible,
   resolveThreadFeedLiveFollow,
   resolveThreadFeedSubmissionAnchor,
   resolveThreadWorkGroupInitialScroll,
@@ -219,5 +220,28 @@ describe("resolveThreadFeedLiveFollow", () => {
 
   it("re-arms after an explicit reset", () => {
     expect(resolveThreadFeedLiveFollow(false, { type: "reset" })).toBe(true);
+  });
+});
+
+describe("resolveScrollToEndVisible", () => {
+  it("hides while following", () => {
+    expect(
+      resolveScrollToEndVisible({ followEnabled: true, userScrollSessionActive: true, isAtEnd: false }),
+    ).toBe(false);
+  });
+
+  it("stays hidden for a touch that starts and stays at the end", () => {
+    expect(
+      resolveScrollToEndVisible({ followEnabled: false, userScrollSessionActive: true, isAtEnd: true }),
+    ).toBe(false);
+  });
+
+  it("shows once the list has left the end, during or after the touch", () => {
+    expect(
+      resolveScrollToEndVisible({ followEnabled: false, userScrollSessionActive: true, isAtEnd: false }),
+    ).toBe(true);
+    expect(
+      resolveScrollToEndVisible({ followEnabled: false, userScrollSessionActive: false, isAtEnd: false }),
+    ).toBe(true);
   });
 });
