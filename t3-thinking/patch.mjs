@@ -15,9 +15,10 @@ if (process.argv[2] === "--revision") {
 }
 const file = process.argv[2];
 const checkOnly = process.argv[3] === "--check";
+const nativeOnly = process.argv[3] === "--native";
 
 if (!file || (process.argv.length > 4)) {
-  console.error("usage: patch.mjs <node_modules/t3/dist/bin.mjs> [--check]");
+  console.error("usage: patch.mjs <node_modules/t3/dist/bin.mjs> [--check|--native]");
   process.exit(2);
 }
 
@@ -28,6 +29,16 @@ if (!file || (process.argv.length > 4)) {
 // freed by stripping indentation from the code that follows it.
 const binaryMode = !file.endsWith(".mjs");
 const source = await readFile(file, binaryMode ? "latin1" : "utf8");
+// Upstream records thinking itself from 0.0.43 (the thread.message.reasoning
+// commands, shipped 2026-09-16). Such a build needs no patch, and patching it
+// would write every trace twice. `--native` answers only that question; a
+// plain run or --check treats it as done so the service hook leaves it alone.
+const nativeThinking = source.includes('"thread.message.reasoning.delta"');
+if (nativeOnly) process.exit(nativeThinking ? 0 : 1);
+if (nativeThinking) {
+  console.log(`${file}: records thinking natively; nothing to patch`);
+  process.exit(0);
+}
 if (source.includes(marker)) {
   const count = source.split(marker).length - 1;
   const expected = binaryMode ? 1 : 2;

@@ -4,6 +4,8 @@ Run a patched local copy of the T3 nightly server. The patch forwards provider r
 
 ## Which builds this works on
 
+Upstream T3 Code records thinking on its own from 0.0.43 (nightlies from 2026-09-16 on, commit 052c7ae53 "show provider thinking traces"): reasoning arrives as messages with role `reasoning`, and clients opt in with `reasoningMessages`. The patcher detects those builds and does nothing (`patch.mjs <t3> --native` exits 0), the service hook leaves them unpatched and never restarts them, and this runner only matters for older servers.
+
 Up to 0.0.40 the server is a JavaScript bundle (`dist/bin.mjs`) and the
 patcher rewrites it. From 0.0.41 the package ships a native executable per
 platform (`@t3code/t3-<platform>-<arch>/t3`, a Node single-executable) with

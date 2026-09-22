@@ -20,6 +20,10 @@ read -r active pending < <("$node_bin" -e '
 ' "$state")
 bin="$t3_home/runtime/versions/$active/t3"
 [ -f "$bin" ] || exit 0
+# A build that records thinking itself (0.0.43+) is left exactly as shipped.
+if "$node_bin" "$patcher" "$bin" --native >/dev/null 2>&1; then
+  exit 0
+fi
 
 if ! "$node_bin" "$patcher" "$bin" --check >/dev/null 2>&1; then
   # Exit 3 means an older patch revision is in the file. The original is gone
