@@ -176,8 +176,6 @@ function StashRow(props: {
   );
 }
 
-export const STASH_TAB_RADIUS = 18;
-
 /**
  * What the composer surface needs to grow the stash tab out of its own glass:
  * the crown to lay out above the body, and the tab's rect inside that crown

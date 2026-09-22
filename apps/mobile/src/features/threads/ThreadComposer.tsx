@@ -102,7 +102,6 @@ import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
 import {
   ComposerStashButton,
-  STASH_TAB_RADIUS,
   useComposerStashChrome,
 } from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
@@ -260,8 +259,10 @@ export function ComposerSurface(props: {
     setCrownHeight((current) => (current === height ? current : height));
   }, []);
   const crownCap = props.crown ? props.crownCap : null;
-  // The cap reaches STASH_TAB_RADIUS into the body so its own bottom corners
-  // vanish inside the union; only its top corners and the smooth join show.
+  // The cap's corners match the body's, capped at a half-height pill. It
+  // reaches that far into the body so its own bottom corners vanish inside
+  // the union; only its top corners and the smooth join show.
+  const capRadius = crownCap ? Math.min(targetBorderRadius, crownCap.height / 2) : 0;
   const glassShape: GlassShape | null =
     crownCap && crownHeight > 0
       ? {
@@ -270,8 +271,8 @@ export function ComposerSurface(props: {
             x: crownCap.x,
             y: crownCap.y,
             width: crownCap.width,
-            height: crownCap.height + STASH_TAB_RADIUS,
-            radius: STASH_TAB_RADIUS,
+            height: crownCap.height + capRadius,
+            radius: capRadius,
           },
         }
       : null;
@@ -563,7 +564,10 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     };
   }, [inputRef, isFocused, isVoiceInputPresented, navigation]);
   // An open draft stays visible; only a collapsed composer becomes a voice strip.
-  const isExpanded = isFocused || settingsSheetPresentation.keepsComposerExpanded;
+  // Android never collapses to the compact pill: the card stays open with its
+  // toolbar whether or not the editor has focus.
+  const isExpanded =
+    Platform.OS === "android" || isFocused || settingsSheetPresentation.keepsComposerExpanded;
   const showsCompactDictation = isVoiceInputPresented && !isExpanded;
   const isToolbarVisible = isExpanded || isVoiceInputPresented;
   const attachmentBlockReason = composerAttachmentUploadBlockReason({
