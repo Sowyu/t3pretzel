@@ -18,6 +18,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schedule from "effect/Schedule";
 import * as BackgroundTask from "expo-background-task";
 import * as TaskManager from "expo-task-manager";
 import { AppState } from "react-native";
@@ -33,6 +34,7 @@ import {
   BACKGROUND_REFRESH_CONCURRENCY,
   BACKGROUND_REFRESH_ENVIRONMENT_TIMEOUT_MS,
   BACKGROUND_REFRESH_INTERVAL_MINUTES,
+  BACKGROUND_REFRESH_RETRY_DELAY_MS,
   BACKGROUND_REFRESH_SESSION_TIMEOUT_MS,
   type BackgroundRefreshEnvironmentResult,
   type BackgroundRefreshRecord,
@@ -41,6 +43,7 @@ import {
   type BackgroundRefreshTrigger,
   backgroundRefreshTargets,
   describeBackgroundRefreshFailure,
+  isRetryableBackgroundRefreshFailure,
   shouldRegisterBackgroundRefresh,
   summarizeBackgroundRefresh,
 } from "./background-refresh-plan";
@@ -67,14 +70,11 @@ const LAST_RUN_KEY = "t3code.background-refresh.last-run";
  * backgrounded and a lost token is re-minted on the next use, so the window is
  * small and self-healing. Share one catalog store if either stops being true.
  */
-function backgroundRefreshLayer(session: ManagedRelaySession | null) {
+function backgroundRefreshLayer(readSession: () => ManagedRelaySession | null) {
   const capabilitiesLayer = Layer.effectContext(
     Effect.gen(function* () {
       const storage = yield* MobileStorage.MobileStorage;
-      return Context.make(
-        CloudSession,
-        mobileCloudSession(() => session),
-      ).pipe(
+      return Context.make(CloudSession, mobileCloudSession(readSession)).pipe(
         Context.add(RelayDeviceIdentity, mobileRelayDeviceIdentity(storage)),
         Context.add(ClientPresentation, mobileClientPresentation),
       );
@@ -133,46 +133,56 @@ const prepareTarget = Effect.fn("mobile.backgroundRefresh.prepare")(function* (
   } satisfies PreparedConnection;
 });
 
-const refreshEnvironment = Effect.fn("mobile.backgroundRefresh.environment")(function* (
+const fetchShell = Effect.fn("mobile.backgroundRefresh.fetchShell")(function* (
   target: BackgroundRefreshTarget,
-  session: SessionResolution,
 ) {
-  const label = target.label;
-  // A relay environment cannot be authorized without T3 Connect, and saying so
-  // is the whole diagnosis on a phone that never signed in headlessly.
-  if (target._tag === "RelayConnectionTarget" && session.session === null) {
-    return {
-      label,
-      outcome: "skipped",
-      reason: session.reason ?? "no T3 Connect session",
-    } satisfies BackgroundRefreshEnvironmentResult;
-  }
-  const cache = yield* EnvironmentCacheStore;
-  const prepared = yield* prepareTarget(target).pipe(Effect.result);
-  if (prepared._tag === "Failure") {
-    const reason = describeBackgroundRefreshFailure(prepared.failure);
-    yield* Effect.logInfo("Skipping a background refresh for an unauthorized environment.").pipe(
-      Effect.annotateLogs({ environmentId: target.environmentId, reason }),
-    );
-    return { label, outcome: "skipped", reason } satisfies BackgroundRefreshEnvironmentResult;
-  }
+  const prepared = yield* prepareTarget(target);
   // The loader service swallows the cause into `Option.none`, and the cause is
   // exactly what the Settings row has to show, so this calls the fetch directly.
   const signer = yield* Effect.serviceOption(ManagedRelay.ManagedRelayDpopSigner);
   const remoteAuthorization = yield* Effect.serviceOption(
     RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization,
   );
-  const snapshot = yield* fetchEnvironmentShellSnapshot({
-    prepared: prepared.success,
-    signer,
-    remoteAuthorization,
-  }).pipe(Effect.result);
+  return yield* fetchEnvironmentShellSnapshot({ prepared, signer, remoteAuthorization });
+});
+
+const refreshEnvironment = Effect.fn("mobile.backgroundRefresh.environment")(function* (
+  target: BackgroundRefreshTarget,
+  session: Promise<SessionResolution>,
+) {
+  const label = target.label;
+  // Only relay needs T3 Connect, so a direct-paired environment starts while
+  // Clerk is still loading instead of after it.
+  if (target._tag === "RelayConnectionTarget") {
+    const resolved = yield* Effect.promise(() => session);
+    // A relay environment cannot be authorized without T3 Connect, and saying
+    // so is the whole diagnosis on a phone that never signed in headlessly.
+    if (resolved.session === null) {
+      return {
+        label,
+        outcome: "skipped",
+        reason: resolved.reason ?? "no T3 Connect session",
+      } satisfies BackgroundRefreshEnvironmentResult;
+    }
+  }
+  const cache = yield* EnvironmentCacheStore;
+  const snapshot = yield* fetchShell(target).pipe(
+    Effect.retry({
+      times: 1,
+      schedule: Schedule.spaced(BACKGROUND_REFRESH_RETRY_DELAY_MS),
+      while: isRetryableBackgroundRefreshFailure,
+    }),
+    Effect.result,
+  );
   if (snapshot._tag === "Failure") {
     const reason = describeBackgroundRefreshFailure(snapshot.failure);
+    // Blocked means nothing to try (no credential, not paired); anything else
+    // was a real request that did not come back.
+    const outcome = snapshot.failure._tag === "ConnectionBlockedError" ? "skipped" : "failed";
     yield* Effect.logWarning("A background shell refresh did not come back.").pipe(
       Effect.annotateLogs({ environmentId: target.environmentId, reason }),
     );
-    return { label, outcome: "failed", reason } satisfies BackgroundRefreshEnvironmentResult;
+    return { label, outcome, reason } satisfies BackgroundRefreshEnvironmentResult;
   }
   const saved = yield* cache.saveShell(target.environmentId, snapshot.success).pipe(Effect.result);
   if (saved._tag === "Failure") {
@@ -192,7 +202,7 @@ const refreshEnvironment = Effect.fn("mobile.backgroundRefresh.environment")(fun
 });
 
 const refreshAllEnvironments = Effect.fn("mobile.backgroundRefresh.run")(function* (
-  session: SessionResolution,
+  session: Promise<SessionResolution>,
 ) {
   const targetStore = yield* ConnectionTargetStore;
   const targets = backgroundRefreshTargets(
@@ -425,11 +435,15 @@ async function executeRefresh(trigger: BackgroundRefreshTrigger) {
   await withTimeout(loadRecordOnce(), RECORD_READ_TIMEOUT_MS, undefined);
   const previous = lastRecord;
   let error: string | undefined;
-  const session = await resolveSession();
+  let relaySession: ManagedRelaySession | null = null;
+  const sessionResolution = resolveSession().then((resolved) => {
+    relaySession = resolved.session;
+    return resolved;
+  });
   const environments = await Runtime.runtime
     .runPromise(
-      refreshAllEnvironments(session).pipe(
-        Effect.provide(backgroundRefreshLayer(session.session)),
+      refreshAllEnvironments(sessionResolution).pipe(
+        Effect.provide(backgroundRefreshLayer(() => relaySession)),
         Effect.timeoutOrElse({
           duration: BACKGROUND_REFRESH_BUDGET_MS,
           orElse: () => {
@@ -451,7 +465,9 @@ async function executeRefresh(trigger: BackgroundRefreshTrigger) {
       return [] as ReadonlyArray<BackgroundRefreshEnvironmentResult>;
     });
   // Nothing to refresh is not a failure, but nothing to refresh *and* no
-  // session is the state the user is actually in.
+  // session is the state the user is actually in. Resolves within its own
+  // timeout, so this never waits longer than the session step already did.
+  const session = await sessionResolution;
   if (environments.length === 0 && error === undefined && session.reason !== null) {
     error = session.reason;
   }

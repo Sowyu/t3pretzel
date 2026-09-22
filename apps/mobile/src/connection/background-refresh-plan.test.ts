@@ -13,6 +13,7 @@ import {
   backgroundRefreshSummaryLabel,
   backgroundRefreshTargets,
   describeBackgroundRefreshFailure,
+  isRetryableBackgroundRefreshFailure,
   shouldRegisterBackgroundRefresh,
   summarizeBackgroundRefresh,
 } from "./background-refresh-plan";
@@ -227,14 +228,19 @@ describe("backgroundRefreshRowSubtitle", () => {
   });
 
   it("appends the age of a clean run", () => {
-    expect(subtitle({ ...base, refreshed: 2, environments: [refreshed, refreshed] })).toBe(
-      "2 updated · 12m ago",
-    );
+    expect(
+      subtitle({
+        ...base,
+        durationMs: 2_430,
+        refreshed: 2,
+        environments: [refreshed, refreshed],
+      }),
+    ).toBe("2 updated in 2.4 s · 12m ago");
   });
 
   it("appends why the run failed", () => {
-    expect(subtitle({ ...base, error: "no T3 Connect session" })).toBe(
-      "Failed · 12m ago · no T3 Connect session",
+    expect(subtitle({ ...base, durationMs: 340, error: "no T3 Connect session" })).toBe(
+      "Failed in 340 ms · 12m ago · no T3 Connect session",
     );
   });
 });
@@ -292,5 +298,49 @@ describe("describeBackgroundRefreshFailure", () => {
       `${"x".repeat(47)}\u2026`,
     );
     expect(describeBackgroundRefreshFailure(undefined)).toBe("unknown error");
+  });
+});
+
+describe("isRetryableBackgroundRefreshFailure", () => {
+  it("retries a relay that could not reach the host", () => {
+    expect(
+      isRetryableBackgroundRefreshFailure({
+        _tag: "ConnectionTransientError",
+        reason: "endpoint-unavailable",
+      }),
+    ).toBe(true);
+  });
+
+  it("retries timeouts and server errors", () => {
+    expect(isRetryableBackgroundRefreshFailure({ _tag: "RemoteEnvironmentAuthTimeoutError" })).toBe(
+      true,
+    );
+    expect(
+      isRetryableBackgroundRefreshFailure({
+        _tag: "RemoteEnvironmentAuthUndeclaredStatusError",
+        status: 502,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not retry what will fail the same way again", () => {
+    expect(
+      isRetryableBackgroundRefreshFailure({
+        _tag: "ConnectionBlockedError",
+        reason: "authentication",
+      }),
+    ).toBe(false);
+    expect(
+      isRetryableBackgroundRefreshFailure({
+        _tag: "RemoteEnvironmentAuthUndeclaredStatusError",
+        status: 401,
+      }),
+    ).toBe(false);
+    expect(
+      isRetryableBackgroundRefreshFailure({
+        _tag: "RemoteEnvironmentAuthFetchError",
+        cause: { _tag: "ConnectionBlockedError" },
+      }),
+    ).toBe(false);
   });
 });

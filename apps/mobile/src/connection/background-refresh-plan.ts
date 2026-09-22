@@ -9,7 +9,13 @@ export const BACKGROUND_REFRESH_INTERVAL_MINUTES = 15;
 
 /** The whole run, including relay authorization, has to fit a short OS budget. */
 export const BACKGROUND_REFRESH_BUDGET_MS = 25_000;
-export const BACKGROUND_REFRESH_ENVIRONMENT_TIMEOUT_MS = 12_000;
+/** Room for one attempt, the retry delay, and a second attempt. */
+export const BACKGROUND_REFRESH_ENVIRONMENT_TIMEOUT_MS = 15_000;
+/**
+ * A relay that cannot reach the host right now ("server unreachable") often
+ * can a second later, once the host's tunnel wakes. One retry, not a ladder.
+ */
+export const BACKGROUND_REFRESH_RETRY_DELAY_MS = 1_000;
 /** Clerk's headless `load()` has no timeout of its own and can sit forever. */
 export const BACKGROUND_REFRESH_SESSION_TIMEOUT_MS = 8_000;
 export const BACKGROUND_REFRESH_CONCURRENCY = 3;
@@ -168,8 +174,38 @@ export function backgroundRefreshRowSubtitle(input: {
   if (input.status === "restricted") return "Restricted by the system";
   if (input.record === null) return "Waiting for the first run";
   const reason = backgroundRefreshReason(input.record);
-  const summary = `${backgroundRefreshSummaryLabel(input.record)} · ${input.relativeLabel} ago`;
+  const summary = `${backgroundRefreshSummaryLabel(input.record)} in ${formatRefreshDuration(input.record.durationMs)} · ${input.relativeLabel} ago`;
   return reason === null ? summary : `${summary} · ${reason}`;
+}
+
+/**
+ * Worth one more try inside the same wakeup: the relay or the network flaked.
+ * A missing credential or a rejected sign-in will fail the same way again.
+ */
+export function isRetryableBackgroundRefreshFailure(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const tagged = error as {
+    readonly _tag?: unknown;
+    readonly status?: unknown;
+    readonly cause?: unknown;
+  };
+  switch (tagged._tag) {
+    case "ConnectionTransientError":
+    case "RemoteEnvironmentAuthTimeoutError":
+    case "EnvironmentInternalError":
+      return true;
+    case "RemoteEnvironmentAuthFetchError":
+      // Wraps relay authorization failures too; only a transient cause retries.
+      return (
+        typeof tagged.cause !== "object" ||
+        tagged.cause === null ||
+        (tagged.cause as { readonly _tag?: unknown })._tag !== "ConnectionBlockedError"
+      );
+    case "RemoteEnvironmentAuthUndeclaredStatusError":
+      return typeof tagged.status === "number" && tagged.status >= 500;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -235,6 +271,13 @@ function describeConnectionReason(error: { readonly reason?: unknown }): string 
     default:
       return typeof error.reason === "string" ? error.reason : "blocked";
   }
+}
+
+/** "340 ms" under a second, "2.4 s" above it. */
+export function formatRefreshDuration(durationMs: number): string {
+  return durationMs < 1_000
+    ? `${Math.round(durationMs)} ms`
+    : `${Math.round(durationMs / 100) / 10} s`;
 }
 
 // Long enough for "Could not authorize the environment request", short enough
