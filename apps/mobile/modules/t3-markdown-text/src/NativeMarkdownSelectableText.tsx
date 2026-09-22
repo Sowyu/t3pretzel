@@ -165,7 +165,11 @@ function runStyle(run: NativeMarkdownTextRun, textStyle: NativeMarkdownTextStyle
       run.role === "spacer"
         ? (run.spacing ?? 10)
         : run.role === "list-break"
-          ? textStyle.lineHeight + (run.spacing ?? 0)
+          ? // Android: a taller line height on the item's trailing newline is a
+            // paragraph style there, so measurement stretches every line of the
+            // item while the drawn text keeps the base height, and a 40-item
+            // list ends in a blank block the size of the difference.
+            textStyle.lineHeight + (Platform.OS === "android" ? 0 : (run.spacing ?? 0))
           : isHeading
             ? Math.max(headingFontSize + 6, textStyle.lineHeight + 2)
             : isCodeBlock
