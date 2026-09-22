@@ -46,6 +46,7 @@ import {
   useWindowDimensions,
   View,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
 } from "react-native";
 import {
   KeyboardController,
@@ -336,7 +337,10 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const feedTouchStartRef = useRef<{ pageX: number; pageY: number } | null>(null);
   const selectedThreadKeyRef = useRef(selectedThreadKey);
   const lastScrolledSubmittedMessageIdRef = useRef<MessageId | null>(null);
-  const [composerExpanded, setComposerExpanded] = useState(false);
+  // Android's composer never collapses, so the first inset estimate is the
+  // card's; a collapsed estimate would leave the last rows under the card
+  // until the measured height arrived.
+  const [composerExpanded, setComposerExpanded] = useState(Platform.OS === "android");
   const [composerFocused, setComposerFocused] = useState(false);
   const handleComposerFocusChange = useCallback(
     (focused: boolean) => {
@@ -631,6 +635,39 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
       }
     },
     [],
+  );
+  // The list only retargets an initial scroll that is still running when the
+  // overlay's measured height replaces the estimate; on a cold open that
+  // height lands after the scroll has settled and the tail sits under the
+  // card. Re-pin on every change of the overlay's height while following.
+  // A cold open races several late insets (header, overlay, floating status)
+  // against the list's initial scroll, and one of them lands after every
+  // targeted re-pin above. Two settle re-pins after the thread turns ready
+  // cover the rest; each is a no-op when the end is already right.
+  useEffect(() => {
+    if (contentPresentationKind !== "ready") return;
+    scheduleOverlayRepin(300);
+    const late = setTimeout(() => scheduleOverlayRepin(0), 1000);
+    return () => clearTimeout(late);
+  }, [contentPresentationKind, scheduleOverlayRepin, selectedThreadKey]);
+  // Same for the glass header: its measured height becomes the list's top
+  // spacer a commit after mount, and the list keeps the visible rows in
+  // place rather than the end.
+  const contentTopInset = props.contentTopInset ?? 0;
+  useEffect(() => {
+    if (contentTopInset > 0) scheduleOverlayRepin(60);
+  }, [contentTopInset, scheduleOverlayRepin]);
+  const lastOverlayHeightRef = useRef<number | null>(null);
+  const handleComposerOverlayLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      onComposerLayout(event);
+      const height = event.nativeEvent.layout.height;
+      if (lastOverlayHeightRef.current !== null && lastOverlayHeightRef.current !== height) {
+        scheduleOverlayRepin(60);
+      }
+      lastOverlayHeightRef.current = height;
+    },
+    [onComposerLayout, scheduleOverlayRepin],
   );
   useEffect(() => {
     const previous = previousWorkingControlStateRef.current;
@@ -999,7 +1036,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             {/* No paddingTop here: the overlay's measured height becomes the
                 list's bottom inset, so any padding above the pill/composer
                 pushes the resting content floor up by the same amount. */}
-            <View ref={composerOverlayRef} onLayout={onComposerLayout} className="w-full">
+            <View ref={composerOverlayRef} onLayout={handleComposerOverlayLayout} className="w-full">
               <FloatingWorkingControl
                 colorScheme={isDarkMode ? "dark" : "light"}
                 status={floatingStatus}

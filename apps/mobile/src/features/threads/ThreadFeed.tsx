@@ -561,6 +561,8 @@ function MessageAttachmentUnknown(props: { readonly name: string }) {
 const ThreadMediaVisibleContext = createContext(false);
 // LegendList only computes hook visibility when the list has a viewability config.
 const THREAD_MEDIA_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 0 };
+// In viewports; large enough that no thread length is ever outside it.
+const FOLLOW_FROM_ANYWHERE_THRESHOLD = 1000;
 
 function ThreadMediaVisibility(props: { readonly children: ReactNode }) {
   const [visible, setVisible] = useState(false);
@@ -2899,6 +2901,12 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             freeze={props.freeze}
             // Follow the measured end immediately. Animating toward an estimated
             // end races row measurement when a pending message is acknowledged.
+            // LegendList only re-pins when the list is already within a tenth
+            // of a viewport of the end. A message row that measures far taller
+            // than its estimate on open, or a streaming burst, leaves it behind
+            // for good. The follow latch above already says when following is
+            // wanted, so while it does the list re-pins from anywhere.
+            maintainScrollAtEndThreshold={FOLLOW_FROM_ANYWHERE_THRESHOLD}
             maintainScrollAtEnd={
               disclosureToggleSettling || !endFollowEnabled
                 ? false
