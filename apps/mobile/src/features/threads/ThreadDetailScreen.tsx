@@ -96,6 +96,7 @@ import {
   FloatingWorkingControl,
 } from "./floating-working-control";
 import { connectionFloatingStatus, type FloatingWorkingStatus } from "./floating-working-status";
+import { SubagentTabs } from "./subagent-tabs";
 import {
   derivePendingUserInputMaxHeight,
   ESTIMATED_KEYBOARD_HEIGHT,
@@ -997,7 +998,8 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             contentInsetEndAdjustment={combinedContentInsetEndAdjustment}
             contentTopInset={props.contentTopInset ?? 0}
             contentBottomInset={
-              estimatedOverlayHeight + (floatingControlCovers ? FLOATING_WORKING_CONTROL_COVERAGE : 0)
+              estimatedOverlayHeight +
+              (floatingControlCovers ? FLOATING_WORKING_CONTROL_COVERAGE : 0)
             }
             contentMaxWidth={contentMaxWidth}
             layoutVariant={layoutVariant}
@@ -1013,6 +1015,15 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
       ) : (
         <View className="flex-1" />
       )}
+
+      {showContent ? (
+        <SubagentTabs
+          top={
+            props.contentTopInset ||
+            (props.usesAutomaticContentInsets ? insets.top + IOS_NAV_BAR_HEIGHT : 0)
+          }
+        />
+      ) : null}
 
       {/* Floating composer — sticks to keyboard via KeyboardStickyView */}
       {showContent ? (
@@ -1036,7 +1047,11 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             {/* No paddingTop here: the overlay's measured height becomes the
                 list's bottom inset, so any padding above the pill/composer
                 pushes the resting content floor up by the same amount. */}
-            <View ref={composerOverlayRef} onLayout={handleComposerOverlayLayout} className="w-full">
+            <View
+              ref={composerOverlayRef}
+              onLayout={handleComposerOverlayLayout}
+              className="w-full"
+            >
               <FloatingWorkingControl
                 colorScheme={isDarkMode ? "dark" : "light"}
                 status={floatingStatus}
