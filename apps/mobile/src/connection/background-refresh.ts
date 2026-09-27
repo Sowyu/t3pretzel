@@ -52,6 +52,7 @@ import {
   mobileCloudSession,
   mobileRelayDeviceIdentity,
 } from "./platform";
+import { offerShell, trackShellFetch } from "./shell-handoff";
 import { connectionStorageLayer } from "./storage";
 
 const BACKGROUND_REFRESH_TASK = "t3code.connection.background-refresh";
@@ -184,6 +185,7 @@ const refreshEnvironment = Effect.fn("mobile.backgroundRefresh.environment")(fun
     );
     return { label, outcome, reason } satisfies BackgroundRefreshEnvironmentResult;
   }
+  offerShell(target.environmentId, snapshot.success);
   const saved = yield* cache.saveShell(target.environmentId, snapshot.success).pipe(Effect.result);
   if (saved._tag === "Failure") {
     yield* Effect.logWarning("Could not persist a background shell refresh.").pipe(
@@ -208,6 +210,18 @@ const refreshAllEnvironments = Effect.fn("mobile.backgroundRefresh.run")(functio
   const targets = backgroundRefreshTargets(
     yield* targetStore.list,
     yield* targetStore.listDisabled,
+  );
+  // Registered up front, so a reconnect that starts before this run reaches an
+  // environment still waits for it instead of downloading the shell twice.
+  const settled = new Map(
+    targets.map((target) => {
+      let settle = () => {};
+      void trackShellFetch(
+        target.environmentId,
+        new Promise<void>((resolve) => (settle = resolve)),
+      );
+      return [target, settle] as const;
+    }),
   );
   return yield* Effect.forEach(
     targets,
@@ -234,9 +248,10 @@ const refreshAllEnvironments = Effect.fn("mobile.backgroundRefresh.run")(functio
             } satisfies BackgroundRefreshEnvironmentResult),
           ),
         ),
+        Effect.ensuring(Effect.sync(() => settled.get(target)?.())),
       ),
     { concurrency: BACKGROUND_REFRESH_CONCURRENCY },
-  );
+  ).pipe(Effect.ensuring(Effect.sync(() => settled.forEach((settle) => settle()))));
 });
 
 function parseEnvironments(raw: unknown): ReadonlyArray<BackgroundRefreshEnvironmentResult> {
