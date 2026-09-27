@@ -334,7 +334,10 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               >
                 <GlassControl className="h-11 items-center justify-center px-3.5" radius={22}>
                   <RNText
-                    className={cn("text-[13px] font-t3-medium", backdrop ? undefined : "text-foreground")}
+                    className={cn(
+                      "text-[13px] font-t3-medium",
+                      backdrop ? undefined : "text-foreground",
+                    )}
                     style={backdrop ? ON_BACKDROP_TEXT : undefined}
                   >
                     Update
@@ -394,9 +397,7 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               style={{ borderRadius: materialYouStyleLayoutActive ? 24 : 16 }}
               tintColor="transparent"
             >
-              <View className="min-h-12 flex-row items-center gap-2.5 px-3.5">
-                {searchContent}
-              </View>
+              <View className="min-h-12 flex-row items-center gap-2.5 px-3.5">{searchContent}</View>
             </GlassSurface>
           ) : (
             <View

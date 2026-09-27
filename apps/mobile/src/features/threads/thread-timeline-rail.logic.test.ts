@@ -46,9 +46,17 @@ describe("rail geometry", () => {
 
   it("picks the first user message on screen, else the last one scrolled past", () => {
     const items = deriveTimelineRailItems(rows);
-    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 0, lastVisibleRow: 2 })).toBe(0);
-    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 1, lastVisibleRow: 3 })).toBe(0);
-    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 4, lastVisibleRow: 5 })).toBe(1);
-    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 6, lastVisibleRow: 9 })).toBe(2);
+    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 0, lastVisibleRow: 2 })).toBe(
+      0,
+    );
+    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 1, lastVisibleRow: 3 })).toBe(
+      0,
+    );
+    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 4, lastVisibleRow: 5 })).toBe(
+      1,
+    );
+    expect(resolveTimelineRailCurrentIndex({ items, firstVisibleRow: 6, lastVisibleRow: 9 })).toBe(
+      2,
+    );
   });
 });

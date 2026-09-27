@@ -215,9 +215,9 @@ describe("reasoning messages in the feed", () => {
       new Set(),
       null,
     );
-    expect(
-      rows.map((entry) => (entry.type === "message" ? entry.message.id : entry.type)),
-    ).toEqual(["message-1", "turn-fold", "assistant-1"]);
+    expect(rows.map((entry) => (entry.type === "message" ? entry.message.id : entry.type))).toEqual(
+      ["message-1", "turn-fold", "assistant-1"],
+    );
   });
 
   it("keeps a lone thinking row visible when the fold would hide nothing else", () => {
@@ -246,8 +246,8 @@ describe("reasoning messages in the feed", () => {
       new Set(),
       null,
     );
-    expect(
-      rows.map((entry) => (entry.type === "message" ? entry.message.id : entry.type)),
-    ).toEqual(["message-1", "reasoning-1", "assistant-1"]);
+    expect(rows.map((entry) => (entry.type === "message" ? entry.message.id : entry.type))).toEqual(
+      ["message-1", "reasoning-1", "assistant-1"],
+    );
   });
 });

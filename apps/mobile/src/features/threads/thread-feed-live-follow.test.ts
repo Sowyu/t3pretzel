@@ -226,22 +226,38 @@ describe("resolveThreadFeedLiveFollow", () => {
 describe("resolveScrollToEndVisible", () => {
   it("hides while following", () => {
     expect(
-      resolveScrollToEndVisible({ followEnabled: true, userScrollSessionActive: true, isAtEnd: false }),
+      resolveScrollToEndVisible({
+        followEnabled: true,
+        userScrollSessionActive: true,
+        isAtEnd: false,
+      }),
     ).toBe(false);
   });
 
   it("stays hidden for a touch that starts and stays at the end", () => {
     expect(
-      resolveScrollToEndVisible({ followEnabled: false, userScrollSessionActive: true, isAtEnd: true }),
+      resolveScrollToEndVisible({
+        followEnabled: false,
+        userScrollSessionActive: true,
+        isAtEnd: true,
+      }),
     ).toBe(false);
   });
 
   it("shows once the list has left the end, during or after the touch", () => {
     expect(
-      resolveScrollToEndVisible({ followEnabled: false, userScrollSessionActive: true, isAtEnd: false }),
+      resolveScrollToEndVisible({
+        followEnabled: false,
+        userScrollSessionActive: true,
+        isAtEnd: false,
+      }),
     ).toBe(true);
     expect(
-      resolveScrollToEndVisible({ followEnabled: false, userScrollSessionActive: false, isAtEnd: false }),
+      resolveScrollToEndVisible({
+        followEnabled: false,
+        userScrollSessionActive: false,
+        isAtEnd: false,
+      }),
     ).toBe(true);
   });
 });

@@ -143,7 +143,14 @@ export function NightlySkyBackdrop(props: {
         </LinearGradient>
         {/* Android resolves userSpaceOnUse filter regions in device pixels,
             ignoring the viewBox, so size the region from the cloud's own box. */}
-        <Filter filterUnits="objectBoundingBox" height="1.6" id="soft" width="1.6" x="-0.3" y="-0.3">
+        <Filter
+          filterUnits="objectBoundingBox"
+          height="1.6"
+          id="soft"
+          width="1.6"
+          x="-0.3"
+          y="-0.3"
+        >
           <FeGaussianBlur stdDeviation="4" />
         </Filter>
         <Pattern height={SCENE_HEIGHT} id="stars" patternUnits="userSpaceOnUse" width="288">
