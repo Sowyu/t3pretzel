@@ -1,0 +1,16 @@
+diff --git a/android/build.gradle b/android/build.gradle
+index 767eb43d1d9329215c12291c55034c964bcb059c..c78dd76e12f5e04608f903ef09ea9ff8b1f08885 100644
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -111,7 +111,10 @@ dependencies {
+   //noinspection GradleDynamicVersion
+   implementation "com.facebook.react:react-native:+"
+   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+-  implementation "com.facebook.fbjni:fbjni:+"
++  // Pinned to React Native 0.86's fbjni. `+` resolved to 0.8.1, whose libfbjni.so needs a
++  // newer libc++_shared.so than React Native packages, so the app crashed on launch.
++  // Conflict resolution still lifts this to whatever react-android requires.
++  implementation "com.facebook.fbjni:fbjni:0.7.0"
+ }
+ 
+ if (isNewArchitectureEnabled()) {
