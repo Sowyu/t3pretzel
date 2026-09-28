@@ -43,29 +43,6 @@ export function deriveSubagentTabs(
 }
 
 /**
- * How the tabs lay out: a pill per live agent (at most `maxLive`, numbered by
- * wave order), one "+N working" pill for the rest, and one "N done" pill for
- * every finished agent, so a big wave does not bury the feed.
- */
-export function groupSubagentTabs(
-  tabs: ReadonlyArray<RuntimeSubagent>,
-  maxLive: number,
-): {
-  readonly live: ReadonlyArray<{ readonly agent: RuntimeSubagent; readonly number: number }>;
-  readonly moreLive: ReadonlyArray<RuntimeSubagent>;
-  readonly done: ReadonlyArray<RuntimeSubagent>;
-} {
-  const live = tabs
-    .map((agent, index) => ({ agent, number: index + 1 }))
-    .filter((entry) => isActiveSubagentStatus(entry.agent.status));
-  return {
-    live: live.slice(0, maxLive),
-    moreLive: live.slice(maxLive).map((entry) => entry.agent),
-    done: tabs.filter((agent) => !isActiveSubagentStatus(agent.status)),
-  };
-}
-
-/**
  * Tool calls a subagent made, oldest first. The server stamps each inner tool
  * row with `agentId` = the agent's taskId and drops the subagent's own text,
  * so tool calls are all there is to show. Rows fold by the same identity the

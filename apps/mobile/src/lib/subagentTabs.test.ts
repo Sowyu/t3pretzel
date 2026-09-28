@@ -4,7 +4,7 @@ import { EventId, type OrchestrationThreadActivity } from "@t3tools/contracts";
 
 import { foldSubagentActivities } from "@t3tools/client-runtime/state/subagentRuntime";
 
-import { deriveSubagentTabs, groupSubagentTabs, subagentToolCalls } from "./subagentTabs";
+import { deriveSubagentTabs, subagentToolCalls } from "./subagentTabs";
 
 let seq = 0;
 function row(kind: string, payload: Record<string, unknown>, summary = kind) {
@@ -71,30 +71,5 @@ describe("subagentToolCalls", () => {
         done: false,
       },
     ]);
-  });
-});
-
-describe("groupSubagentTabs", () => {
-  const agent = (id: string, status: string) =>
-    ({ id, status }) as unknown as Parameters<typeof groupSubagentTabs>[0][number];
-
-  it("keeps wave numbers, caps live pills, and folds finished agents", () => {
-    const groups = groupSubagentTabs(
-      [
-        agent("a", "completed"),
-        agent("b", "running"),
-        agent("c", "failed"),
-        agent("d", "running"),
-        agent("e", "waiting"),
-      ],
-      2,
-    );
-
-    expect(groups.live.map((entry) => [entry.agent.id, entry.number])).toEqual([
-      ["b", 2],
-      ["d", 4],
-    ]);
-    expect(groups.moreLive.map((entry) => entry.id)).toEqual(["e"]);
-    expect(groups.done.map((entry) => entry.id)).toEqual(["a", "c"]);
   });
 });
