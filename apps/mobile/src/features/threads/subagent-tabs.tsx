@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/AppText";
 import { GlassControl } from "../../components/GlassControl";
 import { cn } from "../../lib/cn";
-import { deriveSubagentTabs, subagentToolCalls } from "../../lib/subagentTabs";
+import { deriveSubagentTabs, groupSubagentTabs, subagentToolCalls } from "../../lib/subagentTabs";
 import { useSelectedThreadDetail } from "../../state/use-thread-detail";
 import { selectionHaptic } from "../../lib/haptics";
 import { appAtomRegistry } from "../../state/atom-registry";
@@ -56,8 +56,10 @@ export function openSubagentSheet(agentIds: ReadonlyArray<string>, selectedId: s
   appAtomRegistry.set(subagentSheetAtom, { agentIds, selectedId });
 }
 
-// A tab grows with its title up to this width, then truncates.
-const TAB_MAX_WIDTH = 176;
+// A live agent's pill wraps its title onto two lines up to this width.
+const TAB_MAX_WIDTH = 240;
+// Past this many live agents the rest fold into one "+N working" pill.
+const MAX_LIVE_TABS = 4;
 
 /**
  * Left-edge tabs, one per subagent, shown while any subagent of the selected
@@ -74,6 +76,8 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
     [activities, sessionLive],
   );
   const tabs = useMemo(() => deriveSubagentTabs(roster), [roster]);
+  const groups = useMemo(() => groupSubagentTabs(tabs, MAX_LIVE_TABS), [tabs]);
+  const tabIds = useMemo(() => tabs.map((agent) => agent.id), [tabs]);
   const sheet = useAtomValue(subagentSheetAtom);
   const setSheet = useAtomSet(subagentSheetAtom);
   // Leaving the thread closes the sheet, so it does not reopen on the next one.
@@ -95,35 +99,31 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
           className="absolute left-2 items-start gap-2"
           style={{ top: props.top + 8 }}
         >
-          {tabs.map((agent, index) => (
-            <Pressable
+          {groups.live.map(({ agent, number }) => (
+            <SubagentPill
               key={agent.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Subagent ${index + 1}, ${agent.title}, ${STATUS_LABEL[agent.status]}`}
-              accessibilityHint="Double tap to see what it is doing."
-              hitSlop={4}
-              onPress={() =>
-                openSubagentSheet(
-                  tabs.map((entry) => entry.id),
-                  agent.id,
-                )
-              }
-              className="active:opacity-70"
-              style={{ maxWidth: TAB_MAX_WIDTH }}
-            >
-              <GlassControl
-                radius={18}
-                className="h-9 border border-border bg-card shadow-md shadow-black/10"
-              >
-                <View className="h-9 flex-row items-center gap-2 px-3">
-                  <View className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[agent.status])} />
-                  <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
-                    {`${index + 1}. ${agent.title}`}
-                  </Text>
-                </View>
-              </GlassControl>
-            </Pressable>
+              dotClassName={STATUS_DOT[agent.status]}
+              label={`${number}. ${agent.title}`}
+              accessibilityLabel={`Subagent ${number}, ${agent.title}, ${STATUS_LABEL[agent.status]}`}
+              onPress={() => openSubagentSheet(tabIds, agent.id)}
+            />
           ))}
+          {groups.moreLive.length > 0 ? (
+            <SubagentPill
+              dotClassName={STATUS_DOT.running}
+              label={`+${groups.moreLive.length} working`}
+              accessibilityLabel={`${groups.moreLive.length} more subagents working`}
+              onPress={() => openSubagentSheet(tabIds, groups.moreLive[0]!.id)}
+            />
+          ) : null}
+          {groups.done.length > 0 ? (
+            <SubagentPill
+              dotClassName={STATUS_DOT.completed}
+              label={`${groups.done.length} done`}
+              accessibilityLabel={`${groups.done.length} subagents done`}
+              onPress={() => openSubagentSheet(tabIds, groups.done[0]!.id)}
+            />
+          ) : null}
         </View>
       ) : null}
       {sheet !== null ? (
@@ -138,6 +138,40 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
     </>
   );
 });
+
+function SubagentPill(props: {
+  readonly dotClassName: string;
+  readonly label: string;
+  readonly accessibilityLabel: string;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={props.accessibilityLabel}
+      accessibilityHint="Double tap to see what the subagents are doing."
+      hitSlop={4}
+      onPress={props.onPress}
+      className="active:opacity-70"
+      style={{ maxWidth: TAB_MAX_WIDTH }}
+    >
+      <GlassControl
+        radius={18}
+        className="min-h-9 border border-border bg-card shadow-md shadow-black/10"
+      >
+        <View className="min-h-9 flex-row items-center gap-2 px-3 py-1.5">
+          <View className={cn("h-2 w-2 shrink-0 rounded-full", props.dotClassName)} />
+          <Text
+            className="shrink font-t3-medium text-xs leading-snug text-foreground"
+            numberOfLines={2}
+          >
+            {props.label}
+          </Text>
+        </View>
+      </GlassControl>
+    </Pressable>
+  );
+}
 
 function SubagentSheet(props: {
   readonly agents: ReadonlyArray<RuntimeSubagent>;
