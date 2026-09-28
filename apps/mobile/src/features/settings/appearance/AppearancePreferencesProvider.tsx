@@ -3,14 +3,12 @@ import {
   startTransition,
   use,
   useCallback,
-  useEffect,
-  useState,
   useLayoutEffect,
   useMemo,
   useRef,
   type ReactNode,
 } from "react";
-import { AppState, Appearance, Platform, useColorScheme } from "react-native";
+import { Appearance, useColorScheme } from "react-native";
 
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -24,8 +22,6 @@ import {
 } from "../../../lib/appearancePreferences";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../../state/preferences";
 import type { Preferences } from "../../../persistence/mobile-preferences";
-import { isSystemColorsAvailable, readSystemColorPalettes } from "../../../lib/materialYouPalette";
-import { materialYouPaletteToMobileThemeVariables } from "../../../lib/materialYouTheme";
 import { getMobileThemeRuntimeVariables } from "../../../lib/mobileThemeVariables";
 import type { MobileThemeVariables } from "../../../lib/mobileTheme";
 import {
@@ -56,18 +52,12 @@ interface AppearancePreferencesContextValue {
   readonly themeIds: MobileThemeIds;
   readonly themeMode: MobileThemeMode;
   readonly themeAppearance: MobileThemeAppearance;
-  readonly materialYouStyleLayoutEnabled: boolean;
-  readonly materialYouStyleLayoutActive: boolean;
-  readonly setMaterialYouStyleLayoutEnabled: (value: boolean) => void;
   readonly toggleColorId: MobileToggleColorId;
   readonly setToggleColorId: (value: MobileToggleColorId) => void;
-  readonly systemColorsAvailable: boolean;
-  readonly systemColorsActive: boolean;
   readonly themeVariables: MobileThemeVariables;
   readonly themeVariablesByAppearance: Readonly<
     Record<MobileThemeAppearance, MobileThemeVariables>
   >;
-  readonly systemColorPalettes: ReturnType<typeof readSystemColorPalettes>;
   readonly isReady: boolean;
   readonly setThemeIdForAppearance: (
     appearance: MobileThemeAppearance,
@@ -104,43 +94,14 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
     [resolvedThemeIds.dark, resolvedThemeIds.light],
   );
   const themeId = themeIds[themeAppearance];
-  const materialYouStyleLayoutEnabled = storedPreferences?.materialYouStyleLayoutEnabled ?? false;
-  const materialYouStyleLayoutActive = Platform.OS === "android" && materialYouStyleLayoutEnabled;
-  const systemColorsActive = themeId === "material-you" && isSystemColorsAvailable;
   const toggleColorId = normalizeMobileToggleColorId(storedPreferences?.toggleColorId);
-  const [systemColorPalettes, setSystemColorPalettes] = useState(readSystemColorPalettes);
-  useEffect(() => {
-    if (!isSystemColorsAvailable) return;
-    const refresh = () => {
-      const next = readSystemColorPalettes();
-      setSystemColorPalettes((previous) =>
-        JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
-      );
-    };
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") refresh();
-    });
-    const focusSubscription = AppState.addEventListener("focus", refresh);
-    return () => {
-      subscription.remove();
-      focusSubscription.remove();
-    };
-  }, []);
   const themeVariablesByAppearance = useMemo(() => {
     const resolve = (appearance: MobileThemeAppearance) => {
       const base = getMobileThemeRuntimeVariables(themeIds[appearance], appearance);
-      const themed =
-        themeIds[appearance] === "material-you" && systemColorPalettes
-          ? materialYouPaletteToMobileThemeVariables(
-              systemColorPalettes[appearance],
-              appearance,
-              base,
-            )
-          : base;
-      return applyMobileToggleColor(themed, appearance, toggleColorId);
+      return applyMobileToggleColor(base, appearance, toggleColorId);
     };
     return { light: resolve("light"), dark: resolve("dark") };
-  }, [themeIds, systemColorPalettes, toggleColorId]);
+  }, [themeIds, toggleColorId]);
   const themeVariables = themeVariablesByAppearance[themeAppearance];
   const activeThemeName = getMobileUniwindThemeName(themeId, themeAppearance);
   const { baseFontSize, codeFontSize, codeWordBreak, terminalFontSize } = preferences;
@@ -257,13 +218,6 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
     [runtimeState, syncThemeRuntime, updateThemePreferences],
   );
 
-  const setMaterialYouStyleLayoutEnabled = useCallback(
-    (value: boolean) => {
-      updatePreferences({ materialYouStyleLayoutEnabled: value });
-    },
-    [updatePreferences],
-  );
-
   const setToggleColorId = useCallback(
     (value: MobileToggleColorId) => {
       // Same reasoning as theme selection: the swatch repaints every switch on
@@ -310,16 +264,10 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       themeIds,
       themeMode,
       themeAppearance,
-      systemColorsAvailable: isSystemColorsAvailable,
-      systemColorsActive,
-      materialYouStyleLayoutEnabled,
-      materialYouStyleLayoutActive,
-      setMaterialYouStyleLayoutEnabled,
       toggleColorId,
       setToggleColorId,
       themeVariables,
       themeVariablesByAppearance,
-      systemColorPalettes,
       isReady,
       setThemeIdForAppearance,
       setThemeIdForBothAppearances,
@@ -335,15 +283,10 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       themeIds,
       themeMode,
       themeAppearance,
-      systemColorsActive,
-      materialYouStyleLayoutEnabled,
-      materialYouStyleLayoutActive,
-      setMaterialYouStyleLayoutEnabled,
       toggleColorId,
       setToggleColorId,
       themeVariables,
       themeVariablesByAppearance,
-      systemColorPalettes,
       isReady,
       setThemeIdForAppearance,
       setThemeIdForBothAppearances,

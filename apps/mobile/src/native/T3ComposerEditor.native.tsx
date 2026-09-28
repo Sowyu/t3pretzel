@@ -262,9 +262,8 @@ export function ComposerEditor({
     },
     [],
   );
-  const { systemColorsActive, themeAppearance } = useAppearancePreferences();
+  const { themeAppearance } = useAppearancePreferences();
   const themeJson = JSON.stringify({
-    selection: systemColorsActive ? theme["--color-primary"] : null,
     // On liquid glass the typed text casts a faint halo onto the material,
     // the way content near real glass bleeds into it. Solid surfaces get none.
     textGlow: supportsLiquidGlass ? (themeAppearance === "dark" ? "#FFFFFF4D" : "#0000002E") : null,

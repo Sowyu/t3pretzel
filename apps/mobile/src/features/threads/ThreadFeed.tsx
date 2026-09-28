@@ -1958,7 +1958,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const previousLatestTurnRef = useRef(props.latestTurn);
   const userScrollSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { width: windowWidth, fontScale } = useWindowDimensions();
-  const { appearance, materialYouStyleLayoutActive } = useAppearancePreferences();
+  const { appearance } = useAppearancePreferences();
   const workRowSizing = useMemo(
     () => deriveThreadWorkLogSizing({ baseFontSize: appearance.baseFontSize, fontScale }),
     [appearance.baseFontSize, fontScale],
@@ -2080,8 +2080,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const iconSubtleColor = theme["--color-icon-subtle"];
   // Work-log edge fades blend into whatever the feed sits on; ThreadDetailScreen
   // paints the Material You layout on the thread canvas, not the screen color.
-  const screenColor =
-    theme[materialYouStyleLayoutActive ? "--color-thread-canvas" : "--color-screen"];
+  const screenColor = theme["--color-screen"];
   const userBubbleColor = theme["--color-user-bubble"];
   const onMarkdownLinkPress = useCallback(
     (href: string) => {

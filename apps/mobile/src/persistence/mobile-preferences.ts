@@ -24,7 +24,6 @@ export interface Preferences {
   readonly lightThemeId?: MobileThemeId;
   readonly darkThemeId?: MobileThemeId;
   readonly themeMode?: MobileThemeMode;
-  readonly materialYouStyleLayoutEnabled?: boolean;
   /** Colour a switch shows while it is on; `system` follows the theme accent. */
   readonly toggleColorId?: MobileToggleColorId;
   readonly baseFontSize?: number;
@@ -103,7 +102,6 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     lightThemeId?: MobileThemeId;
     darkThemeId?: MobileThemeId;
     themeMode?: MobileThemeMode;
-    materialYouStyleLayoutEnabled?: boolean;
     toggleColorId?: MobileToggleColorId;
     baseFontSize?: number;
     terminalFontSize?: number | null;
@@ -151,9 +149,6 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     parsed.themeMode === "dark"
   ) {
     preferences.themeMode = parsed.themeMode;
-  }
-  if (typeof parsed.materialYouStyleLayoutEnabled === "boolean") {
-    preferences.materialYouStyleLayoutEnabled = parsed.materialYouStyleLayoutEnabled;
   }
   if (
     typeof parsed.toggleColorId === "string" &&

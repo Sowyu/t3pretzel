@@ -92,7 +92,7 @@ function filesPatch(paths: ReadonlyArray<string>) {
 }
 
 function appTheme(themeId: MobileThemeId, appearance: MobileThemeAppearance) {
-  return themeId === DEFAULT_MOBILE_THEME_ID || themeId === "material-you"
+  return themeId === DEFAULT_MOBILE_THEME_ID
     ? readDefaultMobileThemeVariables(appearance)
     : getMobileThemeVariables(themeId, appearance);
 }
@@ -225,7 +225,7 @@ describe("createNativeReviewDiffTheme", () => {
     ["rgba(0, 0, 0, 0.5)", "#808080"],
     ["rgb(0, 0, 0)", "#000000"],
   ])("flattens %s over the screen color", (sheet, expected) => {
-    const theme = createNativeReviewDiffTheme("light", "material-you", {
+    const theme = createNativeReviewDiffTheme("light", "t3-code", {
       ...appTheme("t3-code", "light"),
       "--color-screen": "#FFFFFFFF",
       "--color-sheet": sheet,

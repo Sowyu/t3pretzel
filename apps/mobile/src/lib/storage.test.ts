@@ -196,29 +196,16 @@ describe("mobile connection storage", () => {
     });
   });
 
-  it("persists Material You independently for each appearance", async () => {
-    const themes = { lightThemeId: "material-you", darkThemeId: "ocean" } as const;
-    await savePreferencesPatch(themes);
-    await expect(loadPreferences()).resolves.toEqual(themes);
-    await savePreferencesPatch({ lightThemeId: "t3-chat" });
-    await expect(loadPreferences()).resolves.toEqual({ ...themes, lightThemeId: "t3-chat" });
-  });
-
-  it("persists the Material You layout independently of the selected theme", async () => {
-    await savePreferencesPatch({
-      lightThemeId: "material-you",
-      materialYouStyleLayoutEnabled: true,
-    });
-    await savePreferencesPatch({ lightThemeId: "t3-chat" });
-    await expect(loadPreferences()).resolves.toEqual({
-      lightThemeId: "t3-chat",
-      materialYouStyleLayoutEnabled: true,
-    });
-    await savePreferencesPatch({ materialYouStyleLayoutEnabled: false });
-    await expect(loadPreferences()).resolves.toEqual({
-      lightThemeId: "t3-chat",
-      materialYouStyleLayoutEnabled: false,
-    });
+  it("drops the removed Material You theme and layout flag on load", async () => {
+    mocks.setPreferencesJson(
+      JSON.stringify({
+        lightThemeId: "material-you",
+        darkThemeId: "ocean",
+        materialYouStyleLayoutEnabled: true,
+      }),
+      10,
+    );
+    await expect(loadPreferences()).resolves.toEqual({ darkThemeId: "ocean" });
   });
 
   it("keeps a known toggle color and drops an unknown one", async () => {

@@ -1,5 +1,5 @@
 import { memo, useId } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { ScopedTheme, ScopedVariables } from "uniwind";
 
@@ -18,9 +18,6 @@ import {
 import { getMobileUniwindThemeName } from "../../../../lib/mobileThemeRuntime";
 import { cn } from "../../../../lib/cn";
 import { useAppearancePreferences } from "../AppearancePreferencesProvider";
-
-import { SettingsSection } from "../../components/SettingsSection";
-import { SettingsSwitchRow } from "../../components/SettingsSwitchRow";
 
 const APPEARANCE_MODES: ReadonlyArray<{
   readonly id: MobileThemeMode;
@@ -41,12 +38,7 @@ const PreviewOrb = memo(function PreviewOrb(props: {
   const idPrefix = useId().replaceAll(":", "");
   const accentGradientId = `${idPrefix}-accent-glow`;
   const actionGradientId = `${idPrefix}-action-glow`;
-  const { systemColorPalettes } = useAppearancePreferences();
-  const palette = systemColorPalettes?.[props.appearance];
-  const colors =
-    props.themeId === "material-you" && palette
-      ? { canvas: palette.surface, accent: palette.primary, messageAction: palette.tertiary }
-      : getMobileThemePreviewColors(props.themeId, props.appearance);
+  const colors = getMobileThemePreviewColors(props.themeId, props.appearance);
   const spec = THEME_PREVIEW_RENDER_SPECS[props.appearance];
   const accentRadius = Math.hypot(
     Math.max(spec.accent.center[0], 1 - spec.accent.center[0]),
@@ -293,25 +285,10 @@ export function ThemeAppearanceSection() {
     setThemeMode,
     themeIds,
     themeMode,
-    materialYouStyleLayoutEnabled,
-    setMaterialYouStyleLayoutEnabled,
-    systemColorsAvailable,
   } = useAppearancePreferences();
 
   return (
     <View className="gap-6">
-      {Platform.OS === "android" ? (
-        <SettingsSection card title="Android">
-          <SettingsSwitchRow
-            disabled={!isReady}
-            icon="square.grid.2x2"
-            label="Material You Layout"
-            onValueChange={setMaterialYouStyleLayoutEnabled}
-            subtitle="Use Material You surfaces, shapes, and component styling."
-            value={materialYouStyleLayoutEnabled}
-          />
-        </SettingsSection>
-      ) : null}
       <View className="gap-2">
         <SectionLabel>Color scheme</SectionLabel>
         <View accessibilityRole="radiogroup" className="flex-row gap-2">
@@ -332,9 +309,7 @@ export function ThemeAppearanceSection() {
       <View className="gap-3">
         <SectionLabel>Themes</SectionLabel>
         <View className="flex-row flex-wrap gap-3">
-          {MOBILE_THEME_OPTIONS.filter(
-            (theme) => theme.id !== "material-you" || systemColorsAvailable,
-          ).map((theme) => (
+          {MOBILE_THEME_OPTIONS.map((theme) => (
             <ThemeCard
               disabled={!isReady}
               key={theme.id}

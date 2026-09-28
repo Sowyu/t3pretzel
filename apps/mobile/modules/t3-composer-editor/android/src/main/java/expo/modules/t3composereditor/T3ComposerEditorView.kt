@@ -7,7 +7,6 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
-import android.os.Build
 import android.text.Editable
 import android.text.InputType
 import android.text.InputFilter
@@ -15,7 +14,6 @@ import android.text.Spanned
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.text.style.ReplacementSpan
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.GestureDetector
 import android.view.MotionEvent
@@ -41,11 +39,6 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
   appContext
 ) {
   private val editor = SelectionAwareEditText(context)
-  private val defaultHighlightColor = editor.highlightColor
-  private val defaultSelectionColor = context.resolveThemeColor(
-    android.R.attr.colorAccent,
-    editor.currentTextColor,
-  )
   private val onComposerChange by EventDispatcher()
   private val onComposerSelectionChange by EventDispatcher()
   private val onComposerFocus by EventDispatcher()
@@ -258,11 +251,6 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
           parseColor(theme.optString("textGlow"), Color.TRANSPARENT),
         )
       }
-      if (theme.isNull("selection")) {
-        resetSelectionTheme()
-      } else {
-        applySelectionTheme(parseColor(theme.optString("selection"), editor.currentTextColor))
-      }
       chipTheme = ComposerChipTheme(
         chipBackground = parseColor(theme.optString("chipBackground"), chipTheme.chipBackground),
         chipBorder = parseColor(theme.optString("chipBorder"), chipTheme.chipBorder),
@@ -408,21 +396,6 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
     editor.setLineSpacing(max(0, desiredLineHeightPx - fontHeight).toFloat(), 1f)
   }
 
-  private fun applySelectionTheme(color: Int) {
-    editor.highlightColor = color.withAlpha(0x52)
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-
-    editor.textCursorDrawable = editor.textCursorDrawable?.mutate()?.apply { setTint(color) }
-    editor.textSelectHandle?.mutate()?.setTint(color)
-    editor.textSelectHandleLeft?.mutate()?.setTint(color)
-    editor.textSelectHandleRight?.mutate()?.setTint(color)
-  }
-
-  private fun resetSelectionTheme() {
-    applySelectionTheme(defaultSelectionColor)
-    editor.highlightColor = defaultHighlightColor
-  }
-
   private fun currentSelectionPayload(
     start: Int = editor.selectionStart,
     end: Int = editor.selectionEnd
@@ -518,13 +491,6 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
     } catch (_: Exception) {
       fallback
     }
-}
-
-private fun Int.withAlpha(alpha: Int): Int = (this and 0x00FFFFFF) or (alpha shl 24)
-
-private fun Context.resolveThemeColor(attribute: Int, fallback: Int): Int {
-  val value = TypedValue()
-  return if (theme.resolveAttribute(attribute, value, true)) value.data else fallback
 }
 
 private data class ComposerToken(

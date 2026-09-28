@@ -57,7 +57,6 @@ export function AndroidScreenHeader(props: {
   readonly below?: ReactNode;
   readonly onBack?: () => void;
   readonly embedded?: boolean;
-  readonly hideBottomBorder?: boolean;
   /** Floats the bar over the screen as liquid glass instead of sitting in
       flow, so content refracts through it while it scrolls underneath. The
       caller owns the matching top inset for that content and measures this
@@ -157,10 +156,7 @@ export function AndroidScreenHeader(props: {
     <View
       className={cn("border-b border-header-border bg-header", paddingClassName)}
       onLayout={handleLayout}
-      style={{
-        paddingTop,
-        borderBottomWidth: props.hideBottomBorder ? 0 : undefined,
-      }}
+      style={{ paddingTop }}
     >
       {content}
     </View>

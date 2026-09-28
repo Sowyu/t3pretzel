@@ -1,5 +1,4 @@
 import type { ComposerTextPaste } from "../../native/T3ComposerEditor.types";
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import { useAtomValue } from "@effect/atom-react";
 import { clampFileAttachmentUploadBytes } from "@t3tools/client-runtime/state/attachments";
 import { pastedTextDisposition, replaceTextSelection } from "@t3tools/client-runtime/text-paste";
@@ -232,7 +231,6 @@ export function ComposerSurface(props: {
   readonly crown?: ReactNode;
   readonly crownCap?: LayoutRectangle | null;
 }) {
-  const { materialYouStyleLayoutActive } = useAppearancePreferences();
   const colors = useUniwindTheme();
   const targetBorderRadius =
     typeof props.style.borderRadius === "number" ? props.style.borderRadius : 0;
@@ -287,11 +285,7 @@ export function ComposerSurface(props: {
   if (Platform.OS === "android") {
     return (
       <View
-        className={
-          materialYouStyleLayoutActive || glassShape
-            ? undefined
-            : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
-        }
+        className={glassShape ? undefined : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"}
         style={
           // With a cap the shader cuts the union; a clip here would shear the
           // tab's corners off, so the wrapper stays a plain box.
@@ -306,14 +300,8 @@ export function ComposerSurface(props: {
       >
         <GlassSurface
           chrome="none"
-          fallbackColor={
-            materialYouStyleLayoutActive
-              ? colors["--color-composer-surface"]
-              : colors["--color-card"]
-          }
-          fallbackClassName={
-            materialYouStyleLayoutActive ? "border border-composer-border" : "border border-border"
-          }
+          fallbackColor={colors["--color-card"]}
+          fallbackClassName="border border-border"
           glassEffectStyle="regular"
           glassShape={glassShape}
           tintColor="transparent"
@@ -329,11 +317,7 @@ export function ComposerSurface(props: {
   // clip leaves the glass and content at their final height on the first frame.
   return (
     <Animated.View
-      className={
-        materialYouStyleLayoutActive
-          ? undefined
-          : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
-      }
+      className="shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
       layout={layoutTransition}
       style={[
         animatedShapeStyle,
@@ -344,12 +328,8 @@ export function ComposerSurface(props: {
     >
       <AnimatedGlassSurface
         chrome="none"
-        fallbackColor={
-          materialYouStyleLayoutActive ? colors["--color-composer-surface"] : colors["--color-card"]
-        }
-        fallbackClassName={
-          materialYouStyleLayoutActive ? "border border-composer-border" : "border border-border"
-        }
+        fallbackColor={colors["--color-card"]}
+        fallbackClassName="border border-border"
         glassEffectStyle="regular"
         // The composer is a passive material containing interactive controls.
         // Keep native glass out of the interactive content's layout path.
@@ -373,9 +353,6 @@ export function ComposerSurface(props: {
 
 export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposerProps) {
   const project = useProject(scopeProjectRef(props.environmentId, props.selectedThread.projectId));
-  const { materialYouStyleLayoutActive, themeVariables: materialTheme } =
-    useAppearancePreferences();
-  const composerPanel = materialTheme["--color-composer-panel"];
   const navigation = useNavigation();
   const foregroundColor = useUniwindTheme()["--color-foreground"];
   const bodyText = useScaledTextRole("body");
@@ -782,10 +759,6 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
       style={{
         paddingTop: isExpanded ? 8 : 6,
         paddingBottom: (props.bottomInset ?? 0) + (isExpanded ? 8 : 6),
-        // Liquid glass reads the feed through the composer; a panel or fade
-        // behind it would only show up as a slab under the pill and the stash tab.
-        backgroundColor:
-          materialYouStyleLayoutActive && !supportsLiquidGlass ? composerPanel : undefined,
       }}
     >
       {/* The backdrop gradient lives on a plain View: Reanimated's Animated.View
@@ -793,7 +766,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
           strip fully transparent and the feed text legible through the composer. */}
       <View
         className={
-          materialYouStyleLayoutActive || supportsLiquidGlass
+          supportsLiquidGlass
             ? "hidden"
             : "absolute inset-0 bg-linear-to-b from-screen/0 via-screen/60 to-screen/90"
         }

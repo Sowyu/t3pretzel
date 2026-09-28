@@ -355,10 +355,8 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
     useAdaptiveWorkspaceLayout();
   const [searchQuery, setSearchQuery] = useState("");
   const isAndroid = Platform.OS === "android";
-  const { themeAppearance: highlightTheme, materialYouStyleLayoutActive } =
-    useAppearancePreferences();
+  const { themeAppearance: highlightTheme } = useAppearancePreferences();
   const theme = useUniwindTheme();
-  const screenColor = theme["--color-screen"];
   const sheetSurfaceColor = theme["--color-sheet-solid"];
   const { cwd, environmentId, projectName, selectedThread, threadId } = useThreadFilesWorkspace(
     props.route.params,
@@ -478,7 +476,7 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
       <NativeStackScreenOptions
         options={{
           contentStyle: {
-            backgroundColor: materialYouStyleLayoutActive ? screenColor : sheetSurfaceColor,
+            backgroundColor: sheetSurfaceColor,
           },
           headerShown: !isAndroid,
           unstable_headerSubtitle:
@@ -514,20 +512,19 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
           title="Files"
           subtitle={projectName}
           onBack={handleReturnToThread}
-          hideBottomBorder={materialYouStyleLayoutActive}
           // Same field as the home header's "Search threads": the container
           // is the pill, the input inside it draws nothing of its own.
           below={
             <View
               className={cn(
                 "min-h-12 flex-row items-center gap-2.5 border border-input-border bg-input px-3.5",
-                materialYouStyleLayoutActive ? "rounded-full" : "rounded-2xl",
+                "rounded-2xl",
               )}
             >
               <SymbolView
                 name="magnifyingglass"
                 size={17}
-                tintColorClassName={"accent-foreground-muted"}
+                tintColorClassName="accent-foreground-muted"
                 type="monochrome"
               />
               <TextInput
@@ -548,7 +545,7 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
                   <SymbolView
                     name="xmark.circle.fill"
                     size={17}
-                    tintColorClassName={"accent-foreground-muted"}
+                    tintColorClassName="accent-foreground-muted"
                     type="monochrome"
                   />
                 </Pressable>
@@ -615,13 +612,7 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
     </>
   );
 
-  return materialYouStyleLayoutActive ? (
-    <View className="flex-1" style={{ backgroundColor: screenColor }}>
-      {content}
-    </View>
-  ) : (
-    content
-  );
+  return content;
 }
 
 export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {

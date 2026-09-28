@@ -8,25 +8,34 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
+import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { selectionHaptic } from "../lib/haptics";
 import { useUniwindTheme } from "../lib/useUniwindTheme";
 import { GlassSurface, supportsLiquidGlass } from "./GlassSurface";
 
-const TRACK_WIDTH = 52;
-const TRACK_HEIGHT = 32;
-const KNOB = 26;
-const INSET = 3;
+// Apple's UISwitch geometry.
+const TRACK_WIDTH = 51;
+const TRACK_HEIGHT = 31;
+const KNOB = 27;
+const INSET = 2;
 const TRAVEL = TRACK_WIDTH - KNOB - INSET * 2;
 // How far the knob elongates while held, toward the side it can move to.
 const STRETCH = 8;
 // The knob overshoots its rest and settles, like the iOS 26 toggle.
 const SNAP_SPRING = { damping: 12, stiffness: 260, mass: 0.8 };
 const STRETCH_SPRING = { damping: 14, stiffness: 320, mass: 0.6 };
+// iOS paints the off track in its own neutral gray whatever the theme, and the
+// knob is always white with a soft two-layer shadow.
+const OFF_TRACK = { light: "#E9E9EA", dark: "#39393D" } as const;
+const KNOB_COLOR = "#FFFFFF";
+const KNOB_SHADOW = "0px 3px 8px rgba(0, 0, 0, 0.15), 0px 3px 1px rgba(0, 0, 0, 0.06)";
 
 /**
- * A toggle drawn as liquid glass: a coloured track under a clear glass
+ * The iOS toggle, drawn as liquid glass: a coloured track under a clear glass
  * capsule, and a knob that stretches while held, follows a drag, and springs
- * into place. Below Android 13 the same parts render without the glass.
+ * into place. Below Android 13 the same parts render without the glass. The
+ * on track is `--color-switch-active-track`, so the toggle colour preference
+ * applies.
  */
 export function LiquidSwitch(props: {
   readonly value: boolean;
@@ -38,6 +47,8 @@ export function LiquidSwitch(props: {
   readonly style?: StyleProp<ViewStyle>;
 }) {
   const colors = useUniwindTheme();
+  const offTrack = OFF_TRACK[useAppearancePreferences().themeAppearance];
+  const onTrack = colors["--color-switch-active-track"];
   const { value, onValueChange, disabled } = props;
   const progress = useSharedValue(value ? 1 : 0);
   const stretch = useSharedValue(0);
@@ -70,11 +81,7 @@ export function LiquidSwitch(props: {
     });
 
   const trackStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      progress.value,
-      [0, 1],
-      [colors["--color-switch-inactive-track"], colors["--color-switch-active-track"]],
-    ),
+    backgroundColor: interpolateColor(progress.value, [0, 1], [offTrack, onTrack]),
   }));
   const knobStyle = useAnimatedStyle(() => {
     const extra = stretch.value * STRETCH;
@@ -88,15 +95,11 @@ export function LiquidSwitch(props: {
     <Animated.View
       style={[
         {
-          backgroundColor: colors["--color-switch-active-thumb"],
+          backgroundColor: KNOB_COLOR,
           borderRadius: KNOB / 2,
-          elevation: 2,
+          boxShadow: KNOB_SHADOW,
           height: KNOB,
           position: "absolute",
-          shadowColor: "#000000",
-          shadowOffset: { height: 1, width: 0 },
-          shadowOpacity: 0.25,
-          shadowRadius: 2,
           top: INSET,
         },
         knobStyle,

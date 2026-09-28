@@ -15,8 +15,8 @@ import {
 } from "@t3tools/shared/themePreview";
 
 export const DEFAULT_MOBILE_THEME_ID = MOBILE_DEFAULT_THEME_ID;
-export const MOBILE_THEME_IDS = [...SHARED_MOBILE_THEME_IDS, "material-you"] as const;
-export type MobileThemeId = SharedMobileThemeId | "material-you";
+export const MOBILE_THEME_IDS = SHARED_MOBILE_THEME_IDS;
+export type MobileThemeId = SharedMobileThemeId;
 export type MobileThemeAppearance = ThemeAppearance;
 export type MobileThemeMode = MobileThemeAppearance | "system";
 export type MobileThemeIds = Readonly<Record<MobileThemeAppearance, MobileThemeId>>;
@@ -26,7 +26,6 @@ export const MOBILE_THEME_OPTIONS: ReadonlyArray<{
   readonly label: string;
 }> = [
   { id: DEFAULT_MOBILE_THEME_ID, label: "T3 Code" },
-  { id: "material-you", label: "Material You" },
   ...BUILT_IN_THEMES.map((theme) => ({ id: theme.id as MobileThemeId, label: theme.label })),
 ];
 
@@ -236,16 +235,6 @@ export function createMobileThemeVariables(colors: ThemeColors, appearance: Mobi
     "--color-card": c.surfaceRaised,
     "--color-card-alt": c.surface,
     "--color-card-translucent": withAlpha(c.surfaceRaised, 0.8),
-    "--color-thread-canvas": c.surface,
-    "--color-thread-selected": c.surfaceRaised,
-    "--color-thread-selected-foreground": c.text,
-    "--color-thread-selected-foreground-muted": c.textMuted,
-    "--color-composer-panel": themeColorWithAlpha(c.surface, appearance === "dark" ? 0.92 : 0.88),
-    "--color-composer-surface": themeColorWithAlpha(
-      c.surfaceRaised,
-      appearance === "dark" ? 0.9 : 0.94,
-    ),
-    "--color-composer-border": themeColorWithAlpha(c.border, appearance === "dark" ? 0.46 : 0.54),
     "--color-foreground": c.text,
     "--color-foreground-secondary": c.textMuted,
     "--color-foreground-muted": c.mutedForeground,
@@ -267,7 +256,6 @@ export function createMobileThemeVariables(colors: ThemeColors, appearance: Mobi
     "--color-switch-active-track": c.accent,
     "--color-switch-active-thumb": c.accentForeground,
     "--color-switch-inactive-track": c.secondary,
-    "--color-switch-inactive-thumb": c.mutedForeground,
     "--color-warning": c.warningSurface,
     "--color-warning-border": withAlpha(c.warning, 0.32),
     "--color-warning-foreground": c.warningForeground,
@@ -335,8 +323,7 @@ export function getMobileThemePreviewColors(
   themeId: MobileThemeId,
   appearance: MobileThemeAppearance,
 ): ThemePreviewColors {
-  if (themeId === DEFAULT_MOBILE_THEME_ID || themeId === "material-you")
-    return STANDARD_THEME_PREVIEW_COLORS[appearance];
+  if (themeId === DEFAULT_MOBILE_THEME_ID) return STANDARD_THEME_PREVIEW_COLORS[appearance];
   const theme = BUILT_IN_THEMES.find((candidate) => candidate.id === themeId) ?? T3_CHAT_THEME;
   const colors = getThemeColorsForAppearance(theme, appearance) ?? theme.colors;
   return {

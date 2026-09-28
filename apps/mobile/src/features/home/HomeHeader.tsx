@@ -1,4 +1,3 @@
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import type { EnvironmentId, SidebarThreadSortOrder } from "@t3tools/contracts";
 import Constants from "expo-constants";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
@@ -83,7 +82,6 @@ function checkedMenuState(checked: boolean) {
 }
 
 function AndroidHomeHeader(props: HomeHeaderProps) {
-  const { materialYouStyleLayoutActive } = useAppearancePreferences();
   const insets = useSafeAreaInsets();
   const stageLabel = resolveMobileStageLabel(Constants.expoConfig?.extra?.appVariant);
   const backdrop = stageBackdropVariant(stageLabel);
@@ -233,7 +231,7 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
       <SymbolView
         name="magnifyingglass"
         size={17}
-        tintColorClassName={"accent-foreground-muted"}
+        tintColorClassName="accent-foreground-muted"
         type="monochrome"
       />
       <TextInput
@@ -254,7 +252,7 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
           <SymbolView
             name="xmark.circle.fill"
             size={17}
-            tintColorClassName={"accent-foreground-muted"}
+            tintColorClassName="accent-foreground-muted"
             type="monochrome"
           />
         </Pressable>
@@ -266,11 +264,7 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
     <>
       <NativeStackScreenOptions options={{ headerShown: false }} />
       <View
-        className={
-          materialYouStyleLayoutActive
-            ? "bg-header pb-3"
-            : "border-b border-header-border bg-header pb-3"
-        }
+        className="border-b border-header-border bg-header pb-3"
         style={{
           paddingHorizontal: HOME_HORIZONTAL_INSET,
           paddingTop,
@@ -394,19 +388,13 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
               chrome="none"
               fallbackClassName="border border-input-border"
               glassEffectStyle="regular"
-              style={{ borderRadius: materialYouStyleLayoutActive ? 24 : 16 }}
+              style={{ borderRadius: 16 }}
               tintColor="transparent"
             >
               <View className="min-h-12 flex-row items-center gap-2.5 px-3.5">{searchContent}</View>
             </GlassSurface>
           ) : (
-            <View
-              className={
-                materialYouStyleLayoutActive
-                  ? "min-h-12 flex-row items-center gap-2.5 rounded-full border border-input-border bg-input px-3.5"
-                  : "min-h-12 flex-row items-center gap-2.5 rounded-2xl border border-input-border bg-input px-3.5"
-              }
-            >
+            <View className="min-h-12 flex-row items-center gap-2.5 rounded-2xl border border-input-border bg-input px-3.5">
               {searchContent}
             </View>
           )}
