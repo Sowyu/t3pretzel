@@ -113,11 +113,13 @@ jobs:
         run: |
           apk=t3code-nightly-arm64-v8a.apk
           repo="$GITHUB_REPOSITORY"
+          set -o pipefail
           title="Nightly ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})"
           cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$apk"
           if ! gh release view nightly --repo "$repo" >/dev/null 2>&1; then
             gh release create nightly "$apk" --repo "$repo" --target "$GITHUB_SHA" \
               --prerelease --title "$title" --notes-file .github/nightly-release-notes.md
+            gh release edit nightly --repo "$repo" --draft=false >/dev/null
             exit 0
           fi
           # Upload under a temporary name, then swap it in, so the APK the
@@ -125,12 +127,16 @@ jobs:
           staged="$apk.$GITHUB_RUN_ID"
           cp "$apk" "$staged"
           gh release upload nightly "$staged" --repo "$repo" --clobber
-          assets=$(gh api "repos/$repo/releases/tags/nightly" --jq '.assets[] | "\(.id) \(.name)"')
+          # Read through the release list, not the tag: a draft has no tag.
+          assets=$(gh api "repos/$repo/releases" --jq '.[] | select(.tag_name == "nightly") | .assets[] | "\(.id) \(.name)"')
           old_id=$(awk -v n="$apk" '$2 == n { print $1 }' <<<"$assets")
           new_id=$(awk -v n="$staged" '$2 == n { print $1 }' <<<"$assets")
           if [ -n "$old_id" ]; then gh api -X DELETE "repos/$repo/releases/assets/$old_id"; fi
           gh api -X PATCH "repos/$repo/releases/assets/$new_id" -f name="$apk" >/dev/null
           # Move the tag, then point the release (what the updater compares) at it.
-          gh api -X PATCH "repos/$repo/git/refs/tags/nightly" -f sha="$GITHUB_SHA" -F force=true >/dev/null
-          gh release edit nightly --repo "$repo" --target "$GITHUB_SHA" --prerelease \
+          gh api -X PATCH "repos/$repo/git/refs/tags/nightly" -f sha="$GITHUB_SHA" -F force=true >/dev/null ||
+            gh api -X POST "repos/$repo/git/refs" -f ref=refs/tags/nightly -f sha="$GITHUB_SHA" >/dev/null
+          # --draft=false also rescues a release a failed publish left as a draft,
+          # which the updater cannot see (GitHub answers 404 by tag).
+          gh release edit nightly --repo "$repo" --target "$GITHUB_SHA" --prerelease --draft=false \
             --title "$title" --notes-file .github/nightly-release-notes.md
