@@ -49,6 +49,7 @@ import {
   shouldFollowThreadWorkGroupAppend,
   type ThreadWorkGroupScrollPosition,
 } from "./thread-feed-live-follow";
+import { openSubagentSheet } from "./subagent-tabs";
 import {
   resolveWorkEntryToolPresentation,
   type ToolGroupSummaryKind,
@@ -1099,7 +1100,19 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
             className="ml-8 mt-1.5 gap-1.5 border-l border-adaptive-neutral-300-a60-white-a12 pl-3"
           >
             {summary.members.map((member) => (
-              <View key={member.id} className="gap-px">
+              <Pressable
+                key={member.id}
+                accessibilityRole="button"
+                accessibilityLabel={`${member.title}, ${member.status}`}
+                accessibilityHint="Double tap to see what it is doing."
+                onPress={() =>
+                  openSubagentSheet(
+                    summary.members.map((entry) => entry.id),
+                    member.id,
+                  )
+                }
+                className="-mx-1.5 gap-px rounded-lg px-1.5 py-1 active:bg-subtle"
+              >
                 <View className="flex-row items-center gap-1.5">
                   <View
                     className={cn(
@@ -1121,7 +1134,7 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
                     {member.detail}
                   </Text>
                 ) : null}
-              </View>
+              </Pressable>
             ))}
           </Animated.View>
         ) : null}

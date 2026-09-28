@@ -5,15 +5,19 @@ import {
   type RuntimeSubagent,
   type RuntimeSubagentStatus,
 } from "@t3tools/client-runtime/state/subagentRuntime";
-import { memo, useMemo, useState } from "react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { Atom } from "effect/unstable/reactivity";
+import { memo, useEffect, useMemo } from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
+import { GlassControl } from "../../components/GlassControl";
 import { cn } from "../../lib/cn";
 import { deriveSubagentTabs, subagentToolCalls } from "../../lib/subagentTabs";
 import { useSelectedThreadDetail } from "../../state/use-thread-detail";
 import { selectionHaptic } from "../../lib/haptics";
+import { appAtomRegistry } from "../../state/atom-registry";
 
 const STATUS_LABEL = {
   pending: "Starting",
@@ -38,6 +42,24 @@ const STATUS_DOT = {
 } as const satisfies Record<RuntimeSubagentStatus, string>;
 
 /**
+ * The open subagent sheet: the agents it lists and the one shown. It keeps the
+ * agents it opened with, so it still shows results after the wave ends and the
+ * tabs go away. The feed's subagent card opens it too (openSubagentSheet).
+ */
+const subagentSheetAtom = Atom.make<{
+  readonly agentIds: ReadonlyArray<string>;
+  readonly selectedId: string;
+} | null>(null).pipe(Atom.keepAlive);
+
+export function openSubagentSheet(agentIds: ReadonlyArray<string>, selectedId: string) {
+  void selectionHaptic();
+  appAtomRegistry.set(subagentSheetAtom, { agentIds, selectedId });
+}
+
+// A tab grows with its title up to this width, then truncates.
+const TAB_MAX_WIDTH = 176;
+
+/**
  * Left-edge tabs, one per subagent, shown while any subagent of the selected
  * thread runs. Tapping a tab opens that agent's activity. Rendered by
  * ThreadDetailScreen over the feed; `top` clears the header.
@@ -52,31 +74,25 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
     [activities, sessionLive],
   );
   const tabs = useMemo(() => deriveSubagentTabs(roster), [roster]);
-  // The sheet keeps the agents it opened with, so it still shows results after
-  // the wave ends and the tabs go away.
-  const [openIds, setOpenIds] = useState<ReadonlyArray<string> | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const sheet = useAtomValue(subagentSheetAtom);
+  const setSheet = useAtomSet(subagentSheetAtom);
+  // Leaving the thread closes the sheet, so it does not reopen on the next one.
+  useEffect(() => () => setSheet(null), [setSheet]);
 
   const sheetAgents = useMemo(() => {
-    if (openIds === null) return [];
-    const ids = new Set([...openIds, ...tabs.map((agent) => agent.id)]);
+    if (sheet === null) return [];
+    const ids = new Set([...sheet.agentIds, ...tabs.map((agent) => agent.id)]);
     return roster
       .filter((agent) => ids.has(agent.id))
       .sort((a, b) => a.firstSeenAt.localeCompare(b.firstSeenAt) || a.id.localeCompare(b.id));
-  }, [openIds, roster, tabs]);
-
-  const open = (agentId: string) => {
-    void selectionHaptic();
-    setOpenIds(tabs.map((agent) => agent.id));
-    setSelectedId(agentId);
-  };
+  }, [sheet, roster, tabs]);
 
   return (
     <>
       {tabs.length > 0 ? (
         <View
           pointerEvents="box-none"
-          className="absolute left-0 gap-1.5"
+          className="absolute left-2 items-start gap-2"
           style={{ top: props.top + 8 }}
         >
           {tabs.map((agent, index) => (
@@ -85,23 +101,38 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
               accessibilityRole="button"
               accessibilityLabel={`Subagent ${index + 1}, ${agent.title}, ${STATUS_LABEL[agent.status]}`}
               accessibilityHint="Double tap to see what it is doing."
-              hitSlop={{ top: 4, bottom: 4, right: 10 }}
-              onPress={() => open(agent.id)}
-              className="min-h-10 w-6 items-center justify-center gap-1 rounded-r-lg border border-l-0 border-adaptive-neutral-200-a80-white-a8 bg-card active:bg-subtle"
+              hitSlop={4}
+              onPress={() =>
+                openSubagentSheet(
+                  tabs.map((entry) => entry.id),
+                  agent.id,
+                )
+              }
+              className="active:opacity-70"
+              style={{ maxWidth: TAB_MAX_WIDTH }}
             >
-              <View className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[agent.status])} />
-              <Text className="font-t3-medium text-2xs text-foreground">{index + 1}</Text>
+              <GlassControl
+                radius={18}
+                className="h-9 border border-border bg-card shadow-md shadow-black/10"
+              >
+                <View className="h-9 flex-row items-center gap-2 px-3">
+                  <View className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[agent.status])} />
+                  <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
+                    {`${index + 1}. ${agent.title}`}
+                  </Text>
+                </View>
+              </GlassControl>
             </Pressable>
           ))}
         </View>
       ) : null}
-      {openIds !== null ? (
+      {sheet !== null ? (
         <SubagentSheet
           agents={sheetAgents}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
+          selectedId={sheet.selectedId}
+          onSelect={(selectedId) => setSheet({ ...sheet, selectedId })}
           activities={activities ?? []}
-          onClose={() => setOpenIds(null)}
+          onClose={() => setSheet(null)}
         />
       ) : null}
     </>
