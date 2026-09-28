@@ -20,8 +20,8 @@ import { appAtomRegistry } from "../../state/atom-registry";
 import type { AgentIslandAlert } from "./turnCompletionNotifications";
 import { agentIslandAtom } from "./turnCompletionNotifier";
 
-// The resting pill, the size of the iPhone Dynamic Island, centred on the
-// status bar where Android phones put the front camera.
+// The resting pill, the size of the iPhone Dynamic Island. It sits just below
+// the status bar, so the clock and battery stay readable.
 const PILL_WIDTH = 126;
 const PILL_HEIGHT = 37;
 const OPEN_HEIGHT = 68;
@@ -42,7 +42,7 @@ function clear() {
 
 /**
  * In-app alerts for other threads, shaped like the iPhone Dynamic Island: a
- * black pill at the camera that springs open with what finished, failed, or
+ * black pill under the status bar that springs open with what finished, failed, or
  * needs input. Tap opens the thread, a flick up dismisses it. Fed by the turn
  * completion notifier, which posts system notifications instead while the app
  * is in the background. Mounted once, over every screen, by the root stack.
@@ -56,7 +56,7 @@ export function AgentIsland() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openWidth = Math.min(OPEN_MAX_WIDTH, screenWidth - 24);
-  const top = Math.max(4, (insets.top - PILL_HEIGHT) / 2);
+  const top = insets.top + 6;
 
   const close = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
