@@ -382,6 +382,8 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   const fallbackInputRef = useRef<ComposerEditorHandle>(null);
   const inputRef = props.editorRef ?? fallbackInputRef;
   const [isFocused, setIsFocused] = useState(false);
+  // Android grows the box with the text up to its max height, then scrolls.
+  const [editorContentHeight, setEditorContentHeight] = useState(0);
   const pendingPastedTextAttachmentCountRef = useRef(0);
   const [pendingPastedTextAttachmentCount, setPendingPastedTextAttachmentCount] = useState(0);
   const settingsSheetPresentation = useThreadSettingsSheetPresentation({
@@ -990,6 +992,9 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                 onFocus={handleFocus}
                 onBlur={handleBlur}
                 onSubmit={handleSend}
+                onContentHeightChange={
+                  Platform.OS === "android" ? setEditorContentHeight : undefined
+                }
                 scrollEnabled={isExpanded}
                 // Android: collapsed single line centers natively (gravity) in
                 // a pill-height box matching the send button; iOS keeps insets.
@@ -1001,6 +1006,11 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                         minHeight: 72,
                         maxHeight: 160,
                         paddingVertical: 4,
+                        // 8 is the vertical padding around the text.
+                        height:
+                          Platform.OS === "android"
+                            ? Math.min(160, Math.max(72, editorContentHeight + 8))
+                            : undefined,
                       }
                     : {
                         height: 36,

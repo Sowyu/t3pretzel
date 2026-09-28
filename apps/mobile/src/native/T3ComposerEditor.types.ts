@@ -22,6 +22,8 @@ export interface ComposerEditorHandle {
 
 export interface ComposerEditorProps {
   readonly ref?: Ref<ComposerEditorHandle>;
+  /** Height of the text itself in dp, so the box can grow with it. Android only. */
+  readonly onContentHeightChange?: (height: number) => void;
   readonly value: string;
   readonly context?: OrchestrationMessageContext;
   readonly clipboardFragment?: string;

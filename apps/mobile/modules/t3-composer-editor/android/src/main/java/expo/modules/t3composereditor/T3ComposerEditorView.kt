@@ -67,6 +67,10 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
   private var spellCheck = true
   private var nativeEventCount = 0
 
+  // React Native swallows the EditText's requestLayout when a new line wraps,
+  // so it kept the old layout and the cursor slid out of view below the box.
+  override val shouldUseAndroidLayout = true
+
   init {
     editor.setBackgroundColor(Color.TRANSPARENT)
     editor.gravity = Gravity.TOP or Gravity.START
@@ -89,6 +93,7 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
       if (!applyingNativeValue) {
         emitSelectionChange(start, end)
       }
+      revealCursor()
     }
     editor.pasteImagesListener = { uris ->
       onComposerPasteImages(mapOf("uris" to uris))
@@ -182,6 +187,7 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
             ),
           )
           emitContentSizeIfNeeded()
+          revealCursor()
         }
       },
     )
@@ -438,6 +444,16 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
         "eventCount" to nativeEventCount,
       ),
     )
+  }
+
+  // Scrolls the box so the line being typed stays visible. Posted, so it runs
+  // after the relayout the edit triggered and measures the new line.
+  private fun revealCursor() {
+    editor.post {
+      if (editor.hasFocus() && editor.layout != null) {
+        editor.bringPointIntoView(editor.selectionEnd.coerceAtLeast(0))
+      }
+    }
   }
 
   private fun emitContentSizeIfNeeded() {

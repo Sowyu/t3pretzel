@@ -102,6 +102,9 @@ interface NativeComposerEditorProps extends ViewProps {
   readonly onComposerPasteText?: (event: NativePasteTextEvent) => void;
   readonly onComposerFocus?: () => void;
   readonly onComposerBlur?: () => void;
+  readonly onComposerContentSizeChange?: (
+    event: NativeSyntheticEvent<{ readonly height: number }>,
+  ) => void;
 }
 
 const NativeView = requireNativeView<NativeComposerEditorProps>(NATIVE_MODULE_NAME);
@@ -128,6 +131,7 @@ export function ComposerEditor({
   onFocus,
   onBlur,
   contentInsetVertical = 0,
+  onContentHeightChange,
   ...props
 }: ComposerEditorProps) {
   const nativeRef = useRef<NativeComposerEditorRef>(null);
@@ -376,6 +380,11 @@ export function ComposerEditor({
         }}
         onComposerFocus={onFocus}
         onComposerBlur={onBlur}
+        onComposerContentSizeChange={
+          onContentHeightChange
+            ? (event) => onContentHeightChange(event.nativeEvent.height)
+            : undefined
+        }
       />
     </TextInputWrapper>
   );
