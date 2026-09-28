@@ -18,6 +18,7 @@ import { AppText as Text } from "./components/AppText";
 import { getCompactBrandHeaderOptions } from "./components/CompactBrandTitle";
 import { ArchivedThreadsRouteScreen } from "./features/archive/ArchivedThreadsRouteScreen";
 import { useAgentNotificationNavigation } from "./features/agent-awareness/notificationNavigation";
+import { AgentIsland } from "./features/agent-awareness/AgentIsland";
 import { useTurnCompletionNotifications } from "./features/agent-awareness/turnCompletionNotifier";
 import { ConnectOnboardingRouteScreen } from "./features/cloud/ConnectOnboardingRouteScreen";
 import { useConnectOnboardingNavigation } from "./features/cloud/connectOnboardingNavigation";
@@ -455,6 +456,7 @@ function RootStackLayout(props: {
         <AdaptiveWorkspaceLayout pathname={workspacePathname}>
           {props.children}
         </AdaptiveWorkspaceLayout>
+        <AgentIsland />
       </ExistingThreadSettingsRouteProvider>
     </HardwareKeyboardCommandProvider>
   );

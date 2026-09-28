@@ -120,13 +120,53 @@ describe("reconcileTurnCompletions", () => {
     expect(result.phases.get(KEY)).toBe("completed");
   });
 
-  it("still fires for a thread the user is not looking at", () => {
+  it("shows the island instead of a notification for another thread in the foreground", () => {
     const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "completed" })], {
       foreground: true,
       openThreadKey: "env-1:thread-other",
     });
 
-    expect(result.notifications).toHaveLength(1);
+    expect(result.notifications).toEqual([]);
+    expect(result.islands).toEqual([
+      expect.objectContaining({ key: KEY, kind: "finished", deepLink: "/threads/env-1/thread-1" }),
+    ]);
+  });
+
+  it("shows a failed island even with notifications off", () => {
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "error" })], {
+      enabled: false,
+      foreground: true,
+    });
+
+    expect(result.islands[0]?.kind).toBe("failed");
+  });
+
+  it("shows an input island once when a thread starts waiting", () => {
+    const first = reconcile(
+      new Map([[KEY, "running"]]),
+      [thread({ turnState: "running", hasPendingUserInput: true })],
+      { foreground: true },
+    );
+    const second = reconcile(
+      first.phases,
+      [thread({ turnState: "running", hasPendingUserInput: true })],
+      { foreground: true },
+    );
+
+    expect(first.islands).toEqual([
+      expect.objectContaining({ kind: "input", title: "Fix the thread list needs input" }),
+    ]);
+    expect(second.islands).toEqual([]);
+  });
+
+  it("keeps the island away from the thread already open", () => {
+    const result = reconcile(
+      new Map([[KEY, "running"]]),
+      [thread({ turnState: "running", hasPendingApprovals: true })],
+      { foreground: true, openThreadKey: KEY },
+    );
+
+    expect(result.islands).toEqual([]);
   });
 
   it("fires for the open thread once the app is backgrounded", () => {

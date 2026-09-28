@@ -21,17 +21,32 @@ export interface TurnCompletionNotification {
   readonly deepLink: string;
 }
 
+/** What the in-app island shows while the app is open (see AgentIsland). */
+export interface AgentIslandAlert {
+  readonly key: string;
+  readonly kind: "finished" | "failed" | "input";
+  readonly title: string;
+  readonly body: string;
+  readonly deepLink: string;
+}
+
 /** Last phase seen per scoped thread key. Absent means never observed. */
 export type TurnCompletionPhases = ReadonlyMap<string, AgentAwarenessPhase>;
 
 export interface TurnCompletionReconciliation {
   readonly phases: TurnCompletionPhases;
   readonly notifications: ReadonlyArray<TurnCompletionNotification>;
+  readonly islands: ReadonlyArray<AgentIslandAlert>;
 }
 
 const WORKING_PHASES: ReadonlySet<AgentAwarenessPhase> = new Set([
   "starting",
   "running",
+  "waiting_for_approval",
+  "waiting_for_input",
+]);
+
+const WAITING_PHASES: ReadonlySet<AgentAwarenessPhase> = new Set([
   "waiting_for_approval",
   "waiting_for_input",
 ]);
@@ -77,6 +92,10 @@ export function formatTurnCompletionNotification(input: {
  *
  * Phases are recorded even when nothing is posted, so a suppressed completion
  * cannot fire later once the app backgrounds or notifications are granted.
+ *
+ * In the foreground the edges become island alerts instead of system
+ * notifications, plus one more edge: a thread starting to wait for an approval
+ * or an answer. The open thread shows its own state, so it never alerts.
  */
 export function reconcileTurnCompletions(input: {
   readonly phases: TurnCompletionPhases;
@@ -87,6 +106,7 @@ export function reconcileTurnCompletions(input: {
 }): TurnCompletionReconciliation {
   const phases = new Map<string, AgentAwarenessPhase>();
   const notifications: TurnCompletionNotification[] = [];
+  const islands: AgentIslandAlert[] = [];
 
   for (const entry of input.threads) {
     const awareness = projectThreadAwareness({
@@ -100,23 +120,44 @@ export function reconcileTurnCompletions(input: {
     const previous = input.phases.get(key);
     phases.set(key, awareness.phase);
 
-    if (awareness.phase !== "completed" && awareness.phase !== "failed") continue;
-    if (previous === undefined || !WORKING_PHASES.has(previous)) continue;
-    if (!input.enabled) continue;
+    if (previous === undefined || previous === awareness.phase) continue;
     if (input.foreground && input.openThreadKey === key) continue;
 
-    notifications.push(
-      formatTurnCompletionNotification({
+    if (WAITING_PHASES.has(awareness.phase)) {
+      if (!input.foreground) continue;
+      const summary = awareness.detail?.trim() || awareness.headline;
+      islands.push({
         key,
-        phase: awareness.phase,
-        threadTitle: awareness.threadTitle,
-        projectTitle: awareness.projectTitle,
-        headline: awareness.headline,
-        detail: awareness.detail,
+        kind: "input",
+        title: `${truncate(awareness.threadTitle, TITLE_LIMIT) || "Thread"} needs input`,
+        body: truncate(summary, BODY_LIMIT),
         deepLink: awareness.deepLink,
-      }),
-    );
+      });
+      continue;
+    }
+
+    if (awareness.phase !== "completed" && awareness.phase !== "failed") continue;
+    if (!WORKING_PHASES.has(previous)) continue;
+    if (!input.foreground && !input.enabled) continue;
+
+    const notification = formatTurnCompletionNotification({
+      key,
+      phase: awareness.phase,
+      threadTitle: awareness.threadTitle,
+      projectTitle: awareness.projectTitle,
+      headline: awareness.headline,
+      detail: awareness.detail,
+      deepLink: awareness.deepLink,
+    });
+    if (input.foreground) {
+      islands.push({
+        ...notification,
+        kind: awareness.phase === "failed" ? "failed" : "finished",
+      });
+    } else {
+      notifications.push(notification);
+    }
   }
 
-  return { phases, notifications };
+  return { phases, notifications, islands };
 }

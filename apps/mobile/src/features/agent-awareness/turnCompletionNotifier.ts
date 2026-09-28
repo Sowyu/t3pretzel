@@ -1,3 +1,4 @@
+import { Atom } from "effect/unstable/reactivity";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
@@ -13,6 +14,7 @@ import { activeThreadRef } from "../shortcuts/appShortcuts";
 import { AGENT_ALERT_CHANNEL_ID } from "./notificationPermissions";
 import {
   reconcileTurnCompletions,
+  type AgentIslandAlert,
   type TurnCompletionNotification,
   type TurnCompletionPhases,
 } from "./turnCompletionNotifications";
@@ -30,6 +32,16 @@ const SILENT = {
   shouldPlaySound: false,
   shouldSetBadge: false,
 } as const;
+
+/**
+ * The alert the in-app island shows (AgentIsland). `seq` changes on every
+ * alert, so a second alert for the same thread replays the animation.
+ */
+export const agentIslandAtom = Atom.make<{
+  readonly alert: AgentIslandAlert;
+  readonly seq: number;
+} | null>(null).pipe(Atom.keepAlive);
+let islandSeq = 0;
 
 let phases: TurnCompletionPhases = new Map();
 let openThreadKey: string | null = null;
@@ -86,6 +98,9 @@ function reconcile(threads: ReadonlyArray<EnvironmentThreadShell>): void {
   for (const notification of result.notifications) {
     post(notification);
   }
+  // Several at once is rare (a reconnect); the newest wins.
+  const alert = result.islands.at(-1);
+  if (alert) appAtomRegistry.set(agentIslandAtom, { alert, seq: ++islandSeq });
 }
 
 /**
