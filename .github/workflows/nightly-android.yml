@@ -136,7 +136,11 @@ jobs:
           # Move the tag, then point the release (what the updater compares) at it.
           gh api -X PATCH "repos/$repo/git/refs/tags/nightly" -f sha="$GITHUB_SHA" -F force=true >/dev/null ||
             gh api -X POST "repos/$repo/git/refs" -f ref=refs/tags/nightly -f sha="$GITHUB_SHA" >/dev/null
-          # --draft=false also rescues a release a failed publish left as a draft,
-          # which the updater cannot see (GitHub answers 404 by tag).
-          gh release edit nightly --repo "$repo" --target "$GITHUB_SHA" --prerelease --draft=false \
+          gh release edit nightly --repo "$repo" --target "$GITHUB_SHA" --prerelease \
             --title "$title" --notes-file .github/nightly-release-notes.md
+          # Re-publish, back to back, so published_at moves to now: the in-app
+          # updater ignores a release published before the installed build.
+          # This also rescues a release a failed run left as a draft.
+          id=$(gh api "repos/$repo/releases" --jq '.[] | select(.tag_name == "nightly") | .id')
+          gh api -X PATCH "repos/$repo/releases/$id" -F draft=true >/dev/null
+          gh api -X PATCH "repos/$repo/releases/$id" -F draft=false >/dev/null
