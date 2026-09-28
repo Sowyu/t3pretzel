@@ -108,13 +108,29 @@ jobs:
       - name: Publish nightly release
         env:
           GH_TOKEN: ${{ github.token }}
+        # Updates the release in place. Deleting and recreating it left a minute
+        # with no `nightly` release, and a phone checking then got a 404.
         run: |
           apk=t3code-nightly-arm64-v8a.apk
+          repo="$GITHUB_REPOSITORY"
+          title="Nightly ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})"
           cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$apk"
-          gh release delete nightly --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
-          gh release create nightly "$apk" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --title "Nightly ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})" \
-            --notes-file .github/nightly-release-notes.md
+          if ! gh release view nightly --repo "$repo" >/dev/null 2>&1; then
+            gh release create nightly "$apk" --repo "$repo" --target "$GITHUB_SHA" \
+              --prerelease --title "$title" --notes-file .github/nightly-release-notes.md
+            exit 0
+          fi
+          # Upload under a temporary name, then swap it in, so the APK the
+          # updater looks for is missing for well under a second.
+          staged="$apk.$GITHUB_RUN_ID"
+          cp "$apk" "$staged"
+          gh release upload nightly "$staged" --repo "$repo" --clobber
+          assets=$(gh api "repos/$repo/releases/tags/nightly" --jq '.assets[] | "\(.id) \(.name)"')
+          old_id=$(awk -v n="$apk" '$2 == n { print $1 }' <<<"$assets")
+          new_id=$(awk -v n="$staged" '$2 == n { print $1 }' <<<"$assets")
+          if [ -n "$old_id" ]; then gh api -X DELETE "repos/$repo/releases/assets/$old_id"; fi
+          gh api -X PATCH "repos/$repo/releases/assets/$new_id" -f name="$apk" >/dev/null
+          # Move the tag, then point the release (what the updater compares) at it.
+          gh api -X PATCH "repos/$repo/git/refs/tags/nightly" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          gh release edit nightly --repo "$repo" --target "$GITHUB_SHA" --prerelease \
+            --title "$title" --notes-file .github/nightly-release-notes.md
