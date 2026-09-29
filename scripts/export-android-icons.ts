@@ -34,6 +34,10 @@ const TEXT = { x: 15.53, y: 37, width: 94.5, height: 57 };
 // guaranteed), so 0.48 leaves the letters at ~72% of the mask with room for the
 // launcher's own zoom effects.
 const WORDMARK_FRACTION = 0.48;
+// The heavy "3" puts the wordmark's ink centroid 5.4pt right of and 4.2pt below its box
+// center, so a box-centered mark reads right-heavy and low inside the round mask. Shifting
+// halfway toward the centroid centers it optically without the "T" crowding the left edge.
+const OPTICAL_OFFSET = { x: -2.7, y: -2.1 };
 // Icon Composer positions layers on a 1024pt canvas, with translation relative to center.
 const COMPOSER_CANVAS_PT = 1024;
 const SVG_DENSITY = 300;
@@ -48,8 +52,8 @@ export class AndroidIconRenderError extends Schema.TaggedError<AndroidIconRender
 
 const wordmarkTransform = (size: number) => {
   const scale = (size * WORDMARK_FRACTION) / TEXT.width;
-  const tx = (size - TEXT.width * scale) / 2 - TEXT.x * scale;
-  const ty = (size - TEXT.height * scale) / 2 - TEXT.y * scale;
+  const tx = (size - TEXT.width * scale) / 2 - (TEXT.x - OPTICAL_OFFSET.x) * scale;
+  const ty = (size - TEXT.height * scale) / 2 - (TEXT.y - OPTICAL_OFFSET.y) * scale;
   return `translate(${tx.toFixed(3)} ${ty.toFixed(3)}) scale(${scale.toFixed(4)})`;
 };
 
