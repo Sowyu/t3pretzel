@@ -186,8 +186,9 @@ export async function startNightlyUpdate(update: NightlyUpdate): Promise<void> {
 
 async function runNightlyUpdate(
   active: NonNullable<ReturnType<typeof activeUpdater>>,
-  update: NightlyUpdate,
+  offered: NightlyUpdate,
 ): Promise<void> {
+  let update = offered;
   let info: NativeInstallInfo;
   try {
     info = active.native.getInstallInfo();
@@ -212,6 +213,37 @@ async function runNightlyUpdate(
   }
 
   setNightlyUpdaterState({ kind: "downloading", update, percent: 0 });
+  // The download URL names the rolling asset, so a nightly published since the
+  // check swaps the bytes under the digest the check saw. Re-read the release so
+  // the digest and the file come from the same publish.
+  try {
+    const release = await fetchNightlyRelease(active.build.repository);
+    const resolution = resolveNightlyUpdate(release, active.build, info.supportedAbis);
+    if (resolution.kind !== "available") {
+      setNightlyUpdaterState(
+        resolution.kind === "upToDate"
+          ? { kind: "upToDate" }
+          : {
+              kind: "error",
+              step: "check",
+              message: `The latest nightly has no build for this device (${resolution.abis.join(", ")}).`,
+              update: null,
+            },
+      );
+      return;
+    }
+    update = resolution.update;
+    setNightlyUpdaterState({ kind: "downloading", update, percent: 0 });
+  } catch (error) {
+    setNightlyUpdaterState({
+      kind: "error",
+      step: "check",
+      message: failureMessage(error, "Could not reach GitHub to check for updates."),
+      update,
+    });
+    return;
+  }
+
   let downloadedUri: string;
   try {
     downloadedUri = await downloadNightlyApk(update);
