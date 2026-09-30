@@ -34,6 +34,9 @@ const TEXT = { x: 15.53, y: 37, width: 94.5, height: 57 };
 // guaranteed), so 0.48 leaves the letters at ~72% of the mask with room for the
 // launcher's own zoom effects.
 const WORDMARK_FRACTION = 0.48;
+// Nudges the wordmark below the box center, in 128pt source units. 2.5pt is about 3px on
+// a 165px launcher icon. Tune by eye on a device.
+const WORDMARK_DROP = 2.5;
 // Icon Composer positions layers on a 1024pt canvas, with translation relative to center.
 const COMPOSER_CANVAS_PT = 1024;
 const SVG_DENSITY = 300;
@@ -49,7 +52,7 @@ export class AndroidIconRenderError extends Schema.TaggedError<AndroidIconRender
 const wordmarkTransform = (size: number) => {
   const scale = (size * WORDMARK_FRACTION) / TEXT.width;
   const tx = (size - TEXT.width * scale) / 2 - TEXT.x * scale;
-  const ty = (size - TEXT.height * scale) / 2 - TEXT.y * scale;
+  const ty = (size - TEXT.height * scale) / 2 - (TEXT.y - WORDMARK_DROP) * scale;
   return `translate(${tx.toFixed(3)} ${ty.toFixed(3)}) scale(${scale.toFixed(4)})`;
 };
 
