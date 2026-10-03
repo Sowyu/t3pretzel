@@ -6,9 +6,7 @@ import { AppText as Text } from "./AppText";
 import { GlassControl } from "./GlassControl";
 import { GlassSurface } from "./GlassSurface";
 import { cn } from "../lib/cn";
-import { MaterialIconButton } from "./MaterialIconButton";
 import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
-import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
 
@@ -86,13 +84,12 @@ export function AndroidScreenHeader(props: {
   /** The bar's on-screen height, for the caller's content inset. */
   readonly onHeightChange?: (height: number) => void;
 }) {
-  const titleTypography = useScaledTextRole("title");
-  const subtitleTypography = useScaledTextRole("label");
   const {
-    height: materialToolbarHeight,
+    height: toolbarHeight,
     paddingTop,
     paddingBottom,
   } = useMaterialToolbarLayout(props.embedded);
+  const { scale } = useAndroidControlSizing();
   const [headerWidth, setHeaderWidth] = useState(0);
   const actions = props.actions ?? [];
   const directCount = actions.length > 2 ? (headerWidth >= 600 ? 3 : 1) : actions.length;
@@ -116,26 +113,34 @@ export function AndroidScreenHeader(props: {
 
   const content = (
     <>
-      <View style={{ minHeight: materialToolbarHeight }} className="flex-row items-center gap-1">
+      <View style={{ minHeight: toolbarHeight }} className="flex-row items-center gap-2">
         {props.onBack ? (
-          <MaterialIconButton
+          <Pressable
             accessibilityLabel="Navigate up"
-            icon="arrow.left"
-            tintColorClassName="accent-header-foreground"
+            accessibilityRole="button"
+            hitSlop={8}
             onPress={props.onBack}
-          />
+            className="-mr-2 items-center justify-center"
+            style={{ width: Math.round(44 * scale), height: Math.round(44 * scale) }}
+          >
+            <SymbolView
+              name="chevron.left"
+              size={Math.round(24 * scale)}
+              tintColorClassName="accent-header-foreground"
+              type="monochrome"
+            />
+          </Pressable>
         ) : null}
 
         {props.leading}
 
         <View className={cn("min-w-0 flex-1", !props.onBack && "pl-1")}>
-          <Text numberOfLines={1} style={titleTypography} className="text-header-foreground">
+          <Text numberOfLines={1} className="text-lg font-t3-bold text-header-foreground">
             {props.title}
           </Text>
           {props.subtitle ? (
             <Text
               numberOfLines={1}
-              style={subtitleTypography}
               className="mt-px text-[13px] font-t3-medium text-foreground-muted"
             >
               {props.subtitle}
@@ -201,7 +206,7 @@ export function AndroidScreenHeader(props: {
           zIndex: 1,
         }}
       >
-        <View className="px-2" style={padding}>
+        <View className="px-3" style={padding}>
           {content}
         </View>
       </GlassSurface>
@@ -211,7 +216,7 @@ export function AndroidScreenHeader(props: {
   return (
     <View
       onLayout={handleLayout}
-      className="border-b border-header-border bg-header px-2"
+      className="border-b border-header-border bg-header px-3"
       style={{
         ...padding,
         borderBottomWidth: props.hideBottomBorder ? 0 : undefined,

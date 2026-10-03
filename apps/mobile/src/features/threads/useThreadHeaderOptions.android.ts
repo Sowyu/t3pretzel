@@ -1,10 +1,13 @@
 import type { useThreadHeaderOptions as useIosThreadHeaderOptions } from "./useThreadHeaderOptions";
 
+const ANDROID_THREAD_HEADER_OPTIONS = {};
+
+/** Android draws its own floating glass header over the feed, so no native header options. */
 export function useThreadHeaderOptions(
-  props: Parameters<typeof useIosThreadHeaderOptions>[0],
+  _props: Parameters<typeof useIosThreadHeaderOptions>[0],
 ): ReturnType<typeof useIosThreadHeaderOptions> {
   return {
-    options: { contentStyle: { backgroundColor: props.headerColor } },
+    options: ANDROID_THREAD_HEADER_OPTIONS,
     sidebar: true,
     fallback: null,
   };

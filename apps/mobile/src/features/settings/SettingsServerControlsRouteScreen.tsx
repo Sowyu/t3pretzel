@@ -465,7 +465,7 @@ function MixedValuesLabel(props: { readonly projectSelected: boolean }) {
           ? "Selected project checkouts use different values"
           : "Selected environments use different values"
       }
-      className="px-2 text-sm text-foreground-muted android:px-4"
+      className="px-2 text-sm text-foreground-muted"
     >
       Mixed
     </Text>

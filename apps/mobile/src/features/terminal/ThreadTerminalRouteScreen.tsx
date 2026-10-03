@@ -26,9 +26,6 @@ import {
 import { EmptyState } from "../../components/EmptyState";
 import { GlassSurface } from "../../components/GlassSurface";
 import { LoadingScreen } from "../../components/LoadingScreen";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
-import { MaterialButton } from "../../components/MaterialButton";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
 import { environmentCatalog } from "../../connection/catalog";
 import { useEnvironmentPresentation } from "../../state/presentation";
 import { terminalEnvironment } from "../../state/terminal";
@@ -275,7 +272,6 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     themeAppearance: appearanceScheme,
     themeId,
     setTerminalFontSize,
-    themeVariables,
   } = useAppearancePreferences();
   const fontSize = appearance.terminalFontSize;
   const cachedRouteGridSize =
@@ -1215,190 +1211,169 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
         onSelectTerminal={handleSelectTerminal}
       />
 
-      <MaterialScreenContent>
-        <View
-          className="flex-1"
-          style={{
-            backgroundColor:
-              Platform.OS === "android"
-                ? themeVariables["--color-card-alt"]
-                : terminalTheme.background,
-            paddingBottom:
-              Platform.OS === "android" && !isKeyboardAnimationUsable ? insets.bottom : 0,
-          }}
-        >
-          {!isEnvironmentReady ? (
-            <EnvironmentConnectionNotice
-              environmentLabel={
-                environment.presentation?.entry.target.label ??
-                selectedEnvironmentConnection?.environmentLabel ??
-                "Environment"
+      <View
+        className="flex-1"
+        style={{
+          backgroundColor: terminalTheme.background,
+          paddingBottom:
+            Platform.OS === "android" && !isKeyboardAnimationUsable ? insets.bottom : 0,
+        }}
+      >
+        {!isEnvironmentReady ? (
+          <EnvironmentConnectionNotice
+            environmentLabel={
+              environment.presentation?.entry.target.label ??
+              selectedEnvironmentConnection?.environmentLabel ??
+              "Environment"
+            }
+            connection={
+              environment.presentation?.connection ?? {
+                phase: "available",
+                error: null,
+                traceId: null,
               }
-              connection={
-                environment.presentation?.connection ?? {
-                  phase: "available",
-                  error: null,
-                  traceId: null,
-                }
-              }
-              resourceName="terminal"
-              onRetry={handleRetryEnvironment}
-            />
-          ) : (
-            <>
+            }
+            resourceName="terminal"
+            onRetry={handleRetryEnvironment}
+          />
+        ) : (
+          <>
+            <View
+              style={{
+                flex: 1,
+                paddingBottom: terminalBottomInset,
+              }}
+            >
               <View
+                pointerEvents="none"
                 style={{
-                  flex: 1,
-                  paddingBottom: terminalBottomInset,
+                  position: "absolute",
+                  inset: 0,
+                  backgroundColor: terminalTheme.background,
                 }}
+              />
+              <TerminalSurface
+                autoFocus={terminalAutoFocus}
+                buffer={terminalSurfaceBuffer}
+                fontSize={fontSize}
+                isRunning={isRunning}
+                keyboardFocusRequest={keyboardFocusRequest}
+                captureRequest={captureRequest}
+                onCapture={(text) => {
+                  if (text.trim()) setCapturedOutput(text);
+                  else Alert.alert("No terminal output", "There is no visible output to attach.");
+                }}
+                onInput={handleInput}
+                onResize={handleResize}
+                onTerminalFocus={markInputFocused}
+                style={{ flex: 1 }}
+                terminalKey={terminalKey}
+                theme={terminalTheme}
+              />
+            </View>
+
+            {selectedThread && hasNativeTerminalSurface() ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  KeyboardController.dismiss();
+                  setCaptureRequest((value) => value + 1);
+                }}
+                className="px-4 py-2"
+              >
+                <Text style={{ color: terminalTheme.foreground }}>Attach visible output</Text>
+              </Pressable>
+            ) : null}
+            {isAccessoryVisible ? (
+              <KeyboardStickyView
+                enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
+                style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
+                offset={{ closed: 0, opened: 0 }}
               >
                 <View
-                  pointerEvents="none"
+                  className="border-t"
                   style={{
-                    position: "absolute",
-                    inset: 0,
                     backgroundColor: terminalTheme.background,
+                    borderTopColor: terminalTheme.border,
+                    minHeight: TERMINAL_ACCESSORY_HEIGHT,
                   }}
-                />
-                <TerminalSurface
-                  autoFocus={terminalAutoFocus}
-                  buffer={terminalSurfaceBuffer}
-                  fontSize={fontSize}
-                  isRunning={isRunning}
-                  keyboardFocusRequest={keyboardFocusRequest}
-                  captureRequest={captureRequest}
-                  onCapture={(text) => {
-                    if (text.trim()) setCapturedOutput(text);
-                    else Alert.alert("No terminal output", "There is no visible output to attach.");
-                  }}
-                  onInput={handleInput}
-                  onResize={handleResize}
-                  onTerminalFocus={markInputFocused}
-                  style={{ flex: 1 }}
-                  terminalKey={terminalKey}
-                  theme={terminalTheme}
-                />
-              </View>
+                >
+                  <ComposerToolbarRow paddingBottom={4} paddingHorizontal={8} paddingTop={4}>
+                    <ComposerToolbarScroller
+                      contentPaddingRight={2}
+                      fadeOpaque={terminalTheme.background}
+                      fadeTransparent={`${terminalTheme.background}00`}
+                    >
+                      {terminalToolbarActions.map((action) => {
+                        const active =
+                          action.kind === "modifier" && pendingModifier === action.modifier;
 
-              {Platform.OS === "android" && !isKeyboardAnimationUsable ? (
-                <View className="min-h-14 flex-row items-center gap-2 bg-card-alt px-2">
-                  {selectedThread && hasNativeTerminalSurface() ? (
-                    <MaterialButton
-                      label="Attach output"
-                      tone="text"
-                      onPress={() => setCaptureRequest((value) => value + 1)}
+                        return (
+                          <ComposerToolbarButton
+                            key={action.key}
+                            active={active}
+                            label={action.label}
+                            maxWidth={120}
+                            minWidth={action.label.length > 1 ? 56 : 44}
+                            onPress={() => handleToolbarActionPress(action)}
+                            showChevron={false}
+                            textTransform={
+                              action.kind === "modifier" || action.kind === "clear"
+                                ? "uppercase"
+                                : "none"
+                            }
+                          />
+                        );
+                      })}
+                    </ComposerToolbarScroller>
+                    <ComposerToolbarButton
+                      accessibilityLabel="Dismiss keyboard"
+                      icon={{ ios: "keyboard.chevron.compact.down", android: "keyboard_hide" }}
+                      onPress={handleDismissKeyboard}
+                      showChevron={false}
                     />
-                  ) : null}
-                  <View className="flex-1" />
-                  <MaterialIconButton
-                    accessibilityLabel="Show keyboard"
-                    icon="keyboard"
-                    onPress={handleShowKeyboard}
-                  />
+                  </ComposerToolbarRow>
                 </View>
-              ) : Platform.OS !== "android" && selectedThread && hasNativeTerminalSurface() ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    KeyboardController.dismiss();
-                    setCaptureRequest((value) => value + 1);
+              </KeyboardStickyView>
+            ) : !isKeyboardAnimationUsable ? (
+              <Pressable
+                accessibilityLabel="Show keyboard"
+                accessibilityRole="button"
+                onPress={handleShowKeyboard}
+                style={({ pressed }) => ({
+                  bottom: 16,
+                  borderRadius: 28,
+                  opacity: pressed ? 0.72 : 1,
+                  position: "absolute",
+                  right: 16,
+                })}
+              >
+                <GlassSurface
+                  chrome="none"
+                  fallbackColor={terminalTheme.background}
+                  glassEffectStyle="regular"
+                  tintColor="transparent"
+                  style={{
+                    alignItems: "center",
+                    borderRadius: 24,
+                    height: 48,
+                    justifyContent: "center",
+                    width: 48,
                   }}
-                  className="px-4 py-2"
+                  pointerEvents="none"
                 >
-                  <Text style={{ color: terminalTheme.foreground }}>Attach visible output</Text>
-                </Pressable>
-              ) : null}
-              {isAccessoryVisible ? (
-                <KeyboardStickyView
-                  enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
-                  style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
-                  offset={{ closed: 0, opened: 0 }}
-                >
-                  <View
-                    className="border-t"
-                    style={{
-                      backgroundColor: terminalTheme.background,
-                      borderTopColor: terminalTheme.border,
-                      minHeight: TERMINAL_ACCESSORY_HEIGHT,
-                    }}
-                  >
-                    <ComposerToolbarRow paddingBottom={4} paddingHorizontal={8} paddingTop={4}>
-                      <ComposerToolbarScroller
-                        contentPaddingRight={2}
-                        fadeOpaque={terminalTheme.background}
-                        fadeTransparent={`${terminalTheme.background}00`}
-                      >
-                        {terminalToolbarActions.map((action) => {
-                          const active =
-                            action.kind === "modifier" && pendingModifier === action.modifier;
-
-                          return (
-                            <ComposerToolbarButton
-                              key={action.key}
-                              active={active}
-                              label={action.label}
-                              maxWidth={120}
-                              minWidth={action.label.length > 1 ? 56 : 44}
-                              onPress={() => handleToolbarActionPress(action)}
-                              showChevron={false}
-                              textTransform={
-                                action.kind === "modifier" || action.kind === "clear"
-                                  ? "uppercase"
-                                  : "none"
-                              }
-                            />
-                          );
-                        })}
-                      </ComposerToolbarScroller>
-                      <ComposerToolbarButton
-                        accessibilityLabel="Dismiss keyboard"
-                        icon={{ ios: "keyboard.chevron.compact.down", android: "keyboard_hide" }}
-                        onPress={handleDismissKeyboard}
-                        showChevron={false}
-                      />
-                    </ComposerToolbarRow>
-                  </View>
-                </KeyboardStickyView>
-              ) : !isKeyboardAnimationUsable && Platform.OS !== "android" ? (
-                <Pressable
-                  accessibilityLabel="Show keyboard"
-                  accessibilityRole="button"
-                  onPress={handleShowKeyboard}
-                  style={({ pressed }) => ({
-                    bottom: 16,
-                    borderRadius: 28,
-                    opacity: pressed ? 0.72 : 1,
-                    position: "absolute",
-                    right: 16,
-                  })}
-                >
-                  <GlassSurface
-                    chrome="none"
-                    fallbackColor={terminalTheme.background}
-                    glassEffectStyle="regular"
-                    tintColor="transparent"
-                    style={{
-                      alignItems: "center",
-                      borderRadius: 24,
-                      height: 48,
-                      justifyContent: "center",
-                      width: 48,
-                    }}
-                    pointerEvents="none"
-                  >
-                    <SymbolView
-                      name={{ ios: "keyboard", android: "keyboard" }}
-                      size={20}
-                      tintColor={terminalTheme.foreground}
-                      type="monochrome"
-                    />
-                  </GlassSurface>
-                </Pressable>
-              ) : null}
-            </>
-          )}
-        </View>
-      </MaterialScreenContent>
+                  <SymbolView
+                    name={{ ios: "keyboard", android: "keyboard" }}
+                    size={20}
+                    tintColor={terminalTheme.foreground}
+                    type="monochrome"
+                  />
+                </GlassSurface>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </View>
     </>
   );
 }

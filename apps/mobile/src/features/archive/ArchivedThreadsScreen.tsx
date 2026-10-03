@@ -33,7 +33,6 @@ import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useServerConfigs } from "../../state/entities";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import type { ArchivedThreadGroup, ArchivedThreadSortOrder } from "./archivedThreadList";
-import { SettingsScreenContent } from "../settings/components/SettingsScreen";
 
 export interface ArchivedThreadsHeaderEnvironment {
   readonly environmentId: EnvironmentId;
@@ -425,43 +424,41 @@ export function ArchivedThreadsScreen(props: {
         sortOrder={props.sortOrder}
       />
 
-      <SettingsScreenContent>
-        <GestureDetector gesture={archiveScrollGesture}>
-          <LegendList
-            className="flex-1"
-            contentContainerStyle={{
-              // iOS is left alone: contentInsetAdjustmentBehavior="automatic"
-              // already adds the safe area to the content inset, and adding it
-              // here again would leave a dead strip below the last thread.
-              // Android ignores that prop, so it needs the inset spelled out.
-              paddingBottom: Platform.OS === "android" ? Math.max(insets.bottom, 16) + 16 : 32,
-              paddingHorizontal: 16,
-              paddingTop: 4,
-            }}
-            contentInsetAdjustmentBehavior="automatic"
-            data={listItems}
-            estimatedItemSize={62}
-            getItemType={(item) => item.kind}
-            keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
-            keyExtractor={(item) => item.key}
-            ListEmptyComponent={listEmptyComponent}
-            ListHeaderComponent={
-              props.error ? <ArchiveError message={props.error} onRetry={props.onRefresh} /> : null
-            }
-            onScrollBeginDrag={() => openSwipeableRef.current?.close()}
-            refreshControl={
-              <RefreshControl
-                onRefresh={props.onRefresh}
-                refreshing={props.isLoading && !isInitialLoad}
-                tintColorClassName={String("accent-icon")}
-              />
-            }
-            renderItem={renderListItem}
-            showsVerticalScrollIndicator={false}
-          />
-        </GestureDetector>
-      </SettingsScreenContent>
+      <GestureDetector gesture={archiveScrollGesture}>
+        <LegendList
+          className="flex-1"
+          contentContainerStyle={{
+            // iOS is left alone: contentInsetAdjustmentBehavior="automatic"
+            // already adds the safe area to the content inset, and adding it
+            // here again would leave a dead strip below the last thread.
+            // Android ignores that prop, so it needs the inset spelled out.
+            paddingBottom: Platform.OS === "android" ? Math.max(insets.bottom, 16) + 16 : 32,
+            paddingHorizontal: 16,
+            paddingTop: 4,
+          }}
+          contentInsetAdjustmentBehavior="automatic"
+          data={listItems}
+          estimatedItemSize={62}
+          getItemType={(item) => item.kind}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          keyExtractor={(item) => item.key}
+          ListEmptyComponent={listEmptyComponent}
+          ListHeaderComponent={
+            props.error ? <ArchiveError message={props.error} onRetry={props.onRefresh} /> : null
+          }
+          onScrollBeginDrag={() => openSwipeableRef.current?.close()}
+          refreshControl={
+            <RefreshControl
+              onRefresh={props.onRefresh}
+              refreshing={props.isLoading && !isInitialLoad}
+              tintColorClassName={String("accent-icon")}
+            />
+          }
+          renderItem={renderListItem}
+          showsVerticalScrollIndicator={false}
+        />
+      </GestureDetector>
     </View>
   );
 }

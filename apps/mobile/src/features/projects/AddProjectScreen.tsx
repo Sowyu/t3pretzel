@@ -1,7 +1,5 @@
-import { MaterialListRow } from "../../components/MaterialListRow";
 import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
-import { MaterialButton } from "../../components/MaterialButton";
 import {
   addProjectRemoteSourceLabel,
   addProjectRemoteSourcePathHint,
@@ -48,7 +46,7 @@ import {
 import { CommonActions, StackActions, useNavigation } from "@react-navigation/native";
 import { SymbolView } from "../../components/AppSymbol";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Platform, ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Arr from "effect/Array";
 import * as Cause from "effect/Cause";
@@ -132,13 +130,7 @@ function sourceFromParam(value: string | string[] | undefined): AddProjectRemote
 
 function SectionTitle(props: { readonly children: string }) {
   return (
-    <Text
-      className={
-        Platform.OS === "android"
-          ? "px-4 text-sm font-t3-medium text-primary-text"
-          : "px-1 text-2xs font-t3-bold tracking-[0.7px] uppercase text-foreground-muted"
-      }
-    >
+    <Text className="px-1 text-2xs font-t3-bold tracking-[0.7px] uppercase text-foreground-muted">
       {props.children}
     </Text>
   );
@@ -158,10 +150,10 @@ function AddProjectShell(props: { readonly children: ReactNode; readonly title: 
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{
-          paddingHorizontal: Platform.OS === "android" ? 16 : 20,
+          paddingHorizontal: 20,
           paddingTop: 16,
           paddingBottom: Math.max(insets.bottom, 18) + 18,
-          gap: Platform.OS === "android" ? 16 : 10,
+          gap: 10,
         }}
       >
         {props.children}
@@ -171,17 +163,7 @@ function AddProjectShell(props: { readonly children: ReactNode; readonly title: 
 }
 
 function ListSection(props: { readonly children: ReactNode }) {
-  return (
-    <View
-      className={
-        Platform.OS === "android"
-          ? "overflow-hidden rounded-[28px] bg-grouped-card"
-          : "overflow-hidden rounded-[24px] bg-grouped-card"
-      }
-    >
-      {props.children}
-    </View>
-  );
+  return <View className="overflow-hidden rounded-[24px] bg-grouped-card">{props.children}</View>;
 }
 
 function ListRow(props: {
@@ -194,21 +176,6 @@ function ListRow(props: {
   readonly right?: ReactNode;
   readonly onPress?: () => void;
 }) {
-  if (Platform.OS === "android") {
-    return (
-      <MaterialListRow
-        className="bg-grouped-card"
-        title={props.title}
-        subtitle={props.subtitle}
-        leading={props.icon}
-        trailing={props.right}
-        disabled={props.disabled}
-        onPress={props.onPress}
-        accessibilityRole={props.selected !== undefined ? "radio" : "button"}
-        accessibilityState={props.selected !== undefined ? { checked: props.selected } : undefined}
-      />
-    );
-  }
   return (
     <Pressable
       disabled={props.disabled}
@@ -258,7 +225,6 @@ function PrimaryActionButton(props: {
   readonly loading?: boolean;
   readonly onPress: () => void;
 }) {
-  if (Platform.OS === "android") return <MaterialButton {...props} tone="primary" fullWidth />;
   return (
     <Pressable
       disabled={props.disabled}
@@ -480,18 +446,9 @@ function SourceControlRow(props: {
       : `Clone ${addProjectRemoteSourceLabel(props.source)} ${props.hint}`;
   const icon =
     props.source === "url" ? (
-      <SymbolView
-        name="link"
-        size={Platform.OS === "android" ? 24 : 17}
-        tintColorClassName="accent-icon"
-        type="monochrome"
-      />
+      <SymbolView name="link" size={17} tintColorClassName="accent-icon" type="monochrome" />
     ) : (
-      <SourceControlIcon
-        kind={props.source}
-        size={Platform.OS === "android" ? 24 : 18}
-        colorClassName="accent-icon"
-      />
+      <SourceControlIcon kind={props.source} size={18} colorClassName="accent-icon" />
     );
 
   if (!props.ready) {
@@ -559,7 +516,7 @@ export function AddProjectSourceScreen() {
                 icon={
                   <EnvironmentMachineSymbol
                     kind={environment.machine}
-                    size={Platform.OS === "android" ? 24 : 17}
+                    size={17}
                     tintColorClassName="accent-icon"
                   />
                 }
@@ -570,7 +527,7 @@ export function AddProjectSourceScreen() {
                   environment.environmentId === selectedEnvironment?.environmentId ? (
                     <SymbolView
                       name="checkmark"
-                      size={Platform.OS === "android" ? 20 : 14}
+                      size={14}
                       tintColorClassName="accent-icon"
                       type="monochrome"
                     />
@@ -593,7 +550,7 @@ export function AddProjectSourceScreen() {
                 icon={
                   <SymbolView
                     name="plus"
-                    size={Platform.OS === "android" ? 24 : 17}
+                    size={17}
                     tintColorClassName="accent-icon"
                     type="monochrome"
                   />
@@ -614,7 +571,7 @@ export function AddProjectSourceScreen() {
               icon={
                 <SymbolView
                   name="folder.badge.plus"
-                  size={Platform.OS === "android" ? 24 : 17}
+                  size={17}
                   tintColorClassName="accent-icon"
                   type="monochrome"
                 />
@@ -884,7 +841,7 @@ function FolderBrowser(props: {
             icon={
               <SymbolView
                 name="arrow.turn.left.up"
-                size={Platform.OS === "android" ? 24 : 17}
+                size={17}
                 tintColorClassName="accent-icon-muted"
                 type="monochrome"
               />
@@ -907,7 +864,7 @@ function FolderBrowser(props: {
             icon={
               <SymbolView
                 name="folder"
-                size={Platform.OS === "android" ? 24 : 17}
+                size={17}
                 tintColorClassName="accent-icon-muted"
                 type="monochrome"
               />
@@ -979,7 +936,7 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
             icon={
               <EnvironmentMachineSymbol
                 kind={option.machine}
-                size={Platform.OS === "android" ? 24 : 17}
+                size={17}
                 tintColorClassName="accent-icon"
               />
             }
@@ -991,7 +948,7 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
               selected ? (
                 <SymbolView
                   name="checkmark"
-                  size={Platform.OS === "android" ? 20 : 14}
+                  size={14}
                   tintColorClassName="accent-icon"
                   type="monochrome"
                 />
@@ -1100,13 +1057,7 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
                     ? getNewProjectGitHubRepository(githubTarget, pathPreview)
                     : githubTarget.account
                 }
-                icon={
-                  <SourceControlIcon
-                    kind="github"
-                    size={Platform.OS === "android" ? 24 : 18}
-                    colorClassName="accent-icon"
-                  />
-                }
+                icon={<SourceControlIcon kind="github" size={18} colorClassName="accent-icon" />}
                 isFirst
                 right={
                   <ThemedSwitch
@@ -1132,7 +1083,7 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
               icon={
                 <SymbolView
                   name="folder.badge.plus"
-                  size={Platform.OS === "android" ? 24 : 17}
+                  size={17}
                   tintColorClassName="accent-icon"
                   type="monochrome"
                 />

@@ -113,6 +113,14 @@ describe("workspace connection status", () => {
     });
   });
 
+  it("keeps one failing environment out of the title while another is ready", () => {
+    const state = workspaceState({
+      connectionError: "Relay has no active link for this environment.",
+    });
+
+    expect(workspaceConnectionStatusPresentation(state)).toBeNull();
+  });
+
   it("shows shell catch-up while cached threads remain visible", () => {
     const state = workspaceState({ hasPendingShellSnapshot: true });
 

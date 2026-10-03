@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { Platform, View } from "react-native";
+import { View } from "react-native";
 
 import { SymbolView } from "../../../components/AppSymbol";
 import { AppText as Text } from "../../../components/AppText";
@@ -13,22 +13,16 @@ export function SettingsControlRow(props: {
   readonly children: ReactNode;
 }) {
   return (
-    <View
-      className={cn(
-        "flex-row items-center gap-4 p-4 android:min-h-14 android:py-3",
-        props.subtitle && "android:min-h-18",
-        props.disabled && "opacity-[0.45]",
-      )}
-    >
+    <View className={cn("flex-row items-center gap-4 p-4", props.disabled && "opacity-[0.45]")}>
       <SymbolView
         name={props.icon}
-        size={Platform.OS === "android" ? 24 : 22}
+        size={22}
         tintColorClassName="accent-icon"
         type="monochrome"
         weight="regular"
       />
-      <View className="min-w-0 flex-1 android:gap-1">
-        <Text className="text-lg text-foreground android:text-base">{props.label}</Text>
+      <View className="min-w-0 flex-1">
+        <Text className="text-lg text-foreground">{props.label}</Text>
         {props.subtitle ? (
           <Text className="text-sm text-foreground-muted">{props.subtitle}</Text>
         ) : null}

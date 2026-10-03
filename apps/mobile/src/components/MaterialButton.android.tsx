@@ -1,96 +1,70 @@
-import {
-  Box,
-  Button,
-  CircularProgressIndicator,
-  FilledTonalButton,
-  Host,
-  Row,
-  Text,
-  TextButton,
-} from "@expo/ui/jetpack-compose";
-import { defaultMinSize, fillMaxWidth, size } from "@expo/ui/jetpack-compose/modifiers";
-import { View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 
-import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
-import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
+import { cn } from "../lib/cn";
+import { AppText } from "./AppText";
+import { GlassControl } from "./GlassControl";
 import type { MaterialButtonProps } from "./MaterialButton";
-import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
+const SOLID_CLASS_NAMES = {
+  primary: ["bg-primary", "text-primary-foreground"],
+  danger: ["bg-danger", "text-danger-foreground"],
+} as const;
+
+/** Fork pill: primary and danger keep solid fills, secondary sits on glass, text is bare. */
 export function MaterialButton(props: MaterialButtonProps) {
-  const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
-  const typography = useScaledTextRole("footnote");
-  const { scale, mediumIconSize } = useAndroidControlSizing();
   const tone = props.tone ?? "secondary";
-  const Component =
-    tone === "text" ? TextButton : tone === "secondary" ? FilledTonalButton : Button;
-  const containerColor =
-    tone === "primary"
-      ? colors["--color-primary"]
-      : tone === "danger"
-        ? colors["--color-danger"]
-        : tone === "text"
-          ? "#00000000"
-          : colors["--color-secondary"];
-  const contentColor =
-    tone === "primary"
-      ? colors["--color-primary-foreground"]
-      : tone === "danger"
-        ? colors["--color-danger-foreground"]
-        : tone === "text"
-          ? colors["--color-primary-text"]
-          : colors["--color-secondary-foreground"];
-  return (
-    <View
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={props.label}
-      accessibilityState={{
-        disabled: Boolean(props.disabled || props.loading),
-        busy: Boolean(props.loading),
-      }}
-      accessibilityActions={[{ name: "activate" }]}
-      onAccessibilityAction={() => {
-        if (!props.disabled && !props.loading) props.onPress();
-      }}
-      style={props.fullWidth ? { width: "100%" } : { alignSelf: "flex-start" }}
-    >
-      <View importantForAccessibility="no-hide-descendants">
-        <Host
-          matchContents={props.fullWidth ? { vertical: true } : true}
-          colorScheme={themeAppearance}
-          ignoreSafeAreaKeyboardInsets
-          style={props.fullWidth ? { width: "100%" } : { alignSelf: "flex-start" }}
-        >
-          <Component
-            enabled={!props.disabled && !props.loading}
-            onClick={props.onPress}
-            modifiers={[
-              defaultMinSize({ minHeight: 48 }),
-              ...(props.fullWidth ? [fillMaxWidth()] : []),
-            ]}
-            colors={{
-              containerColor,
-              contentColor,
-              disabledContainerColor: colors["--color-subtle-strong"],
-              disabledContentColor: colors["--color-foreground-muted"],
-            }}
-          >
-            <Row verticalAlignment="center">
-              {props.loading ? (
-                <>
-                  <CircularProgressIndicator
-                    modifiers={[size(mediumIconSize, mediumIconSize)]}
-                    strokeWidth={2}
-                    color={colors["--color-foreground-muted"]}
-                  />
-                  <Box modifiers={[size(8 * scale, 1)]} />
-                </>
-              ) : null}
-              <Text style={{ ...typography, fontWeight: "500" }}>{props.label}</Text>
-            </Row>
-          </Component>
-        </Host>
-      </View>
+  const disabled = Boolean(props.disabled || props.loading);
+  const solid = tone === "primary" || tone === "danger" ? SOLID_CLASS_NAMES[tone] : null;
+  const width = props.fullWidth ? "w-full" : "self-start";
+  // Padding lives on the inner row: on liquid glass the control's own padding
+  // would inset the material and leave an unglazed ring.
+  const content = (
+    <View className="min-h-12 flex-row items-center justify-center gap-2 px-6">
+      {props.loading ? (
+        <ActivityIndicator size="small" colorClassName="accent-foreground-muted" />
+      ) : null}
+      <AppText
+        className={cn(
+          "text-center font-t3-medium",
+          disabled
+            ? "text-foreground-muted"
+            : solid
+              ? solid[1]
+              : tone === "text"
+                ? "text-primary-text"
+                : "text-foreground",
+        )}
+      >
+        {props.label}
+      </AppText>
     </View>
+  );
+  const pressableProps = {
+    accessibilityRole: "button" as const,
+    accessibilityLabel: props.label,
+    accessibilityState: { disabled, busy: Boolean(props.loading) },
+    disabled,
+    onPress: props.onPress,
+  };
+  if (tone === "secondary") {
+    return (
+      <Pressable {...pressableProps} className={cn("active:opacity-70", width)}>
+        <GlassControl className={cn("rounded-full", width)} radius={24}>
+          {content}
+        </GlassControl>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      {...pressableProps}
+      className={cn(
+        "rounded-full active:opacity-70",
+        width,
+        disabled && solid ? "bg-subtle-strong" : (solid?.[0] ?? "bg-transparent"),
+      )}
+    >
+      {content}
+    </Pressable>
   );
 }

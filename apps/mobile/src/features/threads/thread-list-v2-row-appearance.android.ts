@@ -1,9 +1,11 @@
 import type { ViewStyle } from "react-native";
 import type { MobileThemeVariables } from "../../lib/mobileTheme";
 
+// Same flat rows on bg-screen as iOS; Android differs only in the mono font and branch menu title.
+
 export const THREAD_LIST_V2_MONO_FONT = "monospace";
-export const THREAD_LIST_V2_ROW_CONTENT_CLASS_NAME = "px-3 py-2.5";
-export const THREAD_LIST_V2_ROW_DIVIDERS = false;
+export const THREAD_LIST_V2_ROW_CONTENT_CLASS_NAME = "px-5 py-2.5";
+export const THREAD_LIST_V2_ROW_DIVIDERS = true;
 
 export const selectedThreadRowColors = {
   foregroundClassName: "text-thread-selected-foreground",
@@ -22,20 +24,18 @@ export function getThreadListV2RowAppearance(
   selected: boolean,
 ) {
   const selectedBackgroundColor = theme["--color-thread-selected"];
-  const backgroundColor = theme[sidebarPane ? "--color-drawer" : "--color-screen"];
-  const style: ViewStyle = {
-    backgroundColor: selected ? selectedBackgroundColor : backgroundColor,
-    borderRadius: 20,
-  };
-  const swipeContainerStyle: ViewStyle = {
-    borderRadius: 20,
-    overflow: "hidden",
-    marginHorizontal: 8,
-    marginVertical: 2,
-  };
+  const style: ViewStyle | undefined = sidebarPane
+    ? {
+        backgroundColor: selected ? selectedBackgroundColor : theme["--color-drawer"],
+        borderRadius: 12,
+      }
+    : undefined;
+  const swipeContainerStyle: ViewStyle | undefined = sidebarPane
+    ? { borderRadius: 12, overflow: "hidden" }
+    : undefined;
 
   return {
-    className: undefined,
+    className: sidebarPane ? undefined : "bg-screen",
     interactionClassName: sidebarPane ? "bg-thread-hover" : "bg-row-hover",
     interactionOpacity: selected ? 0 : 1,
     foregroundClassName: sidebarPane ? "text-drawer-foreground" : "text-foreground",
@@ -52,9 +52,14 @@ export function getThreadListV2RowAppearance(
       ? "accent-drawer-foreground-muted"
       : "accent-foreground-tertiary",
     style,
-    cardStyle: sidebarPane ? { ...style, paddingHorizontal: 12, paddingVertical: 10 } : style,
+    cardStyle: sidebarPane ? { ...style, paddingHorizontal: 12, paddingVertical: 10 } : undefined,
     swipeContainerStyle,
-    swipeBackgroundColor: backgroundColor,
-    providerIconSurfaceColor: selected ? selectedBackgroundColor : backgroundColor,
+    swipeBackgroundColor: theme[sidebarPane ? "--color-drawer" : "--color-screen"],
+    // Provider badges blend into the surface beneath them.
+    providerIconSurfaceColor: sidebarPane
+      ? selected
+        ? selectedBackgroundColor
+        : theme["--color-drawer"]
+      : theme["--color-screen"],
   };
 }

@@ -1,9 +1,8 @@
 import type { ComponentProps } from "react";
-import { ActivityIndicator, Platform, Pressable } from "react-native";
+import { ActivityIndicator, Pressable } from "react-native";
 
 import { SymbolView } from "../../../components/AppSymbol";
 import { AppText as Text } from "../../../components/AppText";
-import { MaterialListRow } from "../../../components/MaterialListRow";
 import { cn } from "../../../lib/cn";
 
 export function SettingsActionRow(props: {
@@ -20,27 +19,13 @@ export function SettingsActionRow(props: {
   const icon = (
     <SymbolView
       name={props.icon}
-      size={Platform.OS === "android" ? 24 : 22}
+      size={22}
       tintColorClassName={iconColorClassName}
       type="monochrome"
       weight="regular"
     />
   );
   const spinner = props.loading ? <ActivityIndicator colorClassName={iconColorClassName} /> : null;
-
-  if (Platform.OS === "android") {
-    return (
-      <MaterialListRow
-        className="bg-grouped-card"
-        title={props.label}
-        titleClassName={textClassName}
-        leading={icon}
-        trailing={spinner}
-        disabled={props.disabled}
-        onPress={props.onPress}
-      />
-    );
-  }
 
   return (
     <Pressable

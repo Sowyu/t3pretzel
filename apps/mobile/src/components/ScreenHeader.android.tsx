@@ -1,30 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  BackHandler,
-  Keyboard,
-  Pressable,
-  TextInput,
-  type TextInputInstance,
-  View,
-} from "react-native";
+import { BackHandler, Keyboard, type TextInputInstance, View } from "react-native";
 import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
 import { NativeStackScreenOptions } from "../native/StackHeader";
 import { AndroidWorkspaceSidebarButton } from "../features/layout/workspace-sidebar-toolbar";
-import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { AndroidScreenHeader } from "./AndroidScreenHeader";
 import { ScreenHeaderButton } from "./ScreenHeaderButton.android";
-import { SymbolView } from "./AppSymbol";
 import { ControlPillMenu } from "./ControlPill";
 import { MaterialSearchField } from "./MaterialSearchField";
 import { androidHeaderMenuActions, findHeaderMenuAction } from "./headerMenu.android";
 import type { ScreenHeaderProps } from "./ScreenHeader.types";
-import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
 export function ScreenHeader(props: ScreenHeaderProps) {
   const { search } = props;
-  const { paddingTop, paddingBottom } = useMaterialToolbarLayout();
-  const { scale, buttonSize, iconSize, smallIconSize } = useAndroidControlSizing();
-  const { themeVariables } = useAppearancePreferences();
+  const { height, paddingTop, paddingBottom } = useMaterialToolbarLayout();
   const inputRef = useRef<TextInputInstance>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const searching = search !== undefined && (searchOpen || search.value.length > 0);
@@ -53,32 +41,13 @@ export function ScreenHeader(props: ScreenHeaderProps) {
         if (action && !action.disabled) action.onPress();
       }}
     >
-      {search?.mode === "inline" ? (
-        <Pressable
-          accessibilityLabel={menu.title}
-          accessibilityRole="button"
-          className="items-center justify-center rounded-full bg-subtle"
-          style={{ width: buttonSize, height: buttonSize }}
-        >
-          <SymbolView
-            name={menu.icon}
-            size={smallIconSize}
-            tintColorClassName="accent-header-foreground"
-            type="monochrome"
-          />
-        </Pressable>
-      ) : (
-        <ScreenHeaderButton accessibilityLabel={menu.title} icon={menu.icon} />
-      )}
+      <ScreenHeaderButton accessibilityLabel={menu.title} icon={menu.icon} />
     </ControlPillMenu>
   ));
   const options = (
     <NativeStackScreenOptions
       options={{
         ...props.options,
-        ...(props.matchSearchSurface
-          ? { contentStyle: { backgroundColor: themeVariables["--color-header"] } }
-          : undefined),
         headerShown: false,
         title: props.title,
       }}
@@ -93,58 +62,31 @@ export function ScreenHeader(props: ScreenHeaderProps) {
           className="border-b border-header-border bg-header px-3"
           style={{
             paddingTop,
-            paddingBottom: 8.75 * scale,
-            borderBottomWidth: 0,
+            paddingBottom,
+            borderBottomWidth: props.hideBottomBorder ? 0 : undefined,
           }}
         >
-          <View className="flex-row items-center gap-2" style={{ minHeight: buttonSize }}>
+          <View className="flex-row items-center gap-2" style={{ minHeight: height }}>
             {props.onBack ? (
-              <Pressable
+              <ScreenHeaderButton
                 accessibilityLabel="Navigate up"
-                accessibilityRole="button"
-                hitSlop={8}
+                icon="chevron.left"
                 onPress={props.onBack}
-                className="items-center justify-center"
-                style={{ width: buttonSize, height: buttonSize }}
-              >
-                <SymbolView
-                  name="chevron.left"
-                  size={iconSize}
-                  tintColorClassName="accent-header-foreground"
-                  type="monochrome"
-                />
-              </Pressable>
+              />
             ) : null}
-            <View
-              className="flex-1 flex-row items-center bg-input"
-              style={{
-                minHeight: Math.max(48, 38.5 * scale),
-                gap: 8.75 * scale,
-                borderRadius: 14 * scale,
-                paddingHorizontal: 12.25 * scale,
-              }}
-            >
-              <SymbolView
-                name="magnifyingglass"
-                size={Math.round(17 * scale)}
-                tintColorClassName="accent-header-foreground"
-                type="monochrome"
-              />
-              <TextInput
-                accessibilityLabel={search.placeholder}
-                autoCapitalize="none"
-                onChangeText={search.onChangeText}
-                value={search.value}
-                placeholder={
-                  search.compactToolbar
-                    ? (search.compactPlaceholder ?? search.placeholder)
-                    : search.placeholder
-                }
-                placeholderTextColorClassName="accent-placeholder"
-                className="flex-1 text-base font-sans text-header-foreground"
-                style={{ paddingVertical: 7 * scale }}
-              />
-            </View>
+            <MaterialSearchField
+              inputRef={inputRef}
+              autoFocus={false}
+              accessibilityLabel={search.placeholder}
+              clearAccessibilityLabel={search.clearAccessibilityLabel ?? "Clear search"}
+              placeholder={
+                search.compactToolbar
+                  ? (search.compactPlaceholder ?? search.placeholder)
+                  : search.placeholder
+              }
+              value={search.value}
+              onChangeText={search.onChangeText}
+            />
             {menuView}
           </View>
         </View>
@@ -201,8 +143,8 @@ export function ScreenHeader(props: ScreenHeaderProps) {
             {header}
           </View>
           {searching ? (
-            <View className="absolute inset-0 bg-header px-2" style={{ paddingTop, paddingBottom }}>
-              <View className="flex-1 flex-row items-center gap-1">
+            <View className="absolute inset-0 bg-header px-3" style={{ paddingTop, paddingBottom }}>
+              <View className="flex-1 flex-row items-center gap-2">
                 <ScreenHeaderButton
                   accessibilityLabel={search.closeAccessibilityLabel ?? "Close search"}
                   icon="arrow.left"

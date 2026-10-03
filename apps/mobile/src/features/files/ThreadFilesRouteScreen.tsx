@@ -13,7 +13,6 @@ import {
 } from "@t3tools/shared/filePreview";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
 
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
 import { AudioFilePreview } from "../../components/AudioFilePreview";
 import { EmptyState } from "../../components/EmptyState";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
@@ -71,7 +70,6 @@ function FilesBrowserHeader(props: {
       title="Files"
       subtitle={props.projectName}
       onBack={props.onBack}
-      hideBottomBorder
       matchSearchSurface
       search={{
         value: props.searchQuery,
@@ -118,7 +116,6 @@ function FileHeader(props: {
       title={props.title}
       subtitle={props.subtitle}
       onBack={props.onBack}
-      hideBottomBorder
       options={{ headerTintColor: props.iconColor, headerTitle: props.title }}
       backInSplitView={
         props.fileInspectorSupported
@@ -436,7 +433,7 @@ function FilesToolbarBottomFade() {
 export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
   useAdaptiveWorkspacePaneRole("inspector");
   const navigation = useNavigation();
-  const { fileInspector, layout, showAuxiliaryPane } = useAdaptiveWorkspaceLayout();
+  const { fileInspector, showAuxiliaryPane } = useAdaptiveWorkspaceLayout();
   const [searchQuery, setSearchQuery] = useState("");
   const { themeAppearance: highlightTheme } = useAppearancePreferences();
   const { cwd, environmentId, projectName, selectedThread, threadId } = useThreadFilesWorkspace(
@@ -555,27 +552,26 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
         onRefresh={entriesQuery.refresh}
         onBack={handleReturnToThread}
       />
-      <MaterialScreenContent insetHorizontal={layout.usesSplitView}>
-        <FileTreeBrowser
-          key={JSON.stringify([environmentId, cwd])}
-          entries={entriesQuery.entries}
-          loadedDirectories={entriesQuery.loadedDirectories}
-          onLoadDirectory={entriesQuery.loadDirectory}
-          error={entriesQuery.error}
-          isPending={entriesQuery.isPending}
-          searchQuery={searchQuery}
-          searchTruncated={entriesQuery.searchTruncated}
-          selectedPath={null}
-          onPreviewFile={handlePreviewFile}
-          onRefresh={entriesQuery.refresh}
-          onSelectFile={handleSelectFile}
-        />
-        <FilesToolbarBottomFade />
-      </MaterialScreenContent>
+      <FileTreeBrowser
+        key={JSON.stringify([environmentId, cwd])}
+        entries={entriesQuery.entries}
+        loadedDirectories={entriesQuery.loadedDirectories}
+        onLoadDirectory={entriesQuery.loadDirectory}
+        error={entriesQuery.error}
+        isPending={entriesQuery.isPending}
+        searchQuery={searchQuery}
+        searchTruncated={entriesQuery.searchTruncated}
+        selectedPath={null}
+        onPreviewFile={handlePreviewFile}
+        onRefresh={entriesQuery.refresh}
+        onSelectFile={handleSelectFile}
+      />
+      <FilesToolbarBottomFade />
     </>
   );
 
-  return Platform.OS === "android" ? <View className="flex-1 bg-header">{content}</View> : content;
+  // Android has no sheet contentStyle on this route, so the tree draws its own sheet surface.
+  return Platform.OS === "android" ? <View className="flex-1 bg-sheet">{content}</View> : content;
 }
 
 export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
@@ -911,30 +907,28 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
         onReturnToThread={handleReturnToThread}
         actions={fileMenuActions}
       />
-      <MaterialScreenContent>
-        <FileContent
-          key={previewKey}
-          activeMode={resolvedActiveMode}
-          cwd={cwd}
-          environmentId={environmentId}
-          previewUri={previewUri}
-          previewFailure={assetPreview._tag === "Failure" ? assetPreview.reason : null}
-          onRetryPreview={handleRetryPreview}
-          videoSource={videoSource}
-          mediaSource={mediaSource}
-          resolveVideoUri={assetPreview.refresh}
-          fileContents={fileData?.contents ?? null}
-          fileError={fileQuery.error}
-          initialLine={targetLine}
-          relativePath={relativePath}
-          threadId={threadId}
-          truncated={fileData?.truncated ?? false}
-          onRefresh={() => fileQuery.refresh()}
-          onOpenPdf={(uri) =>
-            setFullScreenPreview({ kind: "pdf", uri, name: basename(relativePath) })
-          }
-        />
-      </MaterialScreenContent>
+      <FileContent
+        key={previewKey}
+        activeMode={resolvedActiveMode}
+        cwd={cwd}
+        environmentId={environmentId}
+        previewUri={previewUri}
+        previewFailure={assetPreview._tag === "Failure" ? assetPreview.reason : null}
+        onRetryPreview={handleRetryPreview}
+        videoSource={videoSource}
+        mediaSource={mediaSource}
+        resolveVideoUri={assetPreview.refresh}
+        fileContents={fileData?.contents ?? null}
+        fileError={fileQuery.error}
+        initialLine={targetLine}
+        relativePath={relativePath}
+        threadId={threadId}
+        truncated={fileData?.truncated ?? false}
+        onRefresh={() => fileQuery.refresh()}
+        onOpenPdf={(uri) =>
+          setFullScreenPreview({ kind: "pdf", uri, name: basename(relativePath) })
+        }
+      />
       <FilePreviewModal
         source={fullScreenPreview}
         onRequestClose={() => setFullScreenPreview(null)}

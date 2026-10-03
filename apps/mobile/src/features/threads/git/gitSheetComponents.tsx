@@ -1,8 +1,7 @@
 import { SymbolView } from "../../../components/AppSymbol";
 import type { ComponentProps } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { AppText as Text } from "../../../components/AppText";
-import { MaterialButton } from "../../../components/MaterialButton";
 import { cn } from "../../../lib/cn";
 
 /* ─── Shared sheet components ──────────────────────────────────────── */
@@ -14,18 +13,6 @@ export function SheetActionButton(props: {
   readonly tone?: "primary" | "secondary" | "danger";
   readonly onPress: () => void;
 }) {
-  if (Platform.OS === "android")
-    return (
-      <View className="flex-1">
-        <MaterialButton
-          label={props.label}
-          tone={props.tone}
-          disabled={props.disabled}
-          onPress={props.onPress}
-          fullWidth
-        />
-      </View>
-    );
   const tone = props.tone ?? "secondary";
   const textColorClassName =
     tone === "primary"
@@ -71,7 +58,7 @@ export function SheetActionButton(props: {
 
 export function MetaCard(props: { readonly label: string; readonly value: string }) {
   return (
-    <View className="bg-card px-4 py-3 android:rounded-[20px] ios:rounded-[18px] ios:border ios:border-border">
+    <View className="bg-card px-4 py-3 rounded-[18px] border border-border">
       <Text className="text-foreground-muted text-2xs font-t3-bold tracking-[0.9px] uppercase">
         {props.label}
       </Text>
@@ -91,34 +78,30 @@ export function SheetListRow(props: {
 }) {
   return (
     <Pressable
-      className="flex-row items-center py-3 disabled:opacity-[0.45] android:min-h-16 android:gap-4 android:px-4 android:active:bg-subtle ios:gap-3 ios:px-1"
+      className="flex-row items-center py-3 disabled:opacity-[0.45] gap-3 px-1"
       disabled={props.disabled}
       onPress={props.onPress}
     >
-      <View className="items-center justify-center android:size-6 ios:bg-subtle ios:h-9 ios:w-9 ios:rounded-full">
+      <View className="items-center justify-center bg-subtle h-9 w-9 rounded-full">
         <SymbolView
           name={props.icon}
-          size={Platform.OS === "android" ? 24 : 16}
+          size={16}
           tintColorClassName="accent-icon"
           type="monochrome"
         />
       </View>
       <View className="flex-1 gap-0.5">
-        <Text className="text-foreground text-base android:font-t3-medium ios:font-t3-bold">
-          {props.title}
-        </Text>
+        <Text className="text-foreground text-base font-t3-bold">{props.title}</Text>
         {props.subtitle ? (
           <Text className="text-foreground-muted text-xs leading-snug">{props.subtitle}</Text>
         ) : null}
       </View>
-      {Platform.OS !== "android" ? (
-        <SymbolView
-          name="chevron.right"
-          size={13}
-          tintColorClassName="accent-icon-subtle"
-          type="monochrome"
-        />
-      ) : null}
+      <SymbolView
+        name="chevron.right"
+        size={13}
+        tintColorClassName="accent-icon-subtle"
+        type="monochrome"
+      />
     </Pressable>
   );
 }

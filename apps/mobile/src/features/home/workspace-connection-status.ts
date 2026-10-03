@@ -9,7 +9,9 @@ export interface WorkspaceConnectionStatusPresentation {
 function shouldShowWorkspaceConnectionStatus(state: WorkspaceState): boolean {
   return (
     state.networkStatus === "offline" ||
-    state.connectionError !== null ||
+    // One environment failing (a relay link that is down, a laptop that is
+    // asleep) is not news while another is serving threads.
+    (state.connectionError !== null && !state.hasReadyEnvironment) ||
     state.hasConnectingEnvironment ||
     state.hasPendingShellSnapshot ||
     (state.hasLoadedShellSnapshot && !state.hasReadyEnvironment)

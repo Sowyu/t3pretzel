@@ -14,19 +14,11 @@ import { type EnvironmentId, type SidebarProjectGroupingMode } from "@t3tools/co
 import { useAtomValue } from "@effect/atom-react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  View,
-  type GestureResponderEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from "react-native";
+import { ActivityIndicator, Platform, View, type GestureResponderEvent } from "react-native";
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "../../components/EmptyState";
-import { MaterialFloatingActionButton } from "../../components/MaterialFloatingActionButton";
 import type { WorkspaceEnvironment, WorkspaceState } from "../../state/workspaceModel";
 import type { SavedRemoteConnection } from "../../lib/connection";
 import { scopedProjectKey } from "../../lib/scopedEntities";
@@ -63,7 +55,6 @@ import {
 } from "./homeThreadList";
 import { createSwipeRowActivation } from "./swipe-row-activation";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-swipe-actions";
-import { useMaterialFabScroll } from "./MaterialFabScrollContext";
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
 
@@ -285,7 +276,6 @@ export function HomeScreen(props: HomeScreenProps) {
   const handleScrollBeginDrag = useCallback(() => {
     openSwipeableRef.current?.close();
   }, []);
-  const onMaterialFabScroll = useMaterialFabScroll();
   const listRef = useRef<LegendListRef>(null);
   const swipeRowActivation = useMemo(() => createSwipeRowActivation(), []);
   const activateVisibleRows = useCallback(
@@ -302,17 +292,13 @@ export function HomeScreen(props: HomeScreenProps) {
   // gate, so every scroll also activates the visible rows once it settles.
   const activationTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(activationTimerRef.current), []);
-  const handleListScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      onMaterialFabScroll?.(event);
-      clearTimeout(activationTimerRef.current);
-      activationTimerRef.current = setTimeout(
-        () => activateVisibleRows(listRef.current?.getState().data ?? []),
-        200,
-      );
-    },
-    [activateVisibleRows, onMaterialFabScroll],
-  );
+  const handleListScroll = useCallback(() => {
+    clearTimeout(activationTimerRef.current);
+    activationTimerRef.current = setTimeout(
+      () => activateVisibleRows(listRef.current?.getState().data ?? []),
+      200,
+    );
+  }, [activateVisibleRows]);
   const trackListTouches = useCallback(
     (event: GestureResponderEvent, started: boolean) => {
       const { changedTouches, touches } = event.nativeEvent;
@@ -860,17 +846,6 @@ export function HomeScreen(props: HomeScreenProps) {
               detail={emptyState.detail}
               actionLabel={!props.catalogState.hasReadyEnvironment ? "Add environment" : undefined}
               onAction={!props.catalogState.hasReadyEnvironment ? props.onAddConnection : undefined}
-              action={
-                Platform.OS === "android" && !props.catalogState.hasReadyEnvironment ? (
-                  <MaterialFloatingActionButton
-                    label="Add environment"
-                    icon="plus"
-                    variant="extended"
-                    tone="primary"
-                    onPress={props.onAddConnection}
-                  />
-                ) : undefined
-              }
               variant="plain"
             />
             {emptyState.loading ? (

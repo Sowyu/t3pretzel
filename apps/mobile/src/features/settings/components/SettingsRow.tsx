@@ -1,7 +1,6 @@
-import { MaterialListRow } from "../../../components/MaterialListRow";
 import { useNavigation } from "@react-navigation/native";
 import type { ComponentProps } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { SymbolView } from "../../../components/AppSymbol";
 import { AppText as Text } from "../../../components/AppText";
@@ -21,43 +20,6 @@ export function SettingsRow(props: {
   readonly onPress?: () => void;
 }) {
   const navigation = useNavigation();
-  if (Platform.OS === "android") {
-    return (
-      <MaterialListRow
-        className="bg-grouped-card"
-        title={props.label}
-        subtitle={props.valuePosition === "trailing" ? undefined : props.value}
-        accessibilityLabel={[props.label, props.value].filter(Boolean).join(", ")}
-        trailing={
-          props.valuePosition === "trailing" && props.value ? (
-            <View className="flex-row items-center gap-3">
-              <Text className="text-sm text-foreground-muted">{props.value}</Text>
-              <SymbolView name="chevron.right" size={16} tintColorClassName="accent-chevron" />
-            </View>
-          ) : undefined
-        }
-        disabled={props.disabled}
-        leading={
-          <SymbolView
-            name={props.icon}
-            size={24}
-            tintColorClassName="accent-icon"
-            type="monochrome"
-            weight="regular"
-          />
-        }
-        onPress={() => {
-          if (props.target)
-            navigation.navigate("SettingsSheet", {
-              screen: "SettingsContent",
-              params: { screen: props.target },
-            });
-          else if (props.fullScreenTarget) navigation.navigate(props.fullScreenTarget);
-          else props.onPress?.();
-        }}
-      />
-    );
-  }
   const content = (
     <View className={cn("flex-row items-center gap-4 p-4", props.disabled && "opacity-[0.45]")}>
       <SymbolView

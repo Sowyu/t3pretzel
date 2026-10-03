@@ -2287,7 +2287,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const theme = useUniwindTheme();
   const iconSubtleColor = theme["--color-icon-subtle"];
   // Work-log edge fades blend into whatever the feed sits on; ThreadDetailScreen
-  // paints the Material You layout on the thread canvas, not the screen color.
+  // paints the Android layout on the thread canvas, not the screen color.
   const screenColor = theme["--color-screen"];
   const userBubbleColor = theme["--color-user-bubble"];
   const onMarkdownLinkPress = useCallback(

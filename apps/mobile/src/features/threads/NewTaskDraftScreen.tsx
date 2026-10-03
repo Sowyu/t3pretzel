@@ -53,7 +53,6 @@ import {
   ComposerToolbarRow,
 } from "../../components/ComposerToolbar";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
 import { ComposerAttachmentButton } from "../../components/ComposerAttachmentButton";
 import { ComposerStashButton, useComposerStashChrome } from "./ComposerStashControl";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
@@ -1345,11 +1344,7 @@ export function NewTaskDraftScreen(props: {
         {Platform.OS === "android" ? (
           <>
             <NativeStackScreenOptions options={{ headerShown: false }} />
-            <AndroidScreenHeader
-              title="New thread"
-              hideBottomBorder
-              onBack={() => navigation.goBack()}
-            />
+            <AndroidScreenHeader title="New thread" onBack={() => navigation.goBack()} />
           </>
         ) : (
           <NativeStackScreenOptions options={{ title: "Loading task" }} />
@@ -1595,12 +1590,7 @@ export function NewTaskDraftScreen(props: {
   );
 
   const composerDock = (
-    <View
-      className={
-        Platform.OS === "android" ? "bg-sheet-solid px-[12px] pt-1" : "bg-sheet px-[12px] pt-1"
-      }
-      style={{ paddingBottom: controlsBottomPadding }}
-    >
+    <View className="bg-sheet px-[12px] pt-1" style={{ paddingBottom: controlsBottomPadding }}>
       {!voiceInput.isBusy &&
       composerMenu.trigger &&
       (composerMenu.items.length > 0 || composerMenu.trigger.kind === "pull-request") ? (
@@ -1831,18 +1821,16 @@ export function NewTaskDraftScreen(props: {
     return (
       <View className="flex-1 bg-sheet" collapsable={false}>
         <NativeStackScreenOptions options={{ headerShown: false }} />
-        <AndroidScreenHeader title="New thread" hideBottomBorder onBack={closeNewTask} />
-        <MaterialScreenContent>
-          {heroViewport}
+        <AndroidScreenHeader title="New thread" onBack={closeNewTask} />
+        {heroViewport}
 
-          <KeyboardStickyView
-            enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
-            style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
-            offset={{ closed: 0, opened: keyboardOpenedOffset }}
-          >
-            {composerDock}
-          </KeyboardStickyView>
-        </MaterialScreenContent>
+        <KeyboardStickyView
+          enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
+          style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
+          offset={{ closed: 0, opened: keyboardOpenedOffset }}
+        >
+          {composerDock}
+        </KeyboardStickyView>
       </View>
     );
   }
