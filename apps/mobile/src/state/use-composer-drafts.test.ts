@@ -933,7 +933,9 @@ describe("mobile composer drafts", () => {
       { allowOverflow: true },
     );
     expect(overflowRejected).toBe(0);
-    expect(appAtomRegistry.get(composerDraftsAtom)[draftKey]?.attachments).toHaveLength(9);
+    expect(appAtomRegistry.get(composerDraftsAtom)[draftKey]?.attachments).toHaveLength(
+      PROVIDER_SEND_TURN_MAX_ATTACHMENTS + 1,
+    );
   });
 
   it("keeps shared attachment files until every draft releases them", async () => {

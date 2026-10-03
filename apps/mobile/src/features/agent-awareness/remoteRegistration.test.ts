@@ -1077,6 +1077,9 @@ describe("makeRelayDeviceRegistrationRequest", () => {
         );
       }),
     );
+    vi.mocked(loadPreferences).mockResolvedValueOnce({
+      liveActivitiesEnabled: true,
+    } as Preferences);
     Constants.expoConfig!.extra = { relay: { url: "https://relay.example.test" } };
     setAgentAwarenessRelayTokenProvider(() => Promise.resolve("clerk-token-user-a"), "user-a");
     return Effect.gen(function* () {
