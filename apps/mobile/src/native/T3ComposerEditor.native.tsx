@@ -16,7 +16,10 @@ import {
 import type { NativeSyntheticEvent, ViewProps } from "react-native";
 import { Image, StyleSheet } from "react-native";
 
-import { markdownFileIconSource } from "@t3tools/mobile-markdown-text/file-icons";
+import {
+  markdownFileIconSource,
+  markdownIconAssetUri,
+} from "@t3tools/mobile-markdown-text/file-icons";
 import {
   composerChipSizeSuffix,
   contextChipPresentation,
@@ -28,7 +31,7 @@ import { useFontFamily } from "../lib/useFontFamily";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { supportsLiquidGlass } from "../components/GlassSurface";
 import { useUniwindTheme } from "../lib/useUniwindTheme";
-import { flattenThemeColor } from "../lib/mobileTheme";
+import { createNativeComposerTheme } from "../lib/nativeComposerTheme";
 import {
   acknowledgeComposerNativeEvent,
   assumeComposerControlledState,
@@ -114,8 +117,8 @@ function basename(path: string): string {
   return separator >= 0 ? path.slice(separator + 1) : path;
 }
 
-function fileIconUri(path: string): string {
-  return Image.resolveAssetSource(markdownFileIconSource(resolveMarkdownFileIcon(path))).uri;
+function fileIconUri(path: string): string | null {
+  return markdownIconAssetUri(markdownFileIconSource(resolveMarkdownFileIcon(path))) ?? null;
 }
 
 export function ComposerEditor({
@@ -264,19 +267,10 @@ export function ComposerEditor({
   );
   const { themeAppearance } = useAppearancePreferences();
   const themeJson = JSON.stringify({
+    ...createNativeComposerTheme(theme),
     // On liquid glass the typed text casts a faint halo onto the material,
     // the way content near real glass bleeds into it. Solid surfaces get none.
     textGlow: supportsLiquidGlass ? (themeAppearance === "dark" ? "#FFFFFF4D" : "#0000002E") : null,
-    text: theme["--color-foreground"],
-    placeholder: theme["--color-placeholder"],
-    chipBackground: theme["--color-subtle"],
-    // Native chip drawing parses opaque hex only, and this role is translucent.
-    chipBorder: flattenThemeColor(theme["--color-border"], theme["--color-user-bubble"]),
-    chipText: theme["--color-foreground"],
-    skillBackground: theme["--color-inline-skill-background"],
-    skillBorder: theme["--color-inline-skill-border"],
-    skillText: theme["--color-inline-skill-foreground"],
-    fileTint: theme["--color-icon-muted"],
   });
   const resolvedTextStyle = StyleSheet.flatten(textStyle) ?? {};
   const regularFontFamily = useFontFamily("regular");

@@ -1,9 +1,11 @@
 import {
-  projectThreadAwareness,
+  projectThreadAwarenessV2,
   type AgentAwarenessPhase,
-  type ProjectThreadAwarenessInput,
+  type ProjectThreadAwarenessV2Input,
 } from "@t3tools/shared/agentAwareness";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type { EnvironmentId, RuntimeRequestId } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 
 import { scopedThreadKey } from "../../lib/scopedEntities";
 
@@ -11,7 +13,57 @@ import { scopedThreadKey } from "../../lib/scopedEntities";
 export interface TurnCompletionThread {
   readonly environmentId: EnvironmentId;
   readonly projectTitle: string;
-  readonly thread: ProjectThreadAwarenessInput["thread"];
+  readonly thread: Pick<
+    EnvironmentThreadShell,
+    | "id"
+    | "title"
+    | "lineage"
+    | "modelSelection"
+    | "pendingBackgroundTasks"
+    | "latestRun"
+    | "runtime"
+    | "hasPendingApprovals"
+    | "hasPendingUserInput"
+    | "updatedAt"
+  >;
+}
+
+/**
+ * The client shell carries pending requests as two flags and run state as
+ * summaries; the shared awareness projection reads the server shell's fields.
+ * Only the kind and status matter to it, so the request id and time are
+ * placeholders.
+ */
+function toAwarenessThread(
+  thread: TurnCompletionThread["thread"],
+): ProjectThreadAwarenessV2Input["thread"] {
+  const status = thread.runtime?.status ?? thread.latestRun?.status ?? "idle";
+  const updatedAt = DateTime.makeUnsafe(thread.updatedAt);
+  const pendingKind = thread.hasPendingUserInput
+    ? "user_input"
+    : thread.hasPendingApprovals
+      ? "command"
+      : null;
+  return {
+    id: thread.id,
+    title: thread.title,
+    lineage: thread.lineage,
+    modelSelection: thread.modelSelection,
+    pendingBackgroundTasks: thread.pendingBackgroundTasks,
+    updatedAt,
+    activityRunStatus:
+      status === "preparing" ||
+      status === "starting" ||
+      status === "running" ||
+      status === "waiting"
+        ? status
+        : null,
+    status,
+    pendingRuntimeRequest:
+      pendingKind === null
+        ? null
+        : { id: "pending" as RuntimeRequestId, kind: pendingKind, createdAt: updatedAt },
+  };
 }
 
 export interface TurnCompletionNotification {
@@ -109,10 +161,10 @@ export function reconcileTurnCompletions(input: {
   const islands: AgentIslandAlert[] = [];
 
   for (const entry of input.threads) {
-    const awareness = projectThreadAwareness({
+    const awareness = projectThreadAwarenessV2({
       environmentId: entry.environmentId,
       project: { title: entry.projectTitle },
-      thread: entry.thread,
+      thread: toAwarenessThread(entry.thread),
     });
     if (awareness === null) continue;
 

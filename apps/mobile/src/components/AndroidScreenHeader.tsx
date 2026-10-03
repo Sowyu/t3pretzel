@@ -1,12 +1,16 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SymbolView, type AppSymbolName } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
 import { GlassControl } from "./GlassControl";
 import { GlassSurface } from "./GlassSurface";
 import { cn } from "../lib/cn";
+import { MaterialIconButton } from "./MaterialIconButton";
+import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
+import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
+import { useAndroidControlSizing } from "./useAndroidControlSizing";
+import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
 
 // Bottom corners of the floating glass bar; the composer's card uses the same scale.
 const FLOATING_CORNER_RADIUS = 24;
@@ -16,6 +20,7 @@ export interface AndroidHeaderAction {
   readonly icon: AppSymbolName;
   readonly onPress: () => void;
   readonly disabled?: boolean;
+  readonly selected?: boolean;
 }
 
 export function AndroidHeaderIconButton(props: {
@@ -23,11 +28,15 @@ export function AndroidHeaderIconButton(props: {
   readonly icon: AppSymbolName;
   readonly onPress?: () => void;
   readonly disabled?: boolean;
+  readonly selected?: boolean;
 }) {
+  const { scale } = useAndroidControlSizing();
+  const size = Math.round(44 * scale);
   return (
     <Pressable
       accessibilityLabel={props.accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(props.disabled), selected: props.selected }}
       disabled={props.disabled}
       hitSlop={8}
       onPress={props.onPress}
@@ -35,11 +44,21 @@ export function AndroidHeaderIconButton(props: {
     >
       {/* Same circle as the home header's controls: liquid glass where the
           platform has it, the flat bg-subtle fill everywhere else. */}
-      <GlassControl className="size-11 items-center justify-center rounded-full" radius={22}>
+      <GlassControl
+        className="items-center justify-center rounded-full"
+        radius={size / 2}
+        style={{ width: size, height: size }}
+      >
         <SymbolView
           name={props.icon}
-          size={20}
-          tintColorClassName={props.disabled ? "accent-icon-subtle" : "accent-foreground"}
+          size={Math.round(20 * scale)}
+          tintColorClassName={
+            props.disabled
+              ? "accent-icon-subtle"
+              : props.selected
+                ? "accent-primary"
+                : "accent-header-foreground"
+          }
           type="monochrome"
         />
       </GlassControl>
@@ -51,12 +70,14 @@ export function AndroidScreenHeader(props: {
   readonly title: string;
   readonly subtitle?: string | null;
   readonly actions?: ReadonlyArray<AndroidHeaderAction>;
+  readonly leading?: ReactNode;
   readonly trailing?: ReactNode;
   /** Sits on the header surface under the title row, above the bottom border.
       The Files screen puts its search field here, matching the home header. */
   readonly below?: ReactNode;
   readonly onBack?: () => void;
   readonly embedded?: boolean;
+  readonly hideBottomBorder?: boolean;
   /** Floats the bar over the screen as liquid glass instead of sitting in
       flow, so content refracts through it while it scrolls underneath. The
       caller owns the matching top inset for that content and measures this
@@ -65,45 +86,56 @@ export function AndroidScreenHeader(props: {
   /** The bar's on-screen height, for the caller's content inset. */
   readonly onHeightChange?: (height: number) => void;
 }) {
-  const insets = useSafeAreaInsets();
-  const paddingTop = props.embedded ? 8 : Math.max(insets.top, 12);
-  const paddingClassName = cn("px-3", props.below ? "pb-3" : "pb-2.5");
+  const titleTypography = useScaledTextRole("title");
+  const subtitleTypography = useScaledTextRole("label");
+  const {
+    height: materialToolbarHeight,
+    paddingTop,
+    paddingBottom,
+  } = useMaterialToolbarLayout(props.embedded);
+  const [headerWidth, setHeaderWidth] = useState(0);
+  const actions = props.actions ?? [];
+  const directCount = actions.length > 2 ? (headerWidth >= 600 ? 3 : 1) : actions.length;
+  const visibleActions = actions.slice(0, directCount);
+  const overflowActions = actions.slice(directCount);
   const { onHeightChange } = props;
   // The floating bar overshoots the top of the screen by its corner radius,
   // so only its bottom corners round on screen.
   const overshoot = props.floating ? FLOATING_CORNER_RADIUS : 0;
   const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => onHeightChange?.(event.nativeEvent.layout.height - overshoot),
+    (event: LayoutChangeEvent) => {
+      setHeaderWidth(event.nativeEvent.layout.width);
+      onHeightChange?.(event.nativeEvent.layout.height - overshoot);
+    },
     [onHeightChange, overshoot],
   );
+  const padding = {
+    paddingTop: paddingTop + overshoot,
+    paddingBottom: props.below ? paddingBottom + 5 : paddingBottom,
+  };
 
   const content = (
     <>
-      <View className="min-h-12 flex-row items-center gap-2">
+      <View style={{ minHeight: materialToolbarHeight }} className="flex-row items-center gap-1">
         {props.onBack ? (
-          <Pressable
+          <MaterialIconButton
             accessibilityLabel="Navigate up"
-            accessibilityRole="button"
-            hitSlop={8}
+            icon="arrow.left"
+            tintColorClassName="accent-header-foreground"
             onPress={props.onBack}
-            className="-mr-2 size-11 items-center justify-center"
-          >
-            <SymbolView
-              name="chevron.left"
-              size={24}
-              tintColorClassName={"accent-foreground"}
-              type="monochrome"
-            />
-          </Pressable>
+          />
         ) : null}
 
+        {props.leading}
+
         <View className={cn("min-w-0 flex-1", !props.onBack && "pl-1")}>
-          <Text numberOfLines={1} className="text-lg font-t3-bold text-foreground">
+          <Text numberOfLines={1} style={titleTypography} className="text-header-foreground">
             {props.title}
           </Text>
           {props.subtitle ? (
             <Text
               numberOfLines={1}
+              style={subtitleTypography}
               className="mt-px text-[13px] font-t3-medium text-foreground-muted"
             >
               {props.subtitle}
@@ -111,15 +143,39 @@ export function AndroidScreenHeader(props: {
           ) : null}
         </View>
 
-        {props.actions?.map((action) => (
+        {visibleActions.map((action) => (
           <AndroidHeaderIconButton
             key={action.accessibilityLabel}
             accessibilityLabel={action.accessibilityLabel}
             disabled={action.disabled}
+            selected={action.selected}
             icon={action.icon}
             onPress={action.onPress}
           />
         ))}
+        {overflowActions.length > 0 ? (
+          <AndroidAnchoredMenu
+            actions={overflowActions.map((action, index) => ({
+              id: String(index),
+              title: action.accessibilityLabel,
+              attributes: {
+                disabled: Boolean(action.disabled),
+                state: action.selected ? "on" : undefined,
+              },
+            }))}
+            onPressAction={({ nativeEvent }) =>
+              overflowActions[Number(nativeEvent.event)]?.onPress()
+            }
+          >
+            {(open) => (
+              <AndroidHeaderIconButton
+                accessibilityLabel="More actions"
+                icon="ellipsis"
+                onPress={open}
+              />
+            )}
+          </AndroidAnchoredMenu>
+        ) : null}
         {props.trailing}
       </View>
 
@@ -145,7 +201,7 @@ export function AndroidScreenHeader(props: {
           zIndex: 1,
         }}
       >
-        <View className={paddingClassName} style={{ paddingTop: paddingTop + overshoot }}>
+        <View className="px-2" style={padding}>
           {content}
         </View>
       </GlassSurface>
@@ -154,9 +210,12 @@ export function AndroidScreenHeader(props: {
 
   return (
     <View
-      className={cn("border-b border-header-border bg-header", paddingClassName)}
       onLayout={handleLayout}
-      style={{ paddingTop }}
+      className="border-b border-header-border bg-header px-2"
+      style={{
+        ...padding,
+        borderBottomWidth: props.hideBottomBorder ? 0 : undefined,
+      }}
     >
       {content}
     </View>

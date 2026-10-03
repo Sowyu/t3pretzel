@@ -1,19 +1,20 @@
+import { RequestActionButton } from "./RequestActionButton";
 import type {
-  ApprovalRequestId,
   ProviderApprovalDecision,
   ProviderApprovalOption,
+  RuntimeRequestId,
 } from "@t3tools/contracts";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
 import type { PendingApproval } from "../../lib/threadActivity";
 
 export interface PendingApprovalCardProps {
   readonly approval: PendingApproval;
-  readonly respondingApprovalId: ApprovalRequestId | null;
+  readonly respondingApprovalId: RuntimeRequestId | null;
   readonly onRespond: (
-    requestId: ApprovalRequestId,
+    requestId: RuntimeRequestId,
     decision: ProviderApprovalDecision,
   ) => Promise<unknown>;
 }
@@ -31,6 +32,8 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
   const responding = props.respondingApprovalId === props.approval.requestId;
   // The decision in flight, so only its button shows a spinner.
   const [pressedDecision, setPressedDecision] = useState<ProviderApprovalDecision | null>(null);
+  const canRespond = props.approval.responseCapability === "live";
+  const disabled = !canRespond || responding;
   // Opaque for the same reason as PendingUserInputCard: nothing blurs the feed
   // behind this card, so a translucent surface bleeds messages through it.
   return (
@@ -46,50 +49,34 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
           {props.approval.detail}
         </Text>
       ) : null}
+      {!canRespond ? (
+        <Text className="font-sans text-sm leading-5 text-adaptive-neutral-600-400">
+          The provider process for this request is no longer available. Interrupt or restart the run
+          to continue.
+        </Text>
+      ) : null}
       {warning ? (
         <Text className="font-sans text-xs leading-normal text-warning-foreground">{warning}</Text>
       ) : null}
       <View className="flex-row flex-wrap gap-2.5">
         {options.map((option) => (
-          <Pressable
+          <RequestActionButton
             key={option.decision}
-            className={`flex-row items-center justify-center gap-2 rounded-[14px] px-3.5 py-3 ${
+            label={option.label}
+            tone={
               option.decision === "accept"
-                ? "bg-primary"
+                ? "primary"
                 : option.decision === "decline"
-                  ? "bg-danger"
-                  : "bg-subtle-strong"
-            } ${responding && pressedDecision !== option.decision ? "opacity-50" : ""}`}
-            disabled={responding}
+                  ? "danger"
+                  : "secondary"
+            }
+            busy={responding && pressedDecision === option.decision}
+            disabled={disabled}
             onPress={() => {
               setPressedDecision(option.decision);
               void props.onRespond(props.approval.requestId, option.decision);
             }}
-          >
-            {responding && pressedDecision === option.decision ? (
-              <ActivityIndicator
-                colorClassName={
-                  option.decision === "accept"
-                    ? "accent-primary-foreground"
-                    : option.decision === "decline"
-                      ? "accent-danger-foreground"
-                      : "accent-foreground"
-                }
-                size="small"
-              />
-            ) : null}
-            <Text
-              className={`text-sm ${
-                option.decision === "accept"
-                  ? "font-t3-extrabold text-primary-foreground"
-                  : option.decision === "decline"
-                    ? "font-t3-bold text-danger-foreground"
-                    : "font-t3-bold text-foreground"
-              }`}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
     </View>

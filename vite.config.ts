@@ -121,7 +121,7 @@ export default defineConfig({
           "packages/shared/src/**",
         ],
         excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
-        rules: { "t3code/no-hermes-unsupported-array-methods": "error" },
+        rules: { "t3code/no-hermes-unsupported-apis": "error" },
       },
       {
         // Reviewed native and third-party interop boundaries that cannot consume a className.
@@ -145,7 +145,12 @@ export default defineConfig({
           "apps/mobile/src/features/review/ReviewCommentCard.tsx",
           "apps/mobile/src/features/threads/ThreadSettingsSheet.tsx",
           "apps/mobile/src/features/threads/git/GitOverviewSheet.tsx",
-          "apps/mobile/src/features/threads/thread-list-items.tsx",
+          "apps/mobile/src/features/home/HomeHeader.android.tsx",
+          "apps/mobile/src/features/settings/appearance/components/FontSizeSliderRow.tsx",
+          "apps/mobile/src/features/threads/NewTaskContextPickerScreens.tsx",
+          "apps/mobile/src/features/threads/ThreadAgentsSheet.tsx",
+          "apps/mobile/src/features/threads/ThreadQueueControl.tsx",
+          "apps/mobile/src/native/SelectableMarkdownText.android.tsx",
           "apps/mobile/src/features/threads/thread-list-v2-items.tsx",
           "apps/mobile/src/lib/useMobileNavigationTheme.ts",
           "apps/mobile/src/native/T3ComposerEditor.ios.tsx",

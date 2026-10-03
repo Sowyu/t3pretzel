@@ -1,7 +1,8 @@
+import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, AppState, Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SymbolView } from "../../components/AppSymbol";
@@ -18,6 +19,8 @@ import {
   supportsBatteryOptimizationHint,
 } from "../../lib/batteryOptimization";
 import { tryCopyTextWithHaptic } from "../../lib/copyTextWithHaptic";
+import { SettingsActionRow } from "../settings/components/SettingsActionRow";
+import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import {
   formatStartupCrashReport,
@@ -82,7 +85,7 @@ export function SettingsDiagnosticsRouteScreen() {
   };
 
   return (
-    <View collapsable={false} className="flex-1 bg-sheet">
+    <SettingsScreen title="Diagnostics">
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentInset={{ bottom: Math.max(insets.bottom, 18) }}
@@ -129,23 +132,12 @@ export function SettingsDiagnosticsRouteScreen() {
 
         <View className="gap-3">
           <SettingsSection title="Actions">
-            <Pressable
-              accessibilityRole="button"
+            <SettingsActionRow
+              icon={copied ? "checkmark" : "doc.on.doc"}
+              label={copied ? "Copied" : "Copy crash report"}
               disabled={state.status !== "ready"}
               onPress={() => void copyReport()}
-              className="flex-row items-center gap-4 p-4 disabled:opacity-40"
-            >
-              <SymbolView
-                name={copied ? "checkmark" : "doc.on.doc"}
-                size={22}
-                tintColorClassName={"accent-icon"}
-                type="monochrome"
-                weight="regular"
-              />
-              <Text className="flex-1 text-lg text-foreground">
-                {copied ? "Copied" : "Copy crash report"}
-              </Text>
-            </Pressable>
+            />
           </SettingsSection>
           <Text className="px-2 text-sm leading-normal text-foreground-muted">
             Paste the report into a GitHub issue. It contains the app version, the JavaScript error
@@ -154,7 +146,7 @@ export function SettingsDiagnosticsRouteScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </SettingsScreen>
   );
 }
 
@@ -271,7 +263,7 @@ function EmptyState(props: {
       <SymbolView
         name={props.icon}
         size={28}
-        tintColorClassName={"accent-icon"}
+        tintColorClassName="accent-icon"
         type="monochrome"
         weight="regular"
       />

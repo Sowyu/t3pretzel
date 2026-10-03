@@ -1,63 +1,12 @@
-import { MenuView } from "@react-native-menu/menu";
-import { mediumImpactHaptic } from "../lib/haptics";
-import {
-  cloneElement,
-  isValidElement,
-  type ComponentProps,
-  type ReactElement,
-  type ReactNode,
-  useMemo,
-  useRef,
-} from "react";
-import {
-  Platform,
-  Pressable,
-  View,
-  type ColorValue,
-  type PressableProps,
-  type AccessibilityProps,
-} from "react-native";
-import { withUniwind } from "uniwind";
-import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
-
+import { type ComponentProps, type ReactNode, useRef } from "react";
+import { Pressable, View } from "react-native";
 import { cn } from "../lib/cn";
-import { withMenuActionIconColors } from "../lib/menu-action-colors";
-import {
-  AndroidAnchoredMenu,
-  type AndroidMenuAction,
-  toNativeMenuActions,
-} from "./AndroidAnchoredMenu";
 import { SymbolView } from "./AppSymbol";
 import { GlassControl } from "./GlassControl";
 import { AppText as Text } from "./AppText";
+import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
-const ThemedMenuView = withUniwind(
-  function NativeMenuView({
-    iconColor,
-    destructiveIconColor,
-    ...props
-  }: ComponentProps<typeof MenuView> & {
-    readonly iconColor?: ColorValue;
-    readonly destructiveIconColor?: ColorValue;
-  }) {
-    const actions = useMemo(
-      () =>
-        withMenuActionIconColors(props.actions, {
-          icon: iconColor,
-          destructiveIcon: destructiveIconColor,
-        }),
-      [props.actions, iconColor, destructiveIconColor],
-    );
-    return <MenuView {...props} actions={actions} />;
-  },
-  {
-    iconColor: { fromClassName: "iconColorClassName", styleProperty: "accentColor" },
-    destructiveIconColor: {
-      fromClassName: "destructiveIconColorClassName",
-      styleProperty: "accentColor",
-    },
-  },
-);
+export { ControlPillMenu } from "./ControlPillMenu";
 
 export function ControlPill(props: {
   readonly icon?: ComponentProps<typeof SymbolView>["name"];
@@ -71,6 +20,7 @@ export function ControlPill(props: {
   readonly className?: string;
 }) {
   const variant = props.variant ?? "circle";
+  const { smallIconSize } = useAndroidControlSizing();
   const activatedOnPressInRef = useRef(false);
 
   const handlePressIn = () => {
@@ -126,7 +76,9 @@ export function ControlPill(props: {
       ? props.disabled
         ? "text-foreground-muted"
         : "text-primary-foreground"
-      : "",
+      : variant === "danger"
+        ? "text-danger-foreground"
+        : "text-foreground",
   );
 
   const content = (
@@ -136,7 +88,7 @@ export function ControlPill(props: {
       ) : props.icon ? (
         <SymbolView
           name={props.icon}
-          size={16}
+          size={smallIconSize}
           tintColorClassName={iconTintClassName}
           type="monochrome"
         />
@@ -165,129 +117,5 @@ export function ControlPill(props: {
     <Pressable {...pressableProps} className={containerClassName}>
       {content}
     </Pressable>
-  );
-}
-
-// iOS renders the native UIMenu (standard checkmark for `state: "on"`);
-// Android renders the token-styled AndroidAnchoredMenu, since the native
-// AppCompat popup can't be themed past its stock animation, metrics, and
-// submenu chrome.
-export function ControlPillMenu(
-  props: Omit<ComponentProps<typeof MenuView>, "actions" | "children" | "themeVariant"> &
-    Pick<AccessibilityProps, "accessible" | "accessibilityLabel" | "accessibilityRole"> & {
-      readonly actions: readonly AndroidMenuAction[];
-      readonly children: ReactNode;
-      readonly className?: string;
-    },
-) {
-  const { themeAppearance } = useAppearancePreferences();
-  const isDarkMode = themeAppearance === "dark";
-  const menuPress = useRef({ isPreparing: false, isOpen: false, suppressPress: false });
-  const pendingPress = useRef<(() => void) | null>(null);
-
-  if (Platform.OS === "android") {
-    // Long-press menus keep their child interactive: the child element gets
-    // an injected onLongPress (mirroring the iOS context-menu interaction)
-    // so its own tap handling still works.
-    if (props.shouldOpenOnLongPress && isValidElement(props.children)) {
-      const child = props.children as ReactElement<{ onLongPress?: () => void }>;
-      return (
-        <AndroidAnchoredMenu
-          actions={props.actions}
-          className={props.className}
-          title={props.title}
-          style={props.style}
-          onPressAction={props.onPressAction}
-        >
-          {(open) =>
-            cloneElement(child, {
-              onLongPress: () => {
-                void mediumImpactHaptic();
-                open();
-              },
-            })
-          }
-        </AndroidAnchoredMenu>
-      );
-    }
-    return (
-      <AndroidAnchoredMenu
-        actions={props.actions}
-        className={props.className}
-        title={props.title}
-        style={props.style}
-        onPressAction={props.onPressAction}
-      >
-        {props.children}
-      </AndroidAnchoredMenu>
-    );
-  }
-
-  const { className: _className, actions, ...menuProps } = props;
-  const nativeActions = useMemo(() => toNativeMenuActions(actions), [actions]);
-  let children = menuProps.children;
-  if (props.shouldOpenOnLongPress && isValidElement(children)) {
-    const child = children as ReactElement<Pick<PressableProps, "onTouchStart" | "onPress">>;
-    children = cloneElement(child, {
-      onTouchStart: (event) => {
-        // Reset for a new touch, not onPressIn, which also fires when a
-        // finger moves out of the row and back during the same gesture.
-        menuPress.current.isPreparing = false;
-        menuPress.current.suppressPress = menuPress.current.isOpen;
-        pendingPress.current = null;
-        child.props.onTouchStart?.(event);
-      },
-      onPress: (event) => {
-        // Accessibility clicks have no touch identifier and must not inherit
-        // cancellation from a previous physical gesture.
-        const isTouch = typeof event.nativeEvent.identifier === "number";
-        if (isTouch ? menuPress.current.suppressPress : menuPress.current.isOpen) {
-          return;
-        }
-        if (isTouch && menuPress.current.isPreparing) {
-          // A release can arrive between native menu preparation and display.
-          // Let UIKit's display/cancel callback decide this press's outcome.
-          event.persist();
-          pendingPress.current = () => child.props.onPress?.(event);
-          return;
-        }
-        child.props.onPress?.(event);
-      },
-    });
-    menuProps.onMenuInteractionStart = () => {
-      menuPress.current.isPreparing = true;
-      props.onMenuInteractionStart?.();
-    };
-    menuProps.onOpenMenu = () => {
-      menuPress.current.isPreparing = false;
-      menuPress.current.isOpen = true;
-      menuPress.current.suppressPress = true;
-      pendingPress.current = null;
-      props.onOpenMenu?.();
-    };
-    menuProps.onCloseMenu = () => {
-      menuPress.current.isPreparing = false;
-      menuPress.current.isOpen = false;
-      // Keep this gesture cancelled even if dismissal precedes finger-up.
-      // A separate JS long-press timer would also swallow holds that never
-      // open the native menu.
-      const press = pendingPress.current;
-      pendingPress.current = null;
-      props.onCloseMenu?.();
-      if (!menuPress.current.suppressPress) {
-        press?.();
-      }
-    };
-  }
-  return (
-    <ThemedMenuView
-      {...menuProps}
-      actions={nativeActions}
-      iconColorClassName="accent-icon"
-      destructiveIconColorClassName="accent-danger-foreground"
-      themeVariant={isDarkMode ? "dark" : "light"}
-    >
-      {children}
-    </ThemedMenuView>
   );
 }

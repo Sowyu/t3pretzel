@@ -37,7 +37,7 @@ interface FadeState {
 }
 
 /**
- * Splits the text a streaming reasoning message has grown to into the spans
+ * Splits the text a streaming reasoning item has grown to into the spans
  * that still owe a fade. Deltas only ever append, so the new suffix is the new
  * chunk; text that is not an extension of what was shown (a resumed thread, a
  * provider replacing its block) snaps instead of animating a diff.
@@ -57,7 +57,7 @@ function advanceFade(fade: FadeState, text: string): FadeState {
 }
 
 /**
- * One thinking trace: a `role: "reasoning"` message, shown when Settings →
+ * One thinking trace: a v2 `reasoning` turn item, shown when Settings →
  * Experimental → Thinking traces is on. While it streams each new delta fades
  * in where it lands; a finished block collapses to three lines, because the
  * answer below it is the point. Text already there when the row mounted never

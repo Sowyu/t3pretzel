@@ -1,4 +1,4 @@
-import type { EnvironmentId, OrchestrationShellSnapshot } from "@t3tools/contracts";
+import type { EnvironmentId, OrchestrationV2ShellSnapshot } from "@t3tools/contracts";
 
 /**
  * Hands shell snapshots fetched by background refresh to the live connection.
@@ -15,7 +15,7 @@ import type { EnvironmentId, OrchestrationShellSnapshot } from "@t3tools/contrac
 // the socket still replays from the cursor, but a fresh fetch is cheaper then.
 const MAX_AGE_MS = 20 * 60_000;
 
-const fresh = new Map<EnvironmentId, { snapshot: OrchestrationShellSnapshot; atMs: number }>();
+const fresh = new Map<EnvironmentId, { snapshot: OrchestrationV2ShellSnapshot; atMs: number }>();
 const pending = new Map<EnvironmentId, Promise<unknown>>();
 
 /** Background refresh calls this around each environment's fetch. */
@@ -27,7 +27,7 @@ export function trackShellFetch<A>(environmentId: EnvironmentId, run: Promise<A>
   return run;
 }
 
-export function offerShell(environmentId: EnvironmentId, snapshot: OrchestrationShellSnapshot) {
+export function offerShell(environmentId: EnvironmentId, snapshot: OrchestrationV2ShellSnapshot) {
   fresh.set(environmentId, { snapshot, atMs: Date.now() });
 }
 
@@ -35,7 +35,7 @@ export function offerShell(environmentId: EnvironmentId, snapshot: Orchestration
 export async function takeShell(
   environmentId: EnvironmentId,
   nowMs: () => number = Date.now,
-): Promise<OrchestrationShellSnapshot | null> {
+): Promise<OrchestrationV2ShellSnapshot | null> {
   await pending.get(environmentId)?.catch(() => undefined);
   const entry = fresh.get(environmentId);
   fresh.delete(environmentId);

@@ -2,6 +2,8 @@ name: Nightly Android
 
 # Builds the nightly variant APK from main and publishes it to the rolling
 # `nightly` GitHub release. Runs on every push to main and once a day.
+# A manual run on any other branch only uploads the APK as a run artifact, so a
+# branch build never reaches the in-app updater.
 
 on:
   push:
@@ -15,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: nightly-android
+  group: nightly-android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -62,7 +64,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.1.12297006 cmake;3.22.1"
+          packages: "platform-tools platforms;android-37 build-tools;37.0.0 ndk;27.1.12297006 cmake;3.22.1"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -105,7 +107,15 @@ jobs:
         working-directory: apps/mobile/android
         run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a
 
+      - name: Upload branch APK
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3code-nightly-arm64-v8a-${{ github.sha }}
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+
       - name: Publish nightly release
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         # Updates the release in place. Deleting and recreating it left a minute

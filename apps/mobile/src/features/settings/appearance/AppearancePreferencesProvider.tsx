@@ -8,7 +8,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Appearance, useColorScheme } from "react-native";
+import { Appearance, Platform, useColorScheme } from "react-native";
 
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -97,7 +97,7 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
   const toggleColorId = normalizeMobileToggleColorId(storedPreferences?.toggleColorId);
   const themeVariablesByAppearance = useMemo(() => {
     const resolve = (appearance: MobileThemeAppearance) => {
-      const base = getMobileThemeRuntimeVariables(themeIds[appearance], appearance);
+      const base = getMobileThemeRuntimeVariables(themeIds[appearance], appearance, Platform.OS);
       return applyMobileToggleColor(base, appearance, toggleColorId);
     };
     return { light: resolve("light"), dark: resolve("dark") };

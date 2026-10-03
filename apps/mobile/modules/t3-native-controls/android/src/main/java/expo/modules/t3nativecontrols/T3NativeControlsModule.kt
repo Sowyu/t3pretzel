@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.format.DateFormat
 import android.util.Log
 import androidx.core.content.FileProvider
 import expo.modules.kotlin.Promise
@@ -20,6 +21,11 @@ class T3NativeControlsModule : Module() {
   @Suppress("TooGenericExceptionCaught") // Clear the pending promise before rethrowing.
   override fun definition() = ModuleDefinition {
     Name("T3NativeControls")
+
+    Function("is24HourFormat") {
+      val context = appContext.reactContext ?: error("The app is not active.")
+      DateFormat.is24HourFormat(context)
+    }
 
     AsyncFunction("openFile") { uri: String, mimeType: String, promise: Promise ->
       check(filePreviewPromise == null) { "A document viewer is already open." }

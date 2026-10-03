@@ -1,6 +1,9 @@
 import { Connection } from "@t3tools/client-runtime/connection";
-import { ShellSnapshotLoader, shellSnapshotLoaderLayer } from "@t3tools/client-runtime/state/shell";
-import { threadSnapshotLoaderLayer } from "@t3tools/client-runtime/state/threads";
+import { ShellSnapshotLoader } from "@t3tools/client-runtime/state/shell";
+import {
+  boundedThreadSnapshotLoaderLayer,
+  ThreadHistoryController,
+} from "@t3tools/client-runtime/state/threads";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -26,10 +29,10 @@ const providedConnectionPlatformLayer = connectionPlatformLayer.pipe(
 // A reconnect takes the shell background refresh just fetched (see
 // shell-handoff.ts) and only downloads one itself when there is none.
 const handoffShellSnapshotLoaderLayer = Layer.effect(
-  ShellSnapshotLoader,
+  ShellSnapshotLoader.ShellSnapshotLoader,
   Effect.gen(function* () {
-    const http = yield* ShellSnapshotLoader;
-    return ShellSnapshotLoader.of({
+    const http = yield* ShellSnapshotLoader.ShellSnapshotLoader;
+    return ShellSnapshotLoader.ShellSnapshotLoader.of({
       load: (prepared) =>
         Effect.promise(() => takeShell(prepared.environmentId)).pipe(
           Effect.flatMap((snapshot) =>
@@ -38,9 +41,13 @@ const handoffShellSnapshotLoaderLayer = Layer.effect(
         ),
     });
   }),
-).pipe(Layer.provide(shellSnapshotLoaderLayer));
+).pipe(Layer.provide(ShellSnapshotLoader.layer));
 
-const snapshotLoaderLayer = Layer.merge(threadSnapshotLoaderLayer, handoffShellSnapshotLoaderLayer);
+const snapshotLoaderLayer = Layer.mergeAll(
+  boundedThreadSnapshotLoaderLayer,
+  handoffShellSnapshotLoaderLayer,
+  ThreadHistoryController.layer,
+);
 
 type ConnectionLayerSource =
   | typeof Connection.layer

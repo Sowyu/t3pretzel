@@ -1,9 +1,12 @@
-import { Platform, Switch, type SwitchProps } from "react-native";
+import { Platform, Switch } from "react-native";
 
 import { LiquidSwitch } from "./LiquidSwitch";
+import type { ThemedSwitchProps } from "./MaterialSwitch.types";
+
+export type { ThemedSwitchProps } from "./MaterialSwitch.types";
 
 /** Every toggle in the app goes through here: iOS keeps its own switch, Android draws the iOS one. */
-export function ThemedSwitch(props: SwitchProps) {
+export function ThemedSwitch(props: ThemedSwitchProps) {
   if (Platform.OS === "android") {
     return (
       <LiquidSwitch

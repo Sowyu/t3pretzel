@@ -1,11 +1,7 @@
 import {
-  ClientPresentation,
-  CloudSession,
-  EnvironmentOwnedDataCleanup,
+  ClientCapabilities,
   PlatformConnectionSource,
-  PrimaryEnvironmentAuth,
-  RelayDeviceIdentity,
-  SshEnvironmentGateway,
+  Persistence,
 } from "@t3tools/client-runtime/platform";
 import {
   ConnectionBlockedError,
@@ -123,7 +119,7 @@ const wakeupsLayer = Wakeups.layer({
  * The background refresh worker builds its own session, so this is shared.
  */
 export function mobileCloudSession(readSession: () => ManagedRelaySession | null) {
-  return CloudSession.of({
+  return ClientCapabilities.CloudSession.of({
     identity: Effect.sync(() => Option.fromNullishOr(readSession())),
     clerkToken: Effect.gen(function* () {
       const session = readSession();
@@ -154,13 +150,13 @@ export function mobileCloudSession(readSession: () => ManagedRelaySession | null
 }
 
 /** Identifies this build to environments and to the relay. */
-export const mobileClientPresentation = ClientPresentation.of({
+export const mobileClientPresentation = ClientCapabilities.ClientPresentation.of({
   metadata: authClientMetadata(Constants.expoConfig?.version),
   scopes: AuthStandardClientScopes,
 });
 
 export function mobileRelayDeviceIdentity(storage: MobileStorage.MobileStorage["Service"]) {
-  return RelayDeviceIdentity.of({
+  return ClientCapabilities.RelayDeviceIdentity.of({
     deviceId: storage.loadOrCreateAgentAwarenessDeviceId.pipe(
       Effect.mapError(
         (cause) =>
@@ -178,18 +174,20 @@ const capabilitiesLayer = Layer.effectContext(
   Effect.gen(function* () {
     const storage = yield* MobileStorage.MobileStorage;
     return Context.make(
-      CloudSession,
+      ClientCapabilities.CloudSession,
       mobileCloudSession(() => appAtomRegistry.get(managedRelaySessionAtom)),
     ).pipe(
       Context.add(
-        PrimaryEnvironmentAuth,
-        PrimaryEnvironmentAuth.of({ bearerToken: Effect.succeed(Option.none()) }),
+        ClientCapabilities.PrimaryEnvironmentAuth,
+        ClientCapabilities.PrimaryEnvironmentAuth.of({
+          bearerToken: Effect.succeed(Option.none()),
+        }),
       ),
-      Context.add(RelayDeviceIdentity, mobileRelayDeviceIdentity(storage)),
-      Context.add(ClientPresentation, mobileClientPresentation),
+      Context.add(ClientCapabilities.RelayDeviceIdentity, mobileRelayDeviceIdentity(storage)),
+      Context.add(ClientCapabilities.ClientPresentation, mobileClientPresentation),
       Context.add(
-        SshEnvironmentGateway,
-        SshEnvironmentGateway.of({
+        ClientCapabilities.SshEnvironmentGateway,
+        ClientCapabilities.SshEnvironmentGateway.of({
           provision: () =>
             Effect.fail(
               new ConnectionBlockedError({
@@ -212,8 +210,8 @@ const capabilitiesLayer = Layer.effectContext(
 );
 
 const platformConnectionSourceLayer = Layer.succeed(
-  PlatformConnectionSource,
-  PlatformConnectionSource.of({
+  PlatformConnectionSource.PlatformConnectionSource,
+  PlatformConnectionSource.PlatformConnectionSource.of({
     registrations: Stream.empty,
   }),
 );
@@ -226,8 +224,8 @@ const providedCapabilitiesLayer = capabilitiesLayer.pipe(
 );
 
 const environmentOwnedDataCleanupLayer = Layer.succeed(
-  EnvironmentOwnedDataCleanup,
-  EnvironmentOwnedDataCleanup.of({
+  Persistence.EnvironmentOwnedDataCleanup,
+  Persistence.EnvironmentOwnedDataCleanup.of({
     clear: (environmentId) =>
       Effect.all(
         [
