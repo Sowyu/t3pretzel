@@ -15,15 +15,22 @@ import {
 } from "@t3tools/client-runtime/state/thread-search";
 import {
   type EnvironmentId,
-  resolveEnvironmentMachineKind,
   type SidebarProjectGroupingMode,
   type SidebarThreadSortOrder,
 } from "@t3tools/contracts";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Platform, Pressable, View } from "react-native";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  View,
+  type GestureResponderEvent,
+  type ViewToken,
+} from "react-native";
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -38,7 +45,7 @@ import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/
 import { useThreadSearch } from "../../state/queries";
 import { useThreadListV2Enabled } from "../threads/use-thread-list-v2-enabled";
 import { usePendingThreadOrder } from "../../state/thread-order";
-import { environmentServerConfigsAtom } from "../../state/server";
+import { threadListEnvironmentsAtom } from "../../state/server";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
@@ -80,6 +87,8 @@ import {
   sortHomeProjectScopes,
   type HomeProjectSortOrder,
 } from "./homeThreadList";
+import { useThreadJumpShortcuts } from "../keyboard/threadKeyboardShortcuts";
+import { createSwipeRowActivation } from "./swipe-row-activation";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-swipe-actions";
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
@@ -120,6 +129,10 @@ interface HomeScreenProps {
   readonly onUnsettleThread: (thread: EnvironmentThreadShell) => void;
   readonly onPinThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
   readonly onUnpinThread: (thread: EnvironmentThreadShell) => Promise<boolean>;
+  readonly onSetThreadAutoSettle: (
+    thread: EnvironmentThreadShell,
+    enabled: boolean,
+  ) => Promise<boolean>;
   readonly onMoveThread: (
     thread: EnvironmentThreadShell,
     direction: ThreadMoveDestination,
@@ -167,11 +180,15 @@ function deriveEmptyState(props: {
   if (
     (catalogState.connectionState === "available" ||
       catalogState.connectionState === "offline" ||
-      catalogState.connectionState === "error") &&
+      catalogState.connectionState === "error" ||
+      catalogState.connectionState === "unsupported") &&
     !catalogState.hasLoadedShellSnapshot
   ) {
     return {
-      title: "Environment unavailable",
+      title:
+        catalogState.connectionState === "unsupported"
+          ? "Client not supported"
+          : "Environment unavailable",
       detail:
         catalogState.connectionError ??
         "The saved environment is offline. Check the URL or start the environment, then retry.",
@@ -222,6 +239,10 @@ function deriveEmptyState(props: {
 function HomeTopContentSpacer() {
   return <View className="h-4" />;
 }
+
+// Rows count as viewable once they rest on screen briefly, so a fling does not
+// churn every row it passes between dormant and live.
+const V2_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 1, minimumViewTime: 150 };
 
 /* ─── Main screen ────────────────────────────────────────────────────── */
 
@@ -543,6 +564,12 @@ export function HomeScreen(props: HomeScreenProps) {
     },
     [props.onUnpinThread],
   );
+  const handleSetThreadAutoSettle = useCallback(
+    (thread: EnvironmentThreadShell, enabled: boolean) => {
+      void props.onSetThreadAutoSettle(thread, enabled);
+    },
+    [props.onSetThreadAutoSettle],
+  );
   const handleRegenerateThreadTitle = useCallback(
     (thread: EnvironmentThreadShell) => {
       void props.onRegenerateThreadTitle(thread);
@@ -591,96 +618,29 @@ export function HomeScreen(props: HomeScreenProps) {
   );
   // Threads on servers without the settlement capability never classify as
   // settled (the user could neither un-settle nor pin them).
-  const serverConfigs = useAtomValue(environmentServerConfigsAtom);
-  const settlementEnvironmentIds = useMemo(() => {
-    const supported = new Set<EnvironmentId>();
-    for (const [environmentId, config] of serverConfigs) {
-      if (config.environment.capabilities.threadSettlement === true) {
-        supported.add(environmentId);
-      }
-    }
-    return supported;
-  }, [serverConfigs]);
-  const snoozeEnvironmentIds = useMemo(() => {
-    const supported = new Set<EnvironmentId>();
-    for (const [environmentId, config] of serverConfigs) {
-      if (config.environment.capabilities.threadSnooze === true) {
-        supported.add(environmentId);
-      }
-    }
-    return supported;
-  }, [serverConfigs]);
-  const pinningEnvironmentIds = useMemo(() => {
-    const supported = new Set<EnvironmentId>();
-    for (const [environmentId, config] of serverConfigs) {
-      if (config.environment.capabilities.threadPinning === true) {
-        supported.add(environmentId);
-      }
-    }
-    return supported;
-  }, [serverConfigs]);
-  const pinReorderEnvironmentIds = useMemo(() => {
-    const supported = new Set<EnvironmentId>();
-    for (const [environmentId, config] of serverConfigs) {
-      if (config.environment.capabilities.threadPinReorder === true) {
-        supported.add(environmentId);
-      }
-    }
-    return supported;
-  }, [serverConfigs]);
-  const activeReorderEnvironmentIds = useMemo(() => {
-    const supported = new Set<EnvironmentId>();
-    for (const [environmentId, config] of serverConfigs) {
-      if (config.environment.capabilities.threadActiveReorder === true) {
-        supported.add(environmentId);
-      }
-    }
-    return supported;
-  }, [serverConfigs]);
-  const titleRegenerationEnvironmentIds = useMemo(() => {
-    const supported = new Set<EnvironmentId>();
-    for (const [environmentId, config] of serverConfigs) {
-      if (config.environment.capabilities.threadTitleRegeneration === true) {
-        supported.add(environmentId);
-      }
-    }
-    return supported;
-  }, [serverConfigs]);
-  const providersByEnvironmentId = useMemo(
-    () =>
-      new Map(
-        [...serverConfigs].map(
-          ([environmentId, config]) => [environmentId, config.providers] as const,
-        ),
-      ),
-    [serverConfigs],
-  );
+  // Stable across provider refreshes and model catalog updates, so a server
+  // config tick does not re-render every row.
+  const listEnvironments = useAtomValue(threadListEnvironmentsAtom);
+  const {
+    providersByEnvironmentId,
+    machineByEnvironmentId,
+    settlementEnvironmentIds,
+    snoozeEnvironmentIds,
+    pinningEnvironmentIds,
+    pinReorderEnvironmentIds,
+    activeReorderEnvironmentIds,
+    titleRegenerationEnvironmentIds,
+    autoSettleOptOutEnvironmentIds,
+  } = listEnvironments;
   const resolveProviderInstance = useThreadRowProviderInstanceResolver(providersByEnvironmentId);
-  const machineByEnvironmentId = useMemo(
-    () =>
-      new Map(
-        [...serverConfigs].map(
-          ([environmentId, config]) =>
-            [environmentId, resolveEnvironmentMachineKind(config)] as const,
-        ),
-      ),
-    [serverConfigs],
-  );
   const pendingOrder = usePendingThreadOrder(nowMinute, snoozeWakeTick);
   const threadMovePlanners = useMemo(() => {
     const sectionPlanner = (section: "pinned" | "active") =>
       createThreadMovePlanner({
         allThreads: props.threads,
         section,
-        reorderableEnvironmentIds: new Set(
-          [...serverConfigs].flatMap(([id, config]) =>
-            (section === "pinned"
-              ? config.environment.capabilities.threadPinReorder
-              : config.environment.capabilities.threadActiveReorder) === true
-              ? [id]
-              : [],
-          ),
-        ),
+        reorderableEnvironmentIds:
+          section === "pinned" ? pinReorderEnvironmentIds : activeReorderEnvironmentIds,
         ordered: getThreadListV2OrderedSection({
           threads: props.threads,
           section,
@@ -693,7 +653,8 @@ export function HomeScreen(props: HomeScreenProps) {
       });
     return { pinned: sectionPlanner("pinned"), active: sectionPlanner("active") };
   }, [
-    serverConfigs,
+    pinReorderEnvironmentIds,
+    activeReorderEnvironmentIds,
     props.threads,
     pendingOrder,
     queuedThreadKeys,
@@ -904,6 +865,8 @@ export function HomeScreen(props: HomeScreenProps) {
           onUnsettleThread={handleUnsettleThread}
           onPinThread={handlePinThread}
           onUnpinThread={handleUnpinThread}
+          onSetThreadAutoSettle={handleSetThreadAutoSettle}
+          autoSettleOptOutSupported={autoSettleOptOutEnvironmentIds.has(thread.environmentId)}
           onMoveThread={handleMoveThread}
           onSwipeableClose={handleSwipeableClose}
           onSwipeableWillOpen={handleSwipeableWillOpen}
@@ -923,6 +886,8 @@ export function HomeScreen(props: HomeScreenProps) {
       handleSettleThread,
       handleSnoozeThread,
       handleUnpinThread,
+      handleSetThreadAutoSettle,
+      autoSettleOptOutEnvironmentIds,
       handleUnsnoozeThread,
       handleSwipeableClose,
       handleSwipeableWillOpen,
@@ -952,6 +917,52 @@ export function HomeScreen(props: HomeScreenProps) {
     ],
   );
   const v2KeyExtractor = useCallback((item: ThreadListV2ListItem) => item.key, []);
+  // Cmd/Ctrl+1…9 opens the nth thread as listed, filters and shelves included.
+  useThreadJumpShortcuts(threadListV2Items, props.onSelectThread);
+
+  // Only rows around the viewport carry swipe machinery; the rest paint a
+  // dormant frame (see swipe-row-activation). FlatList re-reports viewable
+  // rows after scrolling rests and whenever its data changes.
+  const swipeRowActivation = useMemo(() => createSwipeRowActivation(), []);
+  const threadListV2ItemsRef = useRef(threadListV2Items);
+  useLayoutEffect(() => {
+    threadListV2ItemsRef.current = threadListV2Items;
+  }, [threadListV2Items]);
+  const handleV2ViewableItemsChanged = useCallback(
+    (info: { readonly viewableItems: ReadonlyArray<ViewToken<ThreadListV2ListItem>> }) => {
+      const indexes = info.viewableItems.flatMap((token) =>
+        token.index === null ? [] : [token.index],
+      );
+      if (indexes.length === 0) return;
+      // Keys match ThreadSwipeable's `threadKey`.
+      const keys = new Set<string>();
+      const addKey = (item: ThreadListV2ListItem) => {
+        if (item.type === "v2-thread") {
+          keys.add(`${item.item.thread.environmentId}:${item.item.thread.id}`);
+        }
+      };
+      for (const token of info.viewableItems) addKey(token.item);
+      const items = threadListV2ItemsRef.current;
+      for (const item of items.slice(
+        Math.max(0, Math.min(...indexes) - 2),
+        Math.max(...indexes) + 3,
+      )) {
+        addKey(item);
+      }
+      swipeRowActivation.activate([...keys]);
+    },
+    [swipeRowActivation],
+  );
+  const trackV2ListTouches = useCallback(
+    (event: GestureResponderEvent, started: boolean) => {
+      const { changedTouches, touches } = event.nativeEvent;
+      swipeRowActivation.trackTouches(
+        started ? changedTouches.map((touch) => String(touch.identifier)) : [],
+        touches.map((touch) => String(touch.identifier)),
+      );
+    },
+    [swipeRowActivation],
+  );
 
   // FlatList treats a changed extraData identity as "re-render every visible
   // row", so an inline object literal would invalidate all rows on every
@@ -960,7 +971,7 @@ export function HomeScreen(props: HomeScreenProps) {
     () => ({
       projectByKey,
       projectTitleByProjectKey: v2ProjectTitleByProjectKey,
-      serverConfigs,
+      listEnvironments,
       savedConnectionsById: props.savedConnectionsById,
       searchQuery: props.searchQuery,
       snoozePresetMinute: nowMinute,
@@ -970,7 +981,7 @@ export function HomeScreen(props: HomeScreenProps) {
       projectByKey,
       props.searchQuery,
       props.savedConnectionsById,
-      serverConfigs,
+      listEnvironments,
       nowMinute,
       threadSearchMatchByKey,
       v2ProjectTitleByProjectKey,
@@ -1184,8 +1195,13 @@ export function HomeScreen(props: HomeScreenProps) {
     return (
       <View className="flex-1 bg-screen">
         <View className="flex-1 bg-screen">
-          <SwipeableScrollGateProvider enabled={swipeEnabled}>
+          <SwipeableScrollGateProvider enabled={swipeEnabled} activation={swipeRowActivation}>
             <FlatList
+              onViewableItemsChanged={handleV2ViewableItemsChanged}
+              viewabilityConfig={V2_VIEWABILITY_CONFIG}
+              onTouchStart={(event) => trackV2ListTouches(event, true)}
+              onTouchEnd={(event) => trackV2ListTouches(event, false)}
+              onTouchCancel={(event) => trackV2ListTouches(event, false)}
               data={threadListV2Items}
               renderItem={renderV2Item}
               keyExtractor={v2KeyExtractor}

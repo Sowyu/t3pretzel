@@ -1,4 +1,5 @@
 import { ComposerContextId } from "@t3tools/contracts";
+import { useNavigation } from "@react-navigation/native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -145,11 +146,14 @@ export function ComposerEditor({
         : "",
     [environmentId, draft.context, draft.attachments],
   );
+  const navigation = useNavigation();
   const selectedReference = selected
     ? collectComposerContextReferences(selected.source)[0]
     : undefined;
-  const selectedSkill = selected?.source.startsWith("$")
-    ? props.skills?.find((skill) => skill.name === selected.source.slice(1))
+  // Skill chips start with any currency sign ($ by default, but servers may localize it).
+  const selectedSkillName = selected?.source.match(/^\p{Sc}(.+)$/u)?.[1];
+  const selectedSkill = selectedSkillName
+    ? props.skills?.find((skill) => skill.name === selectedSkillName)
     : undefined;
   const record = draft.context?.records.find(
     (entry) => entry.contextId === selectedReference?.contextId,
@@ -220,6 +224,13 @@ export function ComposerEditor({
                 },
               }
             : {})}
+          onOpenThread={(thread) => {
+            setSelected(null);
+            navigation.navigate("Thread", {
+              environmentId: String(thread.environmentId),
+              threadId: String(thread.threadId),
+            });
+          }}
           environmentId={environmentId}
           records={draft.context?.records}
           attachments={draft.attachments}

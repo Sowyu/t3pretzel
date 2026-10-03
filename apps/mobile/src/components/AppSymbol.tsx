@@ -70,6 +70,7 @@ import IconNetwork from "@tabler/icons-react-native/IconNetwork";
 import IconPalette from "@tabler/icons-react-native/IconPalette";
 import IconPhoto from "@tabler/icons-react-native/IconPhoto";
 import IconPin from "@tabler/icons-react-native/IconPin";
+import IconPower from "@tabler/icons-react-native/IconPower";
 import IconPinnedOff from "@tabler/icons-react-native/IconPinnedOff";
 import IconPlayerPlay from "@tabler/icons-react-native/IconPlayerPlay";
 import IconPlayerStopFilled from "@tabler/icons-react-native/IconPlayerStopFilled";
@@ -94,6 +95,24 @@ import IconUserCircle from "@tabler/icons-react-native/IconUserCircle";
 import IconWifiOff from "@tabler/icons-react-native/IconWifiOff";
 import IconWorld from "@tabler/icons-react-native/IconWorld";
 import IconX from "@tabler/icons-react-native/IconX";
+import IconAlignLeft from "@tabler/icons-react-native/IconAlignLeft";
+import IconArrowDown from "@tabler/icons-react-native/IconArrowDown";
+import IconArrowForwardUp from "@tabler/icons-react-native/IconArrowForwardUp";
+import IconArrowLeft from "@tabler/icons-react-native/IconArrowLeft";
+import IconArrowRight from "@tabler/icons-react-native/IconArrowRight";
+import IconArrowsLeftRight from "@tabler/icons-react-native/IconArrowsLeftRight";
+import IconCircle from "@tabler/icons-react-native/IconCircle";
+import IconDatabase from "@tabler/icons-react-native/IconDatabase";
+import IconDeviceMobile from "@tabler/icons-react-native/IconDeviceMobile";
+import IconDotsVertical from "@tabler/icons-react-native/IconDotsVertical";
+import IconHome from "@tabler/icons-react-native/IconHome";
+import IconLock from "@tabler/icons-react-native/IconLock";
+import IconMicrophone from "@tabler/icons-react-native/IconMicrophone";
+import IconListNumbers from "@tabler/icons-react-native/IconListNumbers";
+import IconPencil from "@tabler/icons-react-native/IconPencil";
+import IconStar from "@tabler/icons-react-native/IconStar";
+import IconStarFilled from "@tabler/icons-react-native/IconStarFilled";
+import IconUsers from "@tabler/icons-react-native/IconUsers";
 import type { SFSymbol, SymbolViewProps } from "expo-symbols";
 import { withUniwind } from "uniwind";
 
@@ -161,6 +180,7 @@ const ANDROID_ICON_BY_SF_SYMBOL: Partial<Record<SFSymbol, Icon>> = {
   "person.crop.circle": IconUserCircle,
   photo: IconPhoto,
   pin: IconPin,
+  power: IconPower,
   "pin.slash": IconPinnedOff,
   play: IconPlayerPlay,
   plus: IconPlus,
@@ -189,6 +209,30 @@ const ANDROID_ICON_BY_SF_SYMBOL: Partial<Record<SFSymbol, Icon>> = {
   "wifi.slash": IconWifiOff,
   xmark: IconX,
   "xmark.circle.fill": IconCircleXFilled,
+  "arrow.left": IconArrowLeft,
+  "arrow.right": IconArrowRight,
+  "arrow.left.arrow.right": IconArrowsLeftRight,
+  "arrow.down": IconArrowDown,
+  "arrow.triangle.merge": IconGitMerge,
+  "arrow.uturn.forward": IconArrowForwardUp,
+  circle: IconCircle,
+  timer: IconClock,
+  doc: IconFileText,
+  "exclamationmark.circle": IconAlertCircle,
+  globe: IconWorld,
+  hammer: IconHammer,
+  house: IconHome,
+  internaldrive: IconDatabase,
+  keyboard: IconKeyboard,
+  "list.number": IconListNumbers,
+  mic: IconMicrophone,
+  pencil: IconPencil,
+  "person.2": IconUsers,
+  minus: IconMinus,
+  "square.on.square": IconCopy,
+  star: IconStar,
+  "star.fill": IconStarFilled,
+  "text.alignleft": IconAlignLeft,
 };
 
 // Callers can pass `{ ios, android }` names where `android` is a Material
@@ -217,6 +261,12 @@ const ANDROID_ICON_BY_MATERIAL_NAME: Record<string, Icon> = {
   remove: IconMinus,
   terminal: IconTerminal2,
   visibility: IconEye,
+  chat: IconMessage,
+  lock: IconLock,
+  more_vert: IconDotsVertical,
+  merge: IconGitMerge,
+  psychology: IconBrain,
+  smartphone: IconDeviceMobile,
 };
 
 export type { SFSymbol } from "expo-symbols";

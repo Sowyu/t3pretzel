@@ -15,6 +15,7 @@ import { T3KeyboardCommands } from "../../native/T3KeyboardCommands";
 import { useThreadShell } from "../../state/entities";
 import type { GitActionProgress } from "../../state/use-vcs-action-state";
 import { GitActionProgressOverlay } from "../threads/GitActionProgressOverlay";
+import { CommandPalette } from "./CommandPalette";
 import {
   dispatchHardwareKeyboardCommand,
   getHardwareKeyboardCommandRegistrationVersion,
@@ -36,6 +37,8 @@ export function HardwareKeyboardCommandProvider({
   pathname,
 }: PropsWithChildren<{ readonly pathname: string }>) {
   const navigation = useNavigation();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
   const activeThreadRef = useMemo(() => parseActiveThreadPath(pathname), [pathname]);
   const activeThread = useThreadShell(activeThreadRef);
   const copyTarget = useMemo(
@@ -86,6 +89,12 @@ export function HardwareKeyboardCommandProvider({
   const enabledCommands = useMemo(() => {
     const commands = new Set<HardwareKeyboardCommand>(getRegisteredHardwareKeyboardCommands());
     commands.add("newTask");
+    commands.add("commandPalette");
+    if (pathname !== "/" && !pathname.startsWith("/threads/")) {
+      for (const command of commands) {
+        if (command.startsWith("thread.jump.")) commands.delete(command);
+      }
+    }
     if (pathname !== "/" || navigation.canGoBack()) commands.add("back");
     if (activeThreadRef !== null) {
       commands.add("files");
@@ -94,10 +103,14 @@ export function HardwareKeyboardCommandProvider({
       if (pathname.split("/")[4] !== "terminal") commands.add("copyThreadReference");
     }
     return [...commands];
-  }, [pathname, registrationVersion, navigation]);
+  }, [activeThreadRef, pathname, registrationVersion, navigation]);
 
   const onCommand = useCallback(
     (command: HardwareKeyboardCommand) => {
+      if (command === "commandPalette") {
+        setPaletteOpen(true);
+        return;
+      }
       if (dispatchHardwareKeyboardCommand(command)) return;
 
       if (command === "copyThreadReference") {
@@ -157,6 +170,10 @@ export function HardwareKeyboardCommandProvider({
       <T3KeyboardCommands enabledCommands={enabledCommands} onCommand={onCommand}>
         {children}
       </T3KeyboardCommands>
+      {/* A modal, so it can sit beside the app tree; mounted only while open. */}
+      {paletteOpen ? (
+        <CommandPalette pathname={pathname} onClose={closePalette} onCommand={onCommand} />
+      ) : null}
       <GitActionProgressOverlay progress={copyFeedback} onDismiss={dismissCopyFeedback} />
     </>
   );

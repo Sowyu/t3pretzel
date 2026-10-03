@@ -4,10 +4,11 @@ import type {
   RuntimeRequestId,
 } from "@t3tools/contracts";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
 import type { PendingApproval } from "../../lib/threadActivity";
+import { RequestActionButton } from "./RequestActionButton";
 
 export interface PendingApprovalCardProps {
   readonly approval: PendingApproval;
@@ -59,47 +60,23 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
       ) : null}
       <View className="flex-row flex-wrap gap-2.5">
         {options.map((option) => (
-          <Pressable
+          <RequestActionButton
             key={option.decision}
-            className={`flex-row items-center justify-center gap-2 rounded-[14px] px-3.5 py-3 ${
+            label={option.label}
+            tone={
               option.decision === "accept"
-                ? "bg-primary"
+                ? "primary"
                 : option.decision === "decline"
-                  ? "bg-danger"
-                  : "bg-subtle-strong"
-            } ${
-              !canRespond || (responding && pressedDecision !== option.decision) ? "opacity-50" : ""
-            }`}
+                  ? "danger"
+                  : "secondary"
+            }
+            busy={responding && pressedDecision === option.decision}
             disabled={!canRespond || responding}
             onPress={() => {
               setPressedDecision(option.decision);
               void props.onRespond(props.approval.requestId, option.decision);
             }}
-          >
-            {responding && pressedDecision === option.decision ? (
-              <ActivityIndicator
-                colorClassName={
-                  option.decision === "accept"
-                    ? "accent-primary-foreground"
-                    : option.decision === "decline"
-                      ? "accent-danger-foreground"
-                      : "accent-foreground"
-                }
-                size="small"
-              />
-            ) : null}
-            <Text
-              className={`text-sm ${
-                option.decision === "accept"
-                  ? "font-t3-extrabold text-primary-foreground"
-                  : option.decision === "decline"
-                    ? "font-t3-bold text-danger-foreground"
-                    : "font-t3-bold text-foreground"
-              }`}
-            >
-              {option.label}
-            </Text>
-          </Pressable>
+          />
         ))}
       </View>
     </View>

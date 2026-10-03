@@ -270,7 +270,7 @@ function CompactingLabel(props: { readonly onLayout: (event: LayoutChangeEvent) 
       <SymbolView
         name="arrow.down.right.and.arrow.up.left"
         size={13}
-        tintColorClassName="foreground"
+        tintColorClassName="accent-foreground"
         type="monochrome"
       />
       <Text className="font-t3-medium text-xs text-foreground">Compacting…</Text>
@@ -337,7 +337,7 @@ function FloatingStatusLabel(props: {
         <SymbolView
           name="arrow.triangle.branch"
           size={13}
-          tintColorClassName="foreground"
+          tintColorClassName="accent-foreground"
           type="monochrome"
         />
         <ShimmeringWorkContent

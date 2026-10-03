@@ -10,6 +10,11 @@ import { Modal, Platform, Pressable, ScrollView, TextInput, View } from "react-n
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { AppText } from "../../components/AppText";
 import { SegmentedControl } from "../../components/SegmentedControl";
+import {
+  applySnoozePickerDate,
+  applySnoozePickerTime,
+  snoozeDateToPickerDate,
+} from "./customSnoozeDate";
 
 export function CustomSnoozeSheet(props: {
   readonly onClose: () => void;
@@ -76,20 +81,19 @@ export function CustomSnoozeSheet(props: {
               ))}
               {picker && (
                 <DateTimePicker
-                  value={date}
+                  // The Android date dialog is a Compose calendar: it takes and
+                  // returns calendar days as UTC midnight, while its time dialog
+                  // works in local time.
+                  value={picker === "date" ? new Date(snoozeDateToPickerDate(date)) : date}
                   mode={picker}
                   display={Platform.OS === "ios" ? "spinner" : "default"}
                   onDismiss={() => setPicker(null)}
                   onValueChange={(_, selected) => {
-                    const next = new Date(date);
-                    if (picker === "date")
-                      next.setFullYear(
-                        selected.getFullYear(),
-                        selected.getMonth(),
-                        selected.getDate(),
-                      );
-                    else next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
-                    setDate(next);
+                    setDate(
+                      picker === "date"
+                        ? applySnoozePickerDate(date, selected)
+                        : applySnoozePickerTime(date, selected),
+                    );
                     setError(null);
                     if (Platform.OS === "android") setPicker(null);
                   }}

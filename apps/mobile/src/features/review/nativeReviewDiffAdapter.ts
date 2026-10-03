@@ -44,21 +44,19 @@ export function buildNativeReviewSnippetRows(
 
 function opaqueNativeHexColor(color: string, background: string): string {
   const hex = NATIVE_HEX_COLOR.exec(color);
-  if (hex && hex[4] === undefined) return color;
+  if (hex && !hex[4]) return color;
 
-  const components = hex ?? NATIVE_RGBA_COLOR.exec(color);
+  const rgba = NATIVE_RGBA_COLOR.exec(color);
   const backgroundHex = NATIVE_HEX_COLOR.exec(background);
-  if (!components || !backgroundHex) return background;
+  if ((!hex && !rgba) || !backgroundHex) return background;
 
-  const alpha =
-    components[4] === undefined
+  const alpha = hex
+    ? Number.parseInt(hex[4] ?? "ff", 16) / 255
+    : rgba?.[4] === undefined
       ? 1
-      : hex
-        ? Number.parseInt(components[4], 16) / 255
-        : Math.min(1, Math.max(0, Number(components[4])));
+      : Math.min(1, Math.max(0, Number(rgba[4])));
   const channels = [1, 2, 3].map((index) => {
-    const component = components[index] ?? "0";
-    const foreground = hex ? Number.parseInt(component, 16) : Number(component);
+    const foreground = hex ? Number.parseInt(hex[index] ?? "0", 16) : Number(rgba?.[index]);
     const behind = Number.parseInt(backgroundHex[index] ?? "0", 16);
     return Math.round(foreground * alpha + behind * (1 - alpha));
   });
@@ -131,6 +129,8 @@ interface PreparedNativeReviewFileRows {
   readonly filePath: string;
   readonly lineCount: number;
   readonly rows: ReadonlyArray<NativeReviewDiffRow>;
+  readonly commentTargetsByRowId: ReadonlyMap<string, NativeReviewDiffCommentTarget>;
+  readonly rowIdByCommentLineId: ReadonlyMap<string, string>;
   commentedRows: {
     readonly commentsKey: string;
     readonly rows: ReadonlyArray<NativeReviewDiffRow>;
@@ -142,6 +142,7 @@ interface PreparedNativeReviewDiffData extends Omit<NativeReviewDiffData, "rows"
 }
 
 const nativeReviewDiffDataCache = new WeakMap<ReviewParsedDiff, CachedNativeReviewDiffData>();
+const nativeReviewFileRowsCache = new WeakMap<ReviewRenderableFile, PreparedNativeReviewFileRows>();
 
 function buildReviewCommentsCacheKey(comments: ReadonlyArray<ReviewInlineComment>): string {
   if (comments.length === 0) {
@@ -185,7 +186,7 @@ export function createNativeReviewDiffTheme(
       headerBackground: background,
       border: nativeColor(appTheme["--color-border"]),
       hunkBackground: nativeColor(appTheme["--color-subtle-strong"]),
-      hunkText: nativeColor(appTheme["--color-primary"]),
+      hunkText: nativeColor(appTheme["--color-foreground"]),
       addBackground: "#0d2f28",
       deleteBackground: "#391415",
       addBar: "#00cab1",
@@ -204,7 +205,7 @@ export function createNativeReviewDiffTheme(
     headerBackground: background,
     border: nativeColor(appTheme["--color-border"]),
     hunkBackground: nativeColor(appTheme["--color-subtle-strong"]),
-    hunkText: nativeColor(appTheme["--color-primary"]),
+    hunkText: nativeColor(appTheme["--color-foreground"]),
     addBackground: "#e5f8f5",
     deleteBackground: "#ffe6e7",
     addBar: "#00cab1",
@@ -267,6 +268,7 @@ function createNoticeRow(fileId: string, suffix: string, text: string): NativeRe
 }
 
 function noticeRowsForFile(file: ReviewRenderableFile): ReadonlyArray<NativeReviewDiffRow> {
+  if (file.notice) return [createNoticeRow(file.id, "loading", file.notice)];
   if (file.rows.length > 0) {
     return [];
   }
@@ -412,11 +414,11 @@ function mapLineRow(
   };
 }
 
-function prepareFileRows(
-  file: ReviewRenderableFile,
-  commentTargetsByRowId: Map<string, NativeReviewDiffCommentTarget>,
-  rowIdByCommentLineId: Map<string, string>,
-): PreparedNativeReviewFileRows {
+function prepareFileRows(file: ReviewRenderableFile): PreparedNativeReviewFileRows {
+  const cached = nativeReviewFileRowsCache.get(file);
+  if (cached) return cached;
+  const commentTargetsByRowId = new Map<string, NativeReviewDiffCommentTarget>();
+  const rowIdByCommentLineId = new Map<string, string>();
   const rows: NativeReviewDiffRow[] = [
     {
       kind: "file",
@@ -455,14 +457,18 @@ function prepareFileRows(
   });
 
   rows.push(...noticeRowsForFile(file));
-  return {
+  const prepared: PreparedNativeReviewFileRows = {
     fileId: file.id,
     filePath: file.path,
     lineCount: lineRows.length,
     // Comments must not split the source deletion/addition runs used for word matching.
     rows: addNativeWordDiffRanges(rows),
+    commentTargetsByRowId,
+    rowIdByCommentLineId,
     commentedRows: null,
   };
+  nativeReviewFileRowsCache.set(file, prepared);
+  return prepared;
 }
 
 function insertFileComments(
@@ -532,9 +538,15 @@ function prepareNativeReviewDiffData(parsedDiff: ReviewParsedDiff): PreparedNati
   }));
   const commentTargetsByRowId = new Map<string, NativeReviewDiffCommentTarget>();
   const rowIdByCommentLineId = new Map<string, string>();
-  const fileRows = parsedDiff.files.map((file) =>
-    prepareFileRows(file, commentTargetsByRowId, rowIdByCommentLineId),
-  );
+  const fileRows = parsedDiff.files.map(prepareFileRows);
+  for (const file of fileRows) {
+    for (const [rowId, target] of file.commentTargetsByRowId) {
+      commentTargetsByRowId.set(rowId, target);
+    }
+    for (const [lineId, rowId] of file.rowIdByCommentLineId) {
+      rowIdByCommentLineId.set(lineId, rowId);
+    }
+  }
 
   return {
     fileRows,

@@ -18,6 +18,7 @@ import { environmentCatalog } from "../connection/catalog";
 import { connectionAtomRuntime } from "../connection/runtime";
 import { projectFaviconCache } from "../lib/projectFaviconCache";
 import { type AssetUrlState, deriveAssetUrlState } from "./asset-url-state";
+import { environmentProjectCloneListAtom } from "./projectClones";
 import { environmentSession, usePreparedConnection } from "./session";
 import { useAtomQueryRunner } from "./use-atom-query-runner";
 
@@ -29,6 +30,8 @@ export const projectFaviconUrlAtom = createProjectFaviconUrlAtomFamily({
   imageCache: projectFaviconCache,
   createUrl: assetEnvironment.createUrl,
   preparedConnection: environmentSession.preparedConnectionValueAtom,
+  // Re-asks for a cloned project's icon once its files land.
+  projectClones: environmentProjectCloneListAtom,
 });
 
 const EMPTY_CONNECTION_STATE_ATOM = Atom.make(AsyncResult.initial<never, never>(false)).pipe(

@@ -192,6 +192,7 @@ import {
   waitForComposerDraftsLoaded,
   setStickyComposerModelSelection,
   stickyComposerModelSelectionAtom,
+  modelOptionMemoryAtom,
   undoComposerDraftMerge,
   undoComposerDraftMergeState,
 } from "./use-composer-drafts";
@@ -215,6 +216,7 @@ afterEach(() => {
   appAtomRegistry.set(composerDraftsAtom, {});
   appAtomRegistry.set(composerCloudDraftsAtom, { accountId: null, signedOut: {} });
   appAtomRegistry.set(stickyComposerModelSelectionAtom, null);
+  appAtomRegistry.set(modelOptionMemoryAtom, {});
   appAtomRegistry.set(threadOutboxManager.queuedMessagesByThreadKeyAtom, {});
   composerAttachmentCleanupMocks.remove.mockClear();
   composerAttachmentCleanupMocks.releaseUploads.mockReset();
@@ -688,8 +690,12 @@ describe("mobile composer drafts", () => {
       appendComposerDraftAttachments(key, files, { appendReference: true });
       const firstLink = "[notes-0.txt](t3-context://v1/file/file-0)";
       const insertion = captureComposerDraftInsertion(key, { start: 0, end: firstLink.length });
-      expect(countComposerDraftAttachmentsAfterSelection(key, insertion)).toBe(PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1);
-      expect(getComposerDraftAfterSelection(key, insertion).context?.records).toHaveLength(PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1);
+      expect(countComposerDraftAttachmentsAfterSelection(key, insertion)).toBe(
+        PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1,
+      );
+      expect(getComposerDraftAfterSelection(key, insertion).context?.records).toHaveLength(
+        PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1,
+      );
       const replacement = { ...files[0]!, id: "replacement", fileUri: "file:///replacement.txt" };
       if (kind === "attachment") {
         expect(
@@ -717,7 +723,9 @@ describe("mobile composer drafts", () => {
             insertion,
           ),
         ).toBe(true);
-        expect(getComposerDraftSnapshot(key).attachments).toHaveLength(PROVIDER_SEND_TURN_MAX_ATTACHMENTS);
+        expect(getComposerDraftSnapshot(key).attachments).toHaveLength(
+          PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
+        );
         expect(getComposerDraftSnapshot(key).context?.records).toContainEqual(record);
         expect(getComposerDraftSnapshot(key).text).toBe(
           `${formatComposerContextReference(record)}${insertion.text.slice(firstLink.length)}`,
@@ -731,7 +739,9 @@ describe("mobile composer drafts", () => {
       }
       const draft = getComposerDraftSnapshot(key);
       expect(draft.attachments.map((file) => file.id)).not.toContain("file-0");
-      expect(draft.attachments.slice(0, PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1)).toEqual(files.slice(1));
+      expect(draft.attachments.slice(0, PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1)).toEqual(
+        files.slice(1),
+      );
       expect(draft.context?.records.some((record) => record.contextId === "file-0")).toBe(false);
       await cleanup.promise;
       expect(composerAttachmentCleanupMocks.remove).toHaveBeenCalledWith(files[0]!.fileUri);
@@ -907,7 +917,9 @@ describe("mobile composer drafts", () => {
       fileUri: `file:///documents/t3-composer-attachments/${id}.mov`,
     });
     const draftKey = "new-task:environment-1:project-cap";
-    const existing = Array.from({ length: PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1 }, (_, index) => makeAttachment(`held-${index}`));
+    const existing = Array.from({ length: PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 1 }, (_, index) =>
+      makeAttachment(`held-${index}`),
+    );
     appAtomRegistry.set(composerDraftsAtom, {
       [draftKey]: { text: "send this", attachments: existing },
     });
@@ -2273,7 +2285,9 @@ describe("mobile composer drafts", () => {
       previewUri: "data:image/png;base64,YWJj",
     });
     const existingImage = image("existing");
-    const sharedImages = Array.from({ length: PROVIDER_SEND_TURN_MAX_ATTACHMENTS }, (_, index) => image(`shared-${index}`));
+    const sharedImages = Array.from({ length: PROVIDER_SEND_TURN_MAX_ATTACHMENTS }, (_, index) =>
+      image(`shared-${index}`),
+    );
 
     const merged = mergeComposerDraftContentState(
       { [draftKey]: { text: "", attachments: [existingImage] } },
@@ -2283,7 +2297,9 @@ describe("mobile composer drafts", () => {
 
     expect(merged[draftKey]?.attachments).toHaveLength(PROVIDER_SEND_TURN_MAX_ATTACHMENTS);
     expect(merged[draftKey]?.attachments[0]).toEqual(existingImage);
-    expect(merged[draftKey]?.attachments.at(-1)?.id).toBe(`shared-${PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 2}`);
+    expect(merged[draftKey]?.attachments.at(-1)?.id).toBe(
+      `shared-${PROVIDER_SEND_TURN_MAX_ATTACHMENTS - 2}`,
+    );
   });
 
   it("restores the exact draft captured before an interrupted share import", () => {
@@ -2686,5 +2702,42 @@ describe("mobile composer drafts", () => {
       },
     });
     expect(composerAttachmentCleanupMocks.remove).not.toHaveBeenCalled();
+  });
+});
+it("decodes model option memory from the composer document", () => {
+  expect(
+    decodePersistedComposerState({
+      schemaVersion: 1,
+      drafts: {},
+      modelOptionMemory: {
+        pi: { "xai/grok-4.6": [{ id: "thinking", value: "xhigh" }] },
+      },
+    }).modelOptionMemory,
+  ).toEqual({ pi: { "xai/grok-4.6": [{ id: "thinking", value: "xhigh" }] } });
+});
+
+it("merges persisted option memory without replacing newer choices", async () => {
+  composerDraftFileMocks.setDocument({
+    schemaVersion: 1,
+    drafts: {},
+    modelOptionMemory: {
+      pi: {
+        "xai/grok-4.6": [{ id: "thinking", value: "high" }],
+        "openai/gpt-5.4": [{ id: "thinking", value: "medium" }],
+      },
+    },
+  });
+  appAtomRegistry.set(modelOptionMemoryAtom, {
+    pi: { "xai/grok-4.6": [{ id: "thinking", value: "xhigh" }] },
+  });
+
+  ensureComposerDraftsLoaded();
+  await waitForComposerDraftsLoaded();
+
+  expect(appAtomRegistry.get(modelOptionMemoryAtom)).toEqual({
+    pi: {
+      "xai/grok-4.6": [{ id: "thinking", value: "xhigh" }],
+      "openai/gpt-5.4": [{ id: "thinking", value: "medium" }],
+    },
   });
 });

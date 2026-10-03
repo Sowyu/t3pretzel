@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
 
 import { MobilePreferencesStore, type Preferences } from "../persistence/mobile-preferences";
+import { DEFAULT_FOLLOW_UP_BEHAVIOR } from "../lib/followUpBehavior";
 import * as Runtime from "../lib/runtime";
 
 export {
@@ -122,3 +123,14 @@ export const mobilePreferencesState = createMobilePreferencesState(mobilePrefere
 
 export const mobilePreferencesAtom = mobilePreferencesState.preferencesAtom;
 export const updateMobilePreferencesAtom = mobilePreferencesState.updatePreferencesAtom;
+
+/**
+ * What the send button does while a turn is running. Reads the default until
+ * preferences load, so the composer never waits on storage to decide.
+ */
+export const followUpBehaviorAtom = Atom.make((get) => {
+  const preferences = get(mobilePreferencesAtom);
+  return AsyncResult.isSuccess(preferences)
+    ? (preferences.value.followUpBehavior ?? DEFAULT_FOLLOW_UP_BEHAVIOR)
+    : DEFAULT_FOLLOW_UP_BEHAVIOR;
+}).pipe(Atom.withLabel("mobile:preferences:follow-up-behavior"));

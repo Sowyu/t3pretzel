@@ -1,53 +1,57 @@
-import type { EnvironmentId, OrchestrationV2Subagent, ThreadId } from "@t3tools/contracts";
-import { isActiveSubagentStatus } from "@t3tools/client-runtime/state/subagentRuntime";
-import { deriveThreadTurnSubagents } from "@t3tools/client-runtime/state/thread-subagents";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import type { ThreadTurnSubagents } from "@t3tools/client-runtime/state/thread-subagents";
+import {
+  isOrchestrationV2WorkActive,
+  type EnvironmentId,
+  type OrchestrationV2Subagent,
+  type ThreadId,
+} from "@t3tools/contracts";
+import { copySorted } from "@t3tools/shared/Array";
+import { deriveSubagentElapsedMs, formatDuration } from "@t3tools/shared/orchestrationTiming";
+import { StackActions, useNavigation } from "@react-navigation/native";
+import * as DateTime from "effect/DateTime";
 import { Atom } from "effect/unstable/reactivity";
-import { memo, useEffect, useMemo } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import { memo, useEffect, useMemo, useState } from "react";
+import { Modal, Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AndroidSheetHeader } from "../../components/AndroidScreenHeader";
+import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
 import { GlassControl } from "../../components/GlassControl";
 import { cn } from "../../lib/cn";
-import {
-  deriveSubagentTabs,
-  selectSubagents,
-  subagentTitle,
-  subagentToolCalls,
-} from "../../lib/subagentTabs";
-import { useSelectedThreadProjection, useThreadProjection } from "../../state/use-thread-detail";
 import { selectionHaptic } from "../../lib/haptics";
 import { appAtomRegistry } from "../../state/atom-registry";
+import { environmentThreadDetails } from "../../state/threads";
+import { useThreadProjection } from "../../state/use-thread-detail";
+import { SubagentStatusDot } from "./SubagentStatusDot";
+import { resolveSubagentRowPresentation } from "./threadAgentsPresentation";
 
-type SubagentStatus = OrchestrationV2Subagent["status"];
+type AgentsTarget = { readonly environmentId: EnvironmentId; readonly threadId: ThreadId };
 
-const STATUS_LABEL = {
-  pending: "Starting",
-  running: "Working",
-  waiting: "Needs input",
-  idle: "Idle",
-  completed: "Done",
-  failed: "Failed",
-  cancelled: "Cancelled",
-  interrupted: "Interrupted",
-} as const satisfies Record<SubagentStatus, string>;
+function spawnOrder(subagent: OrchestrationV2Subagent): number {
+  return DateTime.toEpochMillis(subagent.startedAt ?? subagent.updatedAt);
+}
 
-const STATUS_DOT = {
-  pending: "bg-adaptive-sky-600-400",
-  running: "bg-adaptive-sky-600-400",
-  waiting: "bg-adaptive-amber-700-400",
-  idle: "bg-foreground-muted",
-  completed: "bg-adaptive-emerald-600-400",
-  failed: "bg-adaptive-rose-600-400",
-  cancelled: "bg-foreground-muted",
-  interrupted: "bg-foreground-muted",
-} as const satisfies Record<SubagentStatus, string>;
+/** The sheet's agents among the thread's subagents, in spawn order. */
+function selectSubagents(
+  subagents: ReadonlyArray<OrchestrationV2Subagent>,
+  ids: ReadonlySet<string>,
+): ReadonlyArray<OrchestrationV2Subagent> {
+  return copySorted(
+    subagents.filter((agent) => ids.has(agent.id)),
+    (a, b) => spawnOrder(a) - spawnOrder(b) || a.id.localeCompare(b.id),
+  );
+}
+
+export function useThreadTurnSubagents(target: AgentsTarget): ThreadTurnSubagents | null {
+  return useAtomValue(environmentThreadDetails.turnSubagentsAtom(target));
+}
 
 /**
- * The open subagent sheet: the agents it lists and the one shown. It keeps the
- * agents it opened with, so it still shows results after the wave ends and the
- * tabs go away. The feed's subagent card opens it too (openSubagentSheet).
+ * The open agents sheet: the agents it lists and the row last tapped. It keeps
+ * the agents it opened with, so it still shows results after the wave ends and
+ * the pill goes away. The feed's subagent card opens it too (openSubagentSheet).
  */
 const subagentSheetAtom = Atom.make<{
   readonly agentIds: ReadonlyArray<string>;
@@ -60,27 +64,18 @@ export function openSubagentSheet(agentIds: ReadonlyArray<string>, selectedId: s
 }
 
 /**
- * One pill under the header, "3 agents working · 2 done", shown while any
- * subagent of the selected thread runs. Tapping it opens the sheet on the
- * first live agent, where every agent's full title and activity are. Rendered
- * by ThreadDetailScreen over the feed; `top` clears the header.
+ * One glass pill under the header, "3 agents working · 2 done", shown while
+ * any subagent of the current turn runs. Tapping it opens the agents sheet.
+ * Rendered by ThreadDetailScreen over the feed; `top` clears the header.
  */
-export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: number }) {
-  const thread = useSelectedThreadProjection();
-  const runs = thread?.projection.runs;
-  const roster = thread?.projection.subagents;
-  // Keyed on runs and subagents so streaming turn items do not recompute it.
-  const tabs = useMemo(
-    () =>
-      runs && roster
-        ? deriveSubagentTabs(deriveThreadTurnSubagents({ runs, subagents: roster }))
-        : [],
-    [runs, roster],
-  );
-  const liveTabs = tabs.filter((agent) => isActiveSubagentStatus(agent.status));
-  const doneCount = tabs.length - liveTabs.length;
+export const SubagentTabs = memo(function SubagentTabs(
+  props: AgentsTarget & { readonly top: number },
+) {
+  const turn = useThreadTurnSubagents(props);
+  const liveCount = turn?.liveCount ?? 0;
+  const doneCount = (turn?.subagents.length ?? 0) - liveCount;
   const pillLabel = [
-    `${liveTabs.length} ${liveTabs.length === 1 ? "agent" : "agents"} working`,
+    `${liveCount} ${liveCount === 1 ? "agent" : "agents"} working`,
     doneCount > 0 ? `${doneCount} done` : null,
   ]
     .filter(Boolean)
@@ -90,25 +85,23 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
   // Leaving the thread closes the sheet, so it does not reopen on the next one.
   useEffect(() => () => setSheet(null), [setSheet]);
 
-  const sheetAgents = useMemo(() => {
-    if (sheet === null || !roster) return [];
-    return selectSubagents(roster, new Set([...sheet.agentIds, ...tabs.map((agent) => agent.id)]));
-  }, [sheet, roster, tabs]);
-
   return (
     <>
-      {liveTabs.length > 0 ? (
+      {turn !== null && liveCount > 0 ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={pillLabel}
-          accessibilityHint="Double tap to see what the subagents are doing."
+          accessibilityHint="Opens the list of agents in this turn"
           hitSlop={6}
-          onPress={() =>
+          onPress={() => {
+            const firstLive = turn.subagents.find((agent) =>
+              isOrchestrationV2WorkActive(agent.status),
+            );
             openSubagentSheet(
-              tabs.map((agent) => agent.id),
-              liveTabs[0]!.id,
-            )
-          }
+              turn.subagents.map((agent) => agent.id),
+              firstLive?.id ?? turn.subagents[0]!.id,
+            );
+          }}
           className="absolute left-3 active:opacity-70"
           style={{ top: props.top + 8 }}
         >
@@ -117,7 +110,7 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
             className="h-9 border border-border bg-card shadow-md shadow-black/10"
           >
             <View className="h-9 flex-row items-center gap-2 px-3.5">
-              <View className={cn("h-2 w-2 rounded-full", STATUS_DOT.running)} />
+              <SubagentStatusDot tone="working" placement="sheet" />
               <Text className="font-t3-medium text-xs text-foreground" numberOfLines={1}>
                 {pillLabel}
               </Text>
@@ -126,11 +119,11 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
         </Pressable>
       ) : null}
       {sheet !== null ? (
-        <SubagentSheet
-          environmentId={thread?.environmentId ?? null}
-          agents={sheetAgents}
+        <ThreadAgentsSheet
+          environmentId={props.environmentId}
+          threadId={props.threadId}
+          agentIds={sheet.agentIds}
           selectedId={sheet.selectedId}
-          onSelect={(selectedId) => setSheet({ ...sheet, selectedId })}
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -138,159 +131,176 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
   );
 });
 
-function SubagentSheet(props: {
-  readonly environmentId: EnvironmentId | null;
-  readonly agents: ReadonlyArray<OrchestrationV2Subagent>;
-  readonly selectedId: string | null;
-  readonly onSelect: (agentId: string) => void;
-  readonly onClose: () => void;
-}) {
+/**
+ * The agents of one wave, upstream's ThreadAgentsSheet rows in the fork's
+ * modal sheet. A row with its own thread opens it; provider-native agents run
+ * inside the parent and only show their progress or result.
+ */
+function ThreadAgentsSheet(
+  props: AgentsTarget & {
+    readonly agentIds: ReadonlyArray<string>;
+    readonly selectedId: string;
+    readonly onClose: () => void;
+  },
+) {
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const agent = props.agents.find((entry) => entry.id === props.selectedId) ?? props.agents[0];
-  const meta = agent?.model ? [agent.model] : [];
-  const failed = agent?.status === "failed";
+  const turn = useThreadTurnSubagents(props);
+  const roster = useThreadProjection(props)?.projection.subagents;
+  const subagents = useMemo(
+    () =>
+      roster
+        ? selectSubagents(
+            roster,
+            new Set([...props.agentIds, ...(turn?.subagents ?? []).map((agent) => agent.id)]),
+          )
+        : [],
+    [props.agentIds, roster, turn],
+  );
+  const hasLiveAgent = subagents.some((agent) => isOrchestrationV2WorkActive(agent.status));
+
+  const openChildThread = (childThreadId: ThreadId) => {
+    void selectionHaptic();
+    props.onClose();
+    // Pushed, so Back returns to this thread.
+    navigation.dispatch(
+      StackActions.push("Thread", {
+        environmentId: String(props.environmentId),
+        threadId: String(childThreadId),
+      }),
+    );
+  };
 
   return (
     <Modal visible animationType="slide" onRequestClose={props.onClose}>
-      <View
-        className="flex-1 bg-screen"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-      >
-        <View className="flex-row items-center justify-between gap-3 px-5 py-3">
-          <Text className="flex-1 font-t3-semibold text-xl">Subagents</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={props.onClose}
-            className="min-h-11 justify-center px-3"
-          >
-            <Text className="text-base text-primary">Done</Text>
-          </Pressable>
-        </View>
+      <View className="flex-1 bg-sheet" style={{ paddingTop: insets.top }}>
+        {Platform.OS === "android" ? (
+          <AndroidSheetHeader title="Agents" onBack={props.onClose} />
+        ) : (
+          <View className="flex-row items-center justify-between gap-3 px-5 py-3">
+            <Text className="flex-1 font-t3-semibold text-xl">Agents</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={props.onClose}
+              className="min-h-11 justify-center px-3"
+            >
+              <Text className="text-base text-primary">Done</Text>
+            </Pressable>
+          </View>
+        )}
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="max-h-12 grow-0"
-          contentContainerClassName="gap-2 px-5 pb-2"
+          className="flex-1"
+          contentContainerClassName="px-5"
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 8 }}
         >
-          {props.agents.map((entry, index) => {
-            const selected = entry.id === agent?.id;
-            return (
-              <Pressable
-                key={entry.id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                onPress={() => props.onSelect(entry.id)}
-                className={cn(
-                  "min-h-9 max-w-56 flex-row items-center gap-1.5 rounded-full border px-3",
-                  selected
-                    ? "border-foreground bg-subtle"
-                    : "border-adaptive-neutral-200-a80-white-a8 bg-card",
-                )}
-              >
-                <View className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[entry.status])} />
-                <Text className="shrink text-sm text-foreground" numberOfLines={1}>
-                  {`${index + 1}. ${subagentTitle(entry)}`}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-        {agent ? (
-          <ScrollView className="flex-1" contentContainerClassName="gap-4 px-5 pb-6 pt-2">
-            <View className="gap-1">
-              <Text selectable className="font-t3-semibold text-lg text-foreground">
-                {subagentTitle(agent)}
-              </Text>
-              <View className="flex-row items-center gap-1.5">
-                <View className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[agent.status])} />
-                <Text className="text-sm text-foreground-muted">
-                  {[STATUS_LABEL[agent.status], ...meta].join(" · ")}
-                </Text>
-              </View>
-            </View>
-            {agent.progress ? (
-              <Text selectable className="text-sm text-foreground">
-                {agent.progress}
-              </Text>
-            ) : null}
-            {agent.childThreadId !== null && props.environmentId !== null ? (
-              <SubagentToolCalls
-                environmentId={props.environmentId}
-                threadId={agent.childThreadId}
+          {subagents.length === 0 ? (
+            <Text className="pt-6 text-center text-sm text-foreground-muted">
+              {roster ? "No agents in this turn." : "Loading agents…"}
+            </Text>
+          ) : (
+            subagents.map((subagent) => (
+              <AgentRow
+                key={subagent.id}
+                subagent={subagent}
+                selected={subagent.id === props.selectedId}
+                tickSeconds={hasLiveAgent}
+                onOpen={openChildThread}
               />
-            ) : null}
-            {agent.result ? (
-              <View className="gap-1">
-                <Text className="font-t3-medium text-xs uppercase text-foreground-muted">
-                  {failed ? "Error" : "Result"}
-                </Text>
-                <Text selectable className="text-sm text-foreground">
-                  {agent.result}
-                </Text>
-              </View>
-            ) : null}
-          </ScrollView>
-        ) : null}
+            ))
+          )}
+        </ScrollView>
       </View>
     </Modal>
   );
 }
 
-/**
- * The selected agent's tool calls, read from its child thread. Mounted only
- * for the agent shown in the open sheet, so at most one extra thread
- * subscription is live. Agents without a child thread (some provider-native
- * ones) show only their progress and result.
- */
-function SubagentToolCalls(props: {
-  readonly environmentId: EnvironmentId;
-  readonly threadId: ThreadId;
+const AgentRow = memo(function AgentRow(props: {
+  readonly subagent: OrchestrationV2Subagent;
+  readonly selected: boolean;
+  readonly tickSeconds: boolean;
+  readonly onOpen: (childThreadId: ThreadId) => void;
 }) {
-  const child = useThreadProjection({
-    environmentId: props.environmentId,
-    threadId: props.threadId,
-  });
-  const turnItems = child?.projection.turnItems;
-  // Only the child's own items: a forked child can carry its parent's history.
-  const tools = useMemo(
-    () =>
-      turnItems
-        ? subagentToolCalls(turnItems.filter((item) => item.threadId === props.threadId))
-        : [],
-    [props.threadId, turnItems],
-  );
+  const { subagent } = props;
+  const presentation = resolveSubagentRowPresentation(subagent);
+  const childThreadId = subagent.childThreadId;
+  const elapsed = useSubagentElapsed(subagent, props.tickSeconds);
+  const accessibilityLabel = `${presentation.title}, ${presentation.statusLabel}`;
 
-  return (
-    <View className="gap-2">
-      <Text className="font-t3-medium text-xs uppercase text-foreground-muted">
-        {child === null
-          ? "Loading tool calls"
-          : tools.length === 0
-            ? "No tool calls yet"
-            : `Tool calls (${tools.length})`}
-      </Text>
-      {tools.map((tool) => (
-        <View key={tool.id} className="flex-row gap-2">
-          <View
-            className={cn(
-              "mt-1.5 h-1.5 w-1.5 rounded-full",
-              tool.done ? "bg-foreground-muted" : "bg-adaptive-sky-600-400",
-            )}
-          />
-          <View className="min-w-0 flex-1">
-            <Text className="text-sm text-foreground">{tool.title}</Text>
-            {tool.detail ? (
-              <Text
-                selectable
-                className="font-mono text-xs text-foreground-muted"
-                numberOfLines={4}
-              >
-                {tool.detail}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-      ))}
+  const row = (
+    <View
+      className={cn(
+        "-mx-2 min-h-14 flex-row items-center gap-3 rounded-2xl px-2 py-3",
+        props.selected && "bg-subtle",
+      )}
+    >
+      <SubagentStatusDot tone={presentation.tone} placement="sheet" />
+      <View className="min-w-0 flex-1 gap-0.5">
+        <Text className="font-t3-medium text-sm text-foreground" numberOfLines={1}>
+          {presentation.title}
+        </Text>
+        <Text
+          className="text-xs text-foreground-muted"
+          numberOfLines={childThreadId === null ? 4 : 1}
+        >
+          {presentation.detail ?? presentation.statusLabel}
+        </Text>
+      </View>
+      {elapsed === null ? null : (
+        <Text className="shrink-0 text-2xs tabular-nums text-foreground-muted">{elapsed}</Text>
+      )}
+      {presentation.canOpenThread ? (
+        <SymbolView name="chevron.right" size={12} tintColorClassName="accent-icon-subtle" />
+      ) : null}
     </View>
   );
+
+  if (childThreadId === null) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint="Provider-managed agent. Its work appears in the transcript."
+      >
+        {row}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint="Opens this agent's thread"
+      onPress={() => props.onOpen(childThreadId)}
+      className="active:opacity-70"
+    >
+      {row}
+    </Pressable>
+  );
+});
+
+/**
+ * Elapsed time for one agent. Only a live agent in a sheet with live work
+ * ticks, so a settled sheet never repaints.
+ */
+function useSubagentElapsed(
+  subagent: Pick<OrchestrationV2Subagent, "status" | "startedAt" | "completedAt">,
+  tickSeconds: boolean,
+): string | null {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const running = isOrchestrationV2WorkActive(subagent.status);
+  useEffect(() => {
+    if (!tickSeconds || !running) return;
+    const intervalId = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(intervalId);
+  }, [running, tickSeconds]);
+  const elapsedMs = deriveSubagentElapsedMs(
+    {
+      status: subagent.status,
+      startedAt: subagent.startedAt === null ? null : DateTime.formatIso(subagent.startedAt),
+      completedAt: subagent.completedAt === null ? null : DateTime.formatIso(subagent.completedAt),
+    },
+    nowMs,
+  );
+  return elapsedMs === null || elapsedMs === 0 ? null : formatDuration(elapsedMs);
 }

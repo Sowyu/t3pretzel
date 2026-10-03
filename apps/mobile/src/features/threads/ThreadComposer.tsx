@@ -5,6 +5,7 @@ import { pastedTextDisposition, replaceTextSelection } from "@t3tools/client-run
 import {
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   PROVIDER_SEND_TURN_MAX_INPUT_CHARS,
+  type ChatAttachment,
   type EnvironmentId,
   type MessageId,
   type ModelSelection,
@@ -106,6 +107,7 @@ import { useScaledTextRole } from "../settings/appearance/useScaledTextRole";
 import type { RemoteClientConnectionState } from "../../lib/connection";
 import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
+import { ComposerQueuedEditAttachments } from "./ComposerQueuedEdit";
 import { ComposerStashButton, useComposerStashChrome } from "./ComposerStashControl";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import {
@@ -164,6 +166,18 @@ export interface ThreadComposerProps {
   readonly projectCwd: string | null;
   /** Why sending is blocked right now (shown as the send button's label), or null. */
   readonly sendBlockedReason?: string | null;
+  /** Where the composer's content lives. Defaults to this thread's own draft. */
+  readonly draftKey?: string;
+  /**
+   * Set while a queued message is open for editing: the send button saves the
+   * edit instead of sending, and the message's server attachments stay visible
+   * above the composer so they can be removed.
+   */
+  readonly queuedEdit?: {
+    readonly existingAttachments: ReadonlyArray<ChatAttachment>;
+    readonly saving: boolean;
+    readonly onRemoveExistingAttachment: (attachmentId: string) => void;
+  } | null;
   readonly editorRef?: RefObject<ComposerEditorHandle | null>;
   readonly onChangeDraftMessage: (value: string) => void;
   readonly onPickDraftMedia: () => Promise<void>;
@@ -447,7 +461,11 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
 
   const [previewFile, setPreviewFile] = useState<FilePreviewSource | null>(null);
   const [previewVideo, setPreviewVideo] = useState<VideoPreviewSource | null>(null);
-  const hasContent = props.draftMessage.trim().length > 0 || props.draftAttachments.length > 0;
+  const queuedEdit = props.queuedEdit ?? null;
+  const hasContent =
+    props.draftMessage.trim().length > 0 ||
+    props.draftAttachments.length > 0 ||
+    (queuedEdit?.existingAttachments.length ?? 0) > 0;
   // Only media belongs above the composer; every other file reads as its inline chip.
   // Where the stash tab or its open list sits on the composer, the corners
   // under it go square so the two read as one piece of glass.
@@ -455,7 +473,8 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     () => composerStripAttachments(props.draftAttachments),
     [props.draftAttachments],
   );
-  const showStopAction = !hasContent && props.canStopThread;
+  // Stopping the agent is not what the send button means in edit mode.
+  const showStopAction = !hasContent && props.canStopThread && queuedEdit === null;
 
   const uploadStates = useAtomValue(composerAttachmentUploadsAtom);
   const attachmentsUploading =
@@ -469,7 +488,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   // Every send goes through the outbox; the label says whether it leaves now
   // or waits (for the connection, an earlier queued message, or an upload).
   const sendPresentation = resolveComposerSendPresentation({
-    editingQueuedMessage: false,
+    editingQueuedMessage: queuedEdit !== null,
     running: props.activeThreadBusy,
     canSteer: props.canSteerActiveTurn,
     followUpBehavior: props.followUpBehavior,
@@ -491,6 +510,9 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     );
   }, [props.serverConfig, props.selectedThread.modelSelection.instanceId]);
   const composerOwnerKey = scopedThreadKey(props.environmentId, props.selectedThread.id);
+  // Content lives under the edit's own draft while a queued message is open;
+  // the owner key still identifies this composer for settings and dictation.
+  const composerDraftKey = props.draftKey ?? composerOwnerKey;
   const stashChrome = useComposerStashChrome(composerOwnerKey);
   const { onStashTabHeightChange } = props;
   const stashTabHeight = stashChrome.cap?.height ?? 0;
@@ -506,7 +528,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
       name: attachment.name,
       mimeType: attachment.mimeType,
       sizeBytes: String(attachment.sizeBytes),
-      draftKey: composerOwnerKey,
+      draftKey: composerDraftKey,
     });
   };
   const { onSendMessage, onChangeDraftMessage, onShowUsageLimits } = props;
@@ -629,12 +651,13 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   });
   const contextImports = useAtomValue(composerContextImportsAtom);
   const sendBlockedReason =
+    (queuedEdit?.saving === true ? "Saving…" : null) ??
     props.sendBlockedReason ??
     (pendingPastedTextAttachmentCount > 0 ? "Attaching pasted text" : null) ??
     attachmentBlockReason;
   const canSend =
     hasContent &&
-    !contextImports[composerOwnerKey] &&
+    !contextImports[composerDraftKey] &&
     !voiceInput.blocksSubmission &&
     sendBlockedReason === null &&
     !modelUnavailable;
@@ -913,6 +936,20 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                 onPickFiles={props.onPickDraftFiles}
               />
             ) : null}
+            {isExpanded && queuedEdit !== null && queuedEdit.existingAttachments.length > 0 ? (
+              <Animated.View
+                className="px-[14px] pb-2.5"
+                entering={COMPOSER_ATTACHMENT_ENTERING}
+                exiting={FadeOut.duration(120)}
+              >
+                <ComposerQueuedEditAttachments
+                  environmentId={props.environmentId}
+                  attachments={queuedEdit.existingAttachments}
+                  disabled={queuedEdit.saving || voiceInput.isBusy}
+                  onRemove={queuedEdit.onRemoveExistingAttachment}
+                />
+              </Animated.View>
+            ) : null}
             {isExpanded && stripAttachments.length > 0 ? (
               <Animated.View
                 className="px-[14px] pb-2.5"
@@ -944,7 +981,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
               layout={COMPOSER_LAYOUT_TRANSITION}
             >
               <ComposerEditor
-                draftKey={composerOwnerKey}
+                draftKey={composerDraftKey}
                 environmentId={props.environmentId}
                 onOpenMention={(path) => {
                   Keyboard.dismiss();
@@ -995,7 +1032,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                     PROVIDER_SEND_TURN_MAX_INPUT_CHARS;
                   const canAttach =
                     maxBytes !== null &&
-                    countComposerDraftAttachmentsAfterSelection(composerOwnerKey, {
+                    countComposerDraftAttachmentsAfterSelection(composerDraftKey, {
                       text: paste.value,
                       ...paste.selection,
                     }) < PROVIDER_SEND_TURN_MAX_ATTACHMENTS &&
@@ -1171,7 +1208,9 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                         onPickMedia={props.onPickDraftMedia}
                         onPickFiles={props.onPickDraftFiles}
                       />
-                      <ComposerStashButton draftKey={composerOwnerKey} hasContent={hasContent} />
+                      {queuedEdit === null ? (
+                        <ComposerStashButton draftKey={composerOwnerKey} hasContent={hasContent} />
+                      ) : null}
                     </View>
                     <View className="min-w-0 shrink">
                       <ComposerInlineControl

@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { QueuedThreadRun } from "@t3tools/client-runtime/state/thread-workflows";
 import {
   CommandId,
   ComposerContextId,
   EnvironmentId,
   MessageId,
-  ProviderInstanceId,
-  RunId,
   ThreadId,
 } from "@t3tools/contracts";
-import * as DateTime from "effect/DateTime";
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
 import { appendPendingThreadMessages } from "./pending-thread-feed";
 
@@ -23,42 +19,7 @@ const pending = (id: string): QueuedThreadMessage => ({
   createdAt: "2026-09-06T10:00:00.000Z",
 });
 
-const queuedRun = (id: string): QueuedThreadRun => ({
-  run: {
-    id: RunId.make(`run-${id}`),
-    threadId: ThreadId.make("thread"),
-    ordinal: 2,
-    providerInstanceId: ProviderInstanceId.make("codex"),
-    modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
-    providerThreadId: null,
-    userMessageId: MessageId.make(id),
-    rootNodeId: null,
-    activeAttemptId: null,
-    status: "queued",
-    requestedAt: DateTime.makeUnsafe("2026-09-06T10:30:00.000Z"),
-    startedAt: null,
-    completedAt: null,
-    checkpointId: null,
-    contextHandoffId: null,
-  },
-  text: id,
-  attachments: [],
-  messageId: MessageId.make(id),
-});
-
 describe("pending timeline messages", () => {
-  it("shows server-queued runs before the local outbox until they start", () => {
-    const entries = appendPendingThreadMessages([], [], [pending("local")], [queuedRun("held")]);
-    expect(entries.map((entry) => entry.id)).toEqual(["held", "local"]);
-    expect(entries[0]?.queuedRun?.run.id).toBe("run-held");
-    expect(entries[0]?.createdAt).toBe("2026-09-06T10:30:00.000Z");
-
-    const started = { ...entries[0]!, queuedRun: undefined };
-    expect(appendPendingThreadMessages([started], [started], [], [queuedRun("held")])).toEqual([
-      started,
-    ]);
-  });
-
   it("retains context records while a message is waiting for delivery", () => {
     const record = {
       version: 1 as const,

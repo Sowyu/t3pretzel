@@ -1,3 +1,4 @@
+import { ConnectionTraceId } from "./ConnectionTraceId";
 import { SymbolView } from "../../components/AppSymbol";
 import { connectionStatusText } from "@t3tools/client-runtime/connection";
 import type { AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
@@ -9,17 +10,17 @@ import { useCallback, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import { AppText as Text } from "../../components/AppText";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
 import { ThemedSwitch } from "../../components/ThemedSwitch";
 import { cn } from "../../lib/cn";
-import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import type { ConnectedEnvironmentSummary } from "../../state/remote-runtime-types";
 import { serverEnvironment } from "../../state/server";
+import { ConnectionFormField } from "./ConnectionFormField";
 import { ConnectionStatusDot } from "./ConnectionStatusDot";
 
 function connectionStatusLabel(environment: ConnectedEnvironmentSummary): string | null {
-  if (!environment.isEnabled) {
+  if (!environment.isEnabled && environment.connectionState !== "unsupported") {
     return "Off";
   }
   return connectionStatusText({
@@ -32,6 +33,8 @@ function connectionStatusLabel(environment: ConnectedEnvironmentSummary): string
 export function ConnectionEnvironmentRow(props: {
   readonly environment: ConnectedEnvironmentSummary;
   readonly expanded: boolean;
+  /** Row navigates to a detail screen instead of expanding inline. */
+  readonly opensDetails?: boolean;
   readonly onToggle: () => void;
   readonly onReconnect: (environmentId: EnvironmentId) => void;
   readonly onRemove: (environmentId: EnvironmentId) => void;
@@ -46,14 +49,12 @@ export function ConnectionEnvironmentRow(props: {
   const serverConfig = useAtomValue(
     serverEnvironment.configValueAtom(props.environment.environmentId),
   );
-  const enabled = props.environment.isEnabled;
+  const unsupported = props.environment.connectionState === "unsupported";
+  const enabled = props.environment.isEnabled && !unsupported;
   const statusLabel = connectionStatusLabel(props.environment);
   const statusTraceId = enabled ? props.environment.connectionErrorTraceId : null;
+  // Unsupported is a compatibility note, not a failure, so it stays muted.
   const hasConnectionFailure = enabled && props.environment.connectionError !== null;
-  const isRetrying =
-    enabled &&
-    (props.environment.connectionState === "connecting" ||
-      props.environment.connectionState === "reconnecting");
   const handleSave = useCallback(async () => {
     const result = await props.onUpdate(props.environment.environmentId, {
       label: label.trim(),
@@ -74,10 +75,15 @@ export function ConnectionEnvironmentRow(props: {
     <Animated.View layout={LinearTransition.duration(250)} className="bg-card">
       <Pressable
         className="flex-row items-center gap-3 px-4 py-3.5 active:opacity-70"
+        accessibilityRole="button"
+        accessibilityLabel={
+          props.opensDetails ? `Manage ${props.environment.environmentLabel}` : undefined
+        }
         onPress={props.onToggle}
       >
         <ConnectionStatusDot
-          state={enabled ? props.environment.connectionState : "available"}
+          state={enabled || unsupported ? props.environment.connectionState : "available"}
+          // Backoff can last forever on an offline host; only a live attempt pulses.
           pulse={enabled && props.environment.connectionState === "connecting"}
           size={8}
         />
@@ -96,9 +102,11 @@ export function ConnectionEnvironmentRow(props: {
               {props.environment.environmentLabel}
             </Text>
           </View>
-          <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-            {props.environment.displayUrl}
-          </Text>
+          {!props.environment.isRelayManaged && props.environment.displayUrl.trim() ? (
+            <Text className="text-xs text-foreground-muted" numberOfLines={1}>
+              {props.environment.displayUrl}
+            </Text>
+          ) : null}
           {statusLabel ? (
             <Text
               className={cn(
@@ -110,36 +118,26 @@ export function ConnectionEnvironmentRow(props: {
             >
               {statusLabel}
               {statusTraceId ? (
-                <>
-                  {" Trace ID: "}
-                  <Text
-                    accessibilityHint="Copies the trace ID"
-                    accessibilityRole="button"
-                    className="underline decoration-dotted"
-                    onLongPress={(event) => {
-                      event.stopPropagation();
-                      copyTextWithHaptic(statusTraceId, { target: "connection-trace-id" });
-                    }}
-                    onPress={(event) => {
-                      event.stopPropagation();
-                    }}
-                  >
-                    {statusTraceId}
-                  </Text>
-                </>
+                <ConnectionTraceId
+                  traceId={statusTraceId}
+                  tone={hasConnectionFailure ? "danger" : "muted"}
+                  activation="longPress"
+                />
               ) : null}
             </Text>
           ) : null}
         </View>
 
         <ThemedSwitch
+          style={{ alignSelf: "center" }}
+          disabled={unsupported}
           onValueChange={(next) => props.onSetEnabled(props.environment.environmentId, next)}
           value={enabled}
         />
         <SymbolView
-          name="chevron.down"
+          name={props.opensDetails ? "chevron.right" : "chevron.down"}
           size={12}
-          tintColorClassName={"accent-icon-subtle"}
+          tintColorClassName="accent-icon-subtle"
           type="monochrome"
           style={{
             transform: [{ rotate: props.expanded ? "180deg" : "0deg" }],
@@ -159,34 +157,24 @@ export function ConnectionEnvironmentRow(props: {
             </Text>
           ) : (
             <>
-              <View className="gap-1.5">
-                <Text className="text-2xs font-t3-bold tracking-[0.8px] uppercase text-foreground-muted">
-                  Label
-                </Text>
-                <TextInput
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  placeholder="My MacBook"
-                  value={label}
-                  onChangeText={setLabel}
-                  className="rounded-[14px] border border-input-border bg-input px-4 py-3 text-base text-foreground"
-                />
-              </View>
+              <ConnectionFormField
+                label="Label"
+                autoCapitalize="words"
+                autoCorrect={false}
+                placeholder="My MacBook"
+                value={label}
+                onChangeText={setLabel}
+              />
 
-              <View className="gap-1.5">
-                <Text className="text-2xs font-t3-bold tracking-[0.8px] uppercase text-foreground-muted">
-                  URL
-                </Text>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  placeholder="192.168.1.100:8080"
-                  value={url}
-                  onChangeText={setUrl}
-                  className="rounded-[14px] border border-input-border bg-input px-4 py-3 text-base text-foreground"
-                />
-              </View>
+              <ConnectionFormField
+                label="URL"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                placeholder="192.168.1.100:8080"
+                value={url}
+                onChangeText={setUrl}
+              />
             </>
           )}
 
@@ -209,6 +197,8 @@ export function ConnectionEnvironmentRow(props: {
             )}
 
             <Pressable
+              accessibilityLabel="Reconnect environment"
+              accessibilityRole="button"
               className="h-[42px] w-[42px] items-center justify-center rounded-[14px] border border-input-border bg-input active:opacity-70 disabled:opacity-40"
               disabled={!enabled}
               onPress={() => props.onReconnect(props.environment.environmentId)}
@@ -222,6 +212,8 @@ export function ConnectionEnvironmentRow(props: {
             </Pressable>
 
             <Pressable
+              accessibilityLabel="Remove environment"
+              accessibilityRole="button"
               className="h-[42px] w-[42px] items-center justify-center rounded-[14px] border border-danger-border bg-danger active:opacity-70"
               onPress={() => props.onRemove(props.environment.environmentId)}
             >

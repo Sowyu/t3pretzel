@@ -22,6 +22,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { USER_INPUT_TOGGLE_DURATION_MS } from "./pendingUserInputLayout";
+import { RequestActionButton } from "./RequestActionButton";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
@@ -344,30 +345,17 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
           );
         })}
       </ScrollView>
-      <Pressable
-        className={cn(
-          "flex-row items-center justify-center gap-2 rounded-2xl px-4 py-3.5",
-          props.answers ? "bg-primary" : "bg-subtle-strong",
-          responding && pressedAction !== "submit" && "opacity-50",
-        )}
+      <RequestActionButton
+        label="Submit answers"
+        size="large"
+        tone={props.answers ? "primary" : "secondary"}
+        busy={responding && pressedAction === "submit"}
         disabled={props.answers === null || responseDisabled}
         onPress={() => {
           setPressedAction("submit");
           void props.onSubmit();
         }}
-      >
-        {responding && pressedAction === "submit" ? (
-          <ActivityIndicator colorClassName="accent-primary-foreground" size="small" />
-        ) : null}
-        <Text
-          className={cn(
-            "font-t3-extrabold text-sm",
-            props.answers ? "text-primary-foreground" : "text-foreground-muted",
-          )}
-        >
-          Submit answers
-        </Text>
-      </Pressable>
+      />
       {props.pendingUserInput.dismissible ? (
         <Pressable
           accessibilityRole="button"

@@ -29,6 +29,12 @@ class T3KeyboardCommandsView(
   var enabledCommands = emptySet<String>()
 
   override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    val isFirstPress = event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0
+    val command = if (isFirstPress) paletteCommand(event) else null
+    if (command != null && enabledCommands.contains(command)) {
+      onCommand(mapOf("command" to command))
+      return true
+    }
     val copiesThreadReference =
       event.action == KeyEvent.ACTION_DOWN &&
         event.repeatCount == 0 &&
@@ -42,5 +48,23 @@ class T3KeyboardCommandsView(
       return true
     }
     return super.dispatchKeyEvent(event)
+  }
+
+  // Command strings match HardwareKeyboardCommand in features/keyboard/hardwareKeyboardCommands.ts.
+  private fun paletteCommand(event: KeyEvent): String? {
+    if (event.hasModifiers(KeyEvent.META_CTRL_ON)) {
+      return when (event.keyCode) {
+        KeyEvent.KEYCODE_K -> "commandPalette"
+        in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> "thread.jump.${event.keyCode - KeyEvent.KEYCODE_0}"
+        else -> null
+      }
+    }
+    if (!event.hasNoModifiers()) return null
+    return when (event.keyCode) {
+      KeyEvent.KEYCODE_DPAD_DOWN -> "paletteNext"
+      KeyEvent.KEYCODE_DPAD_UP -> "palettePrevious"
+      KeyEvent.KEYCODE_ESCAPE -> "paletteDismiss"
+      else -> null
+    }
   }
 }

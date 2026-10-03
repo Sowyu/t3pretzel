@@ -84,7 +84,7 @@ import {
 } from "@t3tools/client-runtime/state/composer-dispatch";
 import { Atom } from "effect/unstable/reactivity";
 import { prepareTurnAttachments } from "../lib/attachmentUpload";
-import { DEFAULT_FOLLOW_UP_BEHAVIOR } from "../lib/followUpBehavior";
+import { followUpBehaviorAtom } from "./preferences";
 import { environmentThreadDetails } from "./threads";
 import {
   endQueuedRunEdit,
@@ -299,9 +299,9 @@ export function useThreadComposerState() {
     }
   }, [acknowledgedMessages, selectedThreadMessages]);
 
-  // The fork has no Settings row for this yet; a send can still override it
-  // per message (the composer's steer action).
-  const followUpBehavior = DEFAULT_FOLLOW_UP_BEHAVIOR;
+  // Settings > Follow-ups picks the default; a send can still override it per
+  // message (the composer's steer action).
+  const followUpBehavior = useAtomValue(followUpBehaviorAtom);
   // Steering needs a live provider turn the adapter can interrupt; the queue
   // workflow already derives that from the session's capabilities.
   const queueWorkflow = useAtomValue(

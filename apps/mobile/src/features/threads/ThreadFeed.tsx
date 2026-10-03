@@ -1,16 +1,20 @@
 import { selectionHaptic } from "../../lib/haptics";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import { useViewabilityAmount, type LegendListRef } from "@legendapp/list/react-native";
-import type {
-  ChatAttachment,
-  ChatFileAttachment,
-  ChatImageAttachment,
-  EnvironmentId,
-  MessageId,
-  OrchestrationMessageContext,
-  RunId,
+import {
   ThreadId,
+  type ChatAttachment,
+  type ChatFileAttachment,
+  type ChatImageAttachment,
+  type EnvironmentId,
+  type MessageId,
+  type OrchestrationMessageContext,
+  type OrchestrationV2ProjectedTurnItem,
+  type RunId,
 } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { canForkProjectedAssistantItem } from "@t3tools/client-runtime/state/thread-workflows";
 import { renderAssistantCitationsAsText } from "@t3tools/shared/assistantCitations";
 import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
 import { encodeComposerContextFragment } from "@t3tools/shared/composerContextClipboard";
@@ -170,6 +174,20 @@ import {
   WORK_GROUP_TOGGLE_HEIGHT,
 } from "./thread-work-log";
 import { ThreadReasoningRow } from "./thread-reasoning-row";
+import { ThreadContextDivider } from "./thread-context-divider";
+import { ThreadHandoffRow } from "./thread-handoff-row";
+import { resolveThreadFeedFixedItemSize } from "./thread-feed-item-size";
+import { waitForThreadShellReady } from "./threadForkNavigation";
+import { useV2ItemSupport } from "./v2-item-support";
+import {
+  WorktreeSetupCard,
+  WorktreeWorkingHeader,
+  type WorktreeSetupCardProps,
+} from "./worktree-setup-card";
+import { appAtomRegistry } from "../../state/atom-registry";
+import { environmentThreadShells, threadEnvironment } from "../../state/threads";
+import { useAtomCommand } from "../../state/use-atom-command";
+import { uuidv4 } from "../../lib/uuid";
 import { ThreadTimelineRail } from "./thread-timeline-rail";
 import {
   deriveTimelineRailItems,
@@ -178,9 +196,6 @@ import {
 } from "./thread-timeline-rail.logic";
 import { appendPendingThreadMessages, type PendingThreadFeedEntry } from "./pending-thread-feed";
 import { resolveUserMessageIntentBadge } from "./userMessageIntentBadge";
-import { useThreadQueuedRuns } from "./use-thread-queued-runs";
-
-type QueuedRunActions = Omit<ReturnType<typeof useThreadQueuedRuns>, "queuedRuns">;
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
 import { useMarkdownCodeHighlight } from "./markdownCodeHighlightState";
 import {
@@ -254,6 +269,10 @@ function isFreshTimestamp(input: string): boolean {
 }
 
 export interface ThreadFeedProps {
+  /** Worktree setup progress for a new worktree thread; shown under its first prompt. */
+  readonly worktreeSetup?: WorktreeSetupCardProps | null;
+  /** First-turn start once setup output is gone; shows the "Working for" header instead. */
+  readonly setupWorkingStartedAt?: string | null;
   readonly queuedMessages: ReadonlyArray<QueuedThreadMessage>;
   readonly dispatchingMessageId: MessageId | null;
   readonly onEditPendingMessage: (message: QueuedThreadMessage) => void;
@@ -288,6 +307,128 @@ export interface ThreadFeedProps {
     readonly loading: boolean;
     readonly onLoadEarlier: () => void;
   } | null;
+}
+
+async function waitForThreadShell(
+  environmentId: EnvironmentId,
+  threadId: ThreadId,
+): Promise<boolean> {
+  const atom = environmentThreadShells.threadShellAtom(scopeThreadRef(environmentId, threadId));
+  return waitForThreadShellReady({
+    read: () => appAtomRegistry.get(atom) !== null,
+  });
+}
+
+/** Meta-row button that forks the thread at this response and opens the fork. */
+const AssistantForkButton = memo(function AssistantForkButton(props: {
+  readonly environmentId: EnvironmentId;
+  readonly iconColor: ColorValue;
+  readonly projectedItem: OrchestrationV2ProjectedTurnItem;
+}) {
+  const support = useV2ItemSupport({
+    environmentId: props.environmentId,
+    sourceThreadId: props.projectedItem.sourceThreadId,
+    sourceItemId: props.projectedItem.sourceItemId,
+  });
+  const sourceTitle = useAtomValue(
+    environmentThreadShells.threadShellAtom(
+      scopeThreadRef(props.environmentId, props.projectedItem.sourceThreadId),
+    ),
+    (shell) => shell?.title ?? "Thread",
+  );
+  const forkFromRun = useAtomCommand(threadEnvironment.forkFromRun, "fork from response");
+  const navigation = useNavigation();
+  const [busy, setBusy] = useState(false);
+  const canFork = canForkProjectedAssistantItem({
+    projectedItem: props.projectedItem,
+    capabilities: support.providerSession?.capabilities,
+  });
+  const runId = props.projectedItem.item.runId;
+
+  if (!canFork || runId === null) return null;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Fork from this response"
+      disabled={busy}
+      hitSlop={4}
+      onPress={() => {
+        const targetThreadId = ThreadId.make(uuidv4());
+        setBusy(true);
+        void selectionHaptic();
+        void forkFromRun({
+          environmentId: props.environmentId,
+          input: {
+            sourceThreadId: props.projectedItem.sourceThreadId,
+            targetThreadId,
+            runId,
+            title: `${sourceTitle} fork`,
+            creationSource: "mobile",
+          },
+        })
+          .then(async (result) => {
+            if (result._tag !== "Success") return;
+            const targetThreadReady = await waitForThreadShell(props.environmentId, targetThreadId);
+            if (!targetThreadReady) {
+              Alert.alert(
+                "Fork created",
+                "Its thread data did not reach this client. Reconnect and try opening it from the thread list.",
+              );
+              return;
+            }
+            navigation.navigate("Thread", {
+              environmentId: props.environmentId,
+              threadId: targetThreadId,
+            });
+          })
+          .finally(() => setBusy(false));
+      }}
+      className="h-7 w-7 items-center justify-center disabled:opacity-40"
+    >
+      {busy ? (
+        <ActivityIndicator size="small" colorClassName="accent-icon-muted" />
+      ) : (
+        <SymbolView
+          name="arrow.triangle.branch"
+          size={13}
+          tintColor={props.iconColor}
+          type="monochrome"
+        />
+      )}
+    </Pressable>
+  );
+});
+
+/** "Sent by another agent" over a user bubble; opens the sending thread when known. */
+function AgentMessageAttribution(props: {
+  readonly environmentId: EnvironmentId;
+  readonly senderThreadId?: ThreadId;
+}) {
+  const navigation = useNavigation();
+  const senderThreadId = props.senderThreadId;
+  const label = (
+    <Text className="mb-1 pr-1 font-t3-medium text-2xs text-foreground-muted">
+      Sent by another agent
+    </Text>
+  );
+  return senderThreadId ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Open sending thread"
+      hitSlop={4}
+      onPress={() =>
+        navigation.navigate("Thread", {
+          environmentId: String(props.environmentId),
+          threadId: String(senderThreadId),
+        })
+      }
+    >
+      {label}
+    </Pressable>
+  ) : (
+    label
+  );
 }
 
 function MessageAttachmentImage(props: {
@@ -1393,7 +1534,6 @@ function renderFeedEntry(
     readonly terminalAssistantMessageIds: ReadonlySet<string>;
     readonly unsettledTurnId: RunId | null;
     readonly failedRunIds: ReadonlySet<RunId>;
-    readonly queuedRunActions: QueuedRunActions;
     readonly isWorking: boolean;
     readonly onCopyWorkRow: (rowId: string, value: string) => void;
     readonly onToggleWorkGroup: (groupId: string, anchorKey: string) => void;
@@ -1494,30 +1634,30 @@ function renderFeedEntry(
     );
   }
 
-  // A context handoff reads like a compaction: one divider with its label.
-  if (
-    entry.type === "activity-group" &&
-    (isContextCompactionActivityGroup(entry) || isContextHandoffActivityGroup(entry))
-  ) {
-    const label = entry.activities[0]!.summary;
+  if (entry.type === "activity-group" && isContextHandoffActivityGroup(entry)) {
     return (
-      <View
-        accessible
-        accessibilityLabel={label}
-        className="mb-3 flex-row items-center gap-3 px-1 py-1"
-      >
-        <View className="h-px flex-1 bg-adaptive-neutral-200-a80-white-a8" />
-        <View className="shrink-0 flex-row items-center gap-1.5">
-          <SymbolView
-            name="arrow.down.right.and.arrow.up.left"
-            size={12}
-            tintColor={iconSubtleColor}
-            type="monochrome"
-          />
-          <Text className="font-t3-medium text-xs text-foreground-muted">{label}</Text>
-        </View>
-        <View className="h-px flex-1 bg-adaptive-neutral-200-a80-white-a8" />
-      </View>
+      <ThreadHandoffRow
+        environmentId={props.environmentId}
+        projectedItem={entry.activities[0]!.projectedItem}
+        iconColor={iconSubtleColor}
+      />
+    );
+  }
+
+  if (entry.type === "activity-group" && isContextCompactionActivityGroup(entry)) {
+    const label = entry.activities[0]!.summary;
+    // Only the live run's running compaction shimmers.
+    const active =
+      props.unsettledTurnId !== null &&
+      entry.runId === props.unsettledTurnId &&
+      entry.activities[0]!.projectedItem.item.status === "running";
+    return (
+      <ThreadContextDivider
+        label={label}
+        icon="arrow.down.right.and.arrow.up.left"
+        iconColor={iconSubtleColor}
+        active={active}
+      />
     );
   }
 
@@ -1564,10 +1704,15 @@ function renderFeedEntry(
       );
       return (
         <View className="mb-5 items-end">
-          {presentation.isAutomation || message.createdBy === "agent" ? (
+          {presentation.isAutomation ? (
             <Text className="mb-1 pr-1 font-t3-medium text-2xs text-foreground-muted">
-              {presentation.isAutomation ? "Sent by automation" : "Sent by another agent"}
+              Sent by automation
             </Text>
+          ) : message.createdBy === "agent" ? (
+            <AgentMessageAttribution
+              environmentId={props.environmentId}
+              senderThreadId={message.senderThreadId}
+            />
           ) : null}
           <View
             className="min-w-0 gap-2 rounded-[20px] px-3.5 py-2.5"
@@ -1662,41 +1807,8 @@ function renderFeedEntry(
               </Text>
             ) : null}
             <Text className="font-t3-medium text-xs tabular-nums text-adaptive-neutral-600-400">
-              {entry.queuedRun
-                ? "Queued"
-                : entry.pendingMessage && !entry.acknowledged
-                  ? "Pending"
-                  : timestampLabel}
+              {entry.pendingMessage && !entry.acknowledged ? "Pending" : timestampLabel}
             </Text>
-            {entry.queuedRun && props.queuedRunActions.canSteer ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Steer now"
-                accessibilityHint="Interrupts what the agent is doing with this message"
-                disabled={props.queuedRunActions.busyRunId !== null}
-                hitSlop={8}
-                className="size-7 items-center justify-center disabled:opacity-40"
-                onPress={() => {
-                  if (entry.queuedRun) props.queuedRunActions.onSteer(entry.queuedRun.run.id);
-                }}
-              >
-                <SymbolView name="arrow.turn.left.up" size={14} tintColor={iconSubtleColor} />
-              </Pressable>
-            ) : null}
-            {entry.queuedRun ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Remove queued message"
-                disabled={props.queuedRunActions.busyRunId !== null}
-                hitSlop={8}
-                className="size-7 items-center justify-center disabled:opacity-40"
-                onPress={() => {
-                  if (entry.queuedRun) props.queuedRunActions.onRemove(entry.queuedRun.run.id);
-                }}
-              >
-                <SymbolView name="xmark" size={13} tintColor={iconSubtleColor} />
-              </Pressable>
-            ) : null}
             {entry.pendingMessage &&
             !entry.acknowledged &&
             !entry.pendingMessage.creation &&
@@ -1790,6 +1902,13 @@ function renderFeedEntry(
         })}
         {showAssistantMeta ? (
           <View className="mt-1 flex-row items-center gap-1">
+            {message.projectedItem ? (
+              <AssistantForkButton
+                environmentId={props.environmentId}
+                iconColor={iconSubtleColor}
+                projectedItem={message.projectedItem}
+              />
+            ) : null}
             <CopyTextButton
               accessibilityLabel="Copy message"
               text={renderedText}
@@ -2346,22 +2465,15 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   // One definition of "still live", shared with the fold derivation: two
   // copies of this test are what let a row and the fold beside it disagree.
   const unsettledTurnId = threadFeedRunIsUnsettled(props.latestRun) ? props.latestRun.runId : null;
-  const { queuedRuns, canSteer, busyRunId, onSteer, onRemove } = useThreadQueuedRuns(
-    props.environmentId,
-    props.threadId,
-  );
-  const queuedRunActions = useMemo<QueuedRunActions>(
-    () => ({ canSteer, busyRunId, onSteer, onRemove }),
-    [busyRunId, canSteer, onRemove, onSteer],
-  );
   // LegendList does not invalidate visible rows when only the renderItem closure changes.
   // Include turn completion so unchanged message rows reveal their footer and spacing
   // even when the final message update arrives before the turn settles.
   const listAppearanceData = useMemo(
     () => ({
+      worktreeSetup: props.worktreeSetup,
+      setupWorkingStartedAt: props.setupWorkingStartedAt,
       dispatchingMessageId: props.dispatchingMessageId,
       unsettledTurnId,
-      queuedRunActions,
       copiedRowId,
       expandedWorkRows,
       workRowSizing,
@@ -2373,9 +2485,10 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       viewportWidth,
     }),
     [
+      props.worktreeSetup,
+      props.setupWorkingStartedAt,
       props.dispatchingMessageId,
       unsettledTurnId,
-      queuedRunActions,
       copiedRowId,
       expandedWorkRows,
       workRowSizing,
@@ -2531,11 +2644,9 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         ),
         props.feed,
         props.queuedMessages,
-        queuedRuns,
       ),
     [
       props.queuedMessages,
-      queuedRuns,
       expandedTurnIds,
       expandedWorkGroupIds,
       props.activeWorkStartedAt,
@@ -2543,6 +2654,10 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       props.feed,
       props.latestRun,
     ],
+  );
+  // The setup card sits under the first prompt, the one that started the worktree.
+  const setupAnchorIndex = presentedFeed.findIndex(
+    (entry) => entry.type === "message" && entry.message.role === "user",
   );
   // The empty↔filled key below remounts the list and resets its imperative
   // content-inset override. Seed the fresh instance synchronously with the
@@ -2827,8 +2942,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       }
       switch (entry.type) {
         case "run-fold":
-          return TURN_FOLD_HEIGHT;
         case "work-toggle":
+          return resolveThreadFeedFixedItemSize(entry.type);
         case "thinking":
           return WORK_GROUP_TOGGLE_HEIGHT;
         case "activity-group":
@@ -2875,7 +2990,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             workGroupScrollPositions,
             terminalAssistantMessageIds,
             unsettledTurnId,
-            queuedRunActions,
             failedRunIds,
             isWorking: props.activeWorkStartedAt !== null,
             onCopyWorkRow,
@@ -2899,10 +3013,18 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             skills: props.skills,
             onUseArtifactTemplate: props.onUseArtifactTemplate,
           })}
+          {props.worktreeSetup && info.index === setupAnchorIndex ? (
+            <WorktreeSetupCard key={props.threadId} {...props.worktreeSetup} />
+          ) : props.setupWorkingStartedAt && info.index === setupAnchorIndex ? (
+            <WorktreeWorkingHeader startedAt={props.setupWorkingStartedAt} />
+          ) : null}
         </ThreadMediaVisibility>
       </Animated.View>
     ),
     [
+      props.worktreeSetup,
+      props.setupWorkingStartedAt,
+      setupAnchorIndex,
       props.dispatchingMessageId,
       props.threadId,
       props.onEditPendingMessage,
@@ -2913,7 +3035,6 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       workGroupScrollPositions,
       terminalAssistantMessageIds,
       unsettledTurnId,
-      queuedRunActions,
       failedRunIds,
       props.activeWorkStartedAt,
       iconSubtleColor,
@@ -3097,6 +3218,9 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             ListHeaderComponent={
               <>
                 {usesNativeAutomaticInsets ? null : <View style={{ height: topContentInset }} />}
+                {setupAnchorIndex < 0 && props.worktreeSetup ? (
+                  <WorktreeSetupCard key={props.threadId} {...props.worktreeSetup} />
+                ) : null}
                 {props.loadEarlier != null ? (
                   <Pressable
                     onPress={props.loadEarlier.onLoadEarlier}
@@ -3126,6 +3250,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           bottomInset={bottomContentInset}
         />
         {presentedFeed.length === 0 &&
+        !props.worktreeSetup &&
         props.activeWorkStartedAt === null &&
         props.contentPresentation.kind === "ready" ? (
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>

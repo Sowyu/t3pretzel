@@ -36,6 +36,25 @@ export const RUNTIME_MODE_CHOICES: ReadonlyArray<{
   },
 ];
 
+/** Runtime choices the provider advertises; every choice when it advertises none we can decode. */
+export function runtimeModeChoicesForSupportedModes(
+  supportedRuntimeModes: ReadonlyArray<RuntimeMode> | undefined,
+) {
+  return supportedRuntimeModes && supportedRuntimeModes.length > 0
+    ? RUNTIME_MODE_CHOICES.filter((choice) => supportedRuntimeModes.includes(choice.mode))
+    : RUNTIME_MODE_CHOICES;
+}
+
+/** The mode a thread effectively runs in when its stored mode is not offered. */
+export function compatibleRuntimeModeForChoices(
+  runtimeMode: RuntimeMode,
+  choices: ReadonlyArray<{ readonly mode: RuntimeMode }>,
+): RuntimeMode {
+  return choices.some((choice) => choice.mode === runtimeMode)
+    ? runtimeMode
+    : (choices[0]?.mode ?? runtimeMode);
+}
+
 export function selectableChoices(
   descriptor: Extract<ProviderOptionDescriptor, { type: "select" }>,
 ) {

@@ -14,18 +14,25 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { HeaderHeightContext } from "@react-navigation/elements";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import type { ThreadUserInputQuestion } from "@t3tools/client-runtime/state/thread-requests";
+import {
+  formatModelSelectionEffort,
+  type ProviderSubagentStatus,
+} from "@t3tools/client-runtime/state/thread-execution";
+import { formatModelSlugName, resolveSelectableModel } from "@t3tools/shared/model";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import type { ActiveTurnComposerAction } from "@t3tools/client-runtime/state/composer-dispatch";
-import type {
-  EnvironmentId,
-  MessageId,
-  ModelSelection,
-  ProviderApprovalDecision,
-  ProviderInteractionMode,
-  RuntimeMode,
-  RuntimeRequestId,
-  ServerConfig as T3ServerConfig,
-  ThreadId,
-  UsageLimitsReport,
+import {
+  isProviderNativeSubagentThread,
+  type EnvironmentId,
+  type MessageId,
+  type ModelSelection,
+  type ProviderApprovalDecision,
+  type ProviderInteractionMode,
+  type RuntimeMode,
+  type RuntimeRequestId,
+  type ServerConfig as T3ServerConfig,
+  type ThreadId,
+  type UsageLimitsReport,
 } from "@t3tools/contracts";
 import type { FollowUpBehavior } from "../../lib/followUpBehavior";
 import { selectionHaptic } from "../../lib/haptics";
@@ -79,6 +86,7 @@ import { CHAT_CONTENT_MAX_WIDTH, type LayoutVariant } from "../../lib/layout";
 import { IOS_NAV_BAR_HEIGHT } from "../../lib/layoutMetrics";
 import { editPendingThreadMessage } from "../../state/edit-pending-thread-message";
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
+import type { QueuedRunEdit } from "../../state/queued-run-edit";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import type {
   PendingApproval,
@@ -91,6 +99,11 @@ import { isAndroidKeyboardAnimationUsable } from "../keyboard/androidKeyboardRec
 import { useAndroidKeyboardRecovery } from "../keyboard/useAndroidKeyboardRecovery";
 import { PendingApprovalCard } from "./PendingApprovalCard";
 import { ComposerFeedback } from "./ComposerFeedback";
+import { ComposerQueuedEditBanner } from "./ComposerQueuedEdit";
+import { ProviderSubagentBar } from "./ProviderSubagentBar";
+import { ThreadQueueControl } from "./ThreadQueueControl";
+import { UsageLimitRecoveryCard } from "./UsageLimitRecoveryCard";
+import { useThreadQueuedRuns } from "./use-thread-queued-runs";
 import { ComposerUsageLimits } from "./ComposerUsageLimits";
 import { PendingUserInputCard } from "./PendingUserInputCard";
 import { ThreadCreationFailedCard } from "./ThreadCreationFailedCard";
@@ -113,10 +126,15 @@ import {
   ThreadComposer,
 } from "./ThreadComposer";
 import { ThreadFeed } from "./ThreadFeed";
+import type { WorktreeSetupCardProps } from "./worktree-setup-card";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import { resolveThreadFeedSubmissionAnchor } from "./thread-feed-live-follow";
 
 export interface ThreadDetailScreenProps {
+  /** Worktree setup progress, shown as a card in the feed while it runs. */
+  readonly worktreeSetup: WorktreeSetupCardProps | null;
+  /** The bootstrap turn's start, for the working header under the setup card. */
+  readonly setupWorkingStartedAt: string | null;
   readonly selectedThread: EnvironmentThreadShell;
   readonly contentPresentation: ThreadContentPresentation;
   readonly screenTone: StatusTone;
@@ -130,6 +148,8 @@ export interface ThreadDetailScreenProps {
   readonly activeWorkStartedAt: string | null;
   /** The live work is a provider-native subagent's runless root turn. */
   readonly runlessWorkActive: boolean;
+  /** Set on a provider-native subagent thread, which shows status instead of a composer. */
+  readonly providerSubagentStatus: ProviderSubagentStatus | null;
   readonly isCompacting: boolean;
   /**
    * The server has not created this thread yet. "preparing" runs while the
@@ -159,6 +179,13 @@ export interface ThreadDetailScreenProps {
   readonly selectedThreadQueueCount: number;
   readonly queuedMessages: ReadonlyArray<QueuedThreadMessage>;
   readonly dispatchingMessageId: MessageId | null;
+  /** Set while a queued message is open in the composer for editing. */
+  readonly queuedRunEdit: QueuedRunEdit | null;
+  /** Where the composer's content lives (the edit's own draft while editing). */
+  readonly composerDraftKey: string | null;
+  readonly isSavingQueuedEdit: boolean;
+  readonly onCancelQueuedRunEdit: () => void;
+  readonly onRemoveQueuedEditAttachment: (attachmentId: string) => void;
   readonly serverConfig: T3ServerConfig | null;
   readonly layoutVariant?: LayoutVariant;
   /** Height of chrome floating over the feed (Android's glass header). */
@@ -344,6 +371,18 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const agentLabel = `${props.selectedThread.modelSelection.instanceId} agent`;
   const selectedThreadKey = scopedThreadKey(props.environmentId, props.selectedThread.id);
   const composerEditorRef = useRef<ComposerEditorHandle>(null);
+  const navigation = useNavigation();
+  const queue = useThreadQueuedRuns(props.environmentId, props.selectedThread.id);
+  // A provider-native subagent shows status instead of a composer.
+  const isProviderSubagent = isProviderNativeSubagentThread(props.selectedThread.source);
+  // Tapping a queued pill should land in a ready composer, not need a second
+  // tap on a composer already holding the message.
+  const editingRunId = props.queuedRunEdit?.runId ?? null;
+  useEffect(() => {
+    if (editingRunId === null) return;
+    const frame = requestAnimationFrame(() => composerEditorRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [editingRunId]);
   const draftMessageRef = useRef(props.draftMessage);
   draftMessageRef.current = props.draftMessage;
   const composerOverlayRef = useRef<View>(null);
@@ -414,6 +453,8 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
       return null;
     }
     if (props.creationState?.kind === "preparing") {
+      // The setup card already reports progress in the feed.
+      if (props.worktreeSetup) return null;
       return {
         kind: "preparing",
         label: props.creationState.preparingWorktree ? "Setting up worktree…" : "Starting…",
@@ -583,7 +624,10 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const userInputCardCoverage = useSharedValue(0);
   // With a stash tab the floating row docks beside the tab, inside the
   // overlay's own height, so it covers nothing extra.
-  const [stashTabHeight, setStashTabHeight] = useState(0);
+  const [measuredStashTabHeight, setStashTabHeight] = useState(0);
+  // The queue pills sit between the floating row and the stash tab, so the
+  // row floats above them instead of docking beside the tab.
+  const stashTabHeight = queue.queuedRuns.length > 0 ? 0 : measuredStashTabHeight;
   const floatingControlCovers = showFloatingStatus && stashTabHeight === 0;
   const floatingControlCoverage = useSharedValue(
     floatingControlCovers ? FLOATING_WORKING_CONTROL_COVERAGE : 0,
@@ -770,6 +814,22 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const layoutVariant = props.layoutVariant ?? "compact";
   const isSplitLayout = layoutVariant === "split";
   const contentMaxWidth = isSplitLayout ? CHAT_CONTENT_MAX_WIDTH : undefined;
+  const providerSubagentProvider = isProviderSubagent
+    ? props.serverConfig?.providers.find(
+        (provider) => provider.instanceId === props.selectedThread.modelSelection.instanceId,
+      )
+    : undefined;
+  // Providers can report a dated id or alias (claude-haiku-4-5-20251001).
+  const providerSubagentModelSlug = providerSubagentProvider
+    ? resolveSelectableModel(
+        providerSubagentProvider.driver,
+        props.selectedThread.modelSelection.model,
+        providerSubagentProvider.models,
+      )
+    : null;
+  const providerSubagentCatalogModel = providerSubagentProvider?.models.find(
+    (model) => model.slug === providerSubagentModelSlug,
+  );
   const workspaceContentWidth = useWorkspaceContentWidth();
   const composerWidthStyle = useAnimatedStyle(() =>
     isSplitLayout && workspaceContentWidth !== null
@@ -993,6 +1053,8 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             threadId={props.selectedThread.id}
             workspaceRoot={props.threadCwd}
             feed={props.selectedThreadFeed}
+            worktreeSetup={props.worktreeSetup}
+            setupWorkingStartedAt={props.setupWorkingStartedAt}
             queuedMessages={props.queuedMessages}
             dispatchingMessageId={props.dispatchingMessageId}
             onEditPendingMessage={handleEditPendingMessage}
@@ -1028,6 +1090,8 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
 
       {showContent ? (
         <SubagentTabs
+          environmentId={props.environmentId}
+          threadId={props.selectedThread.id}
           top={
             props.contentTopInset ||
             (props.usesAutomaticContentInsets ? insets.top + IOS_NAV_BAR_HEIGHT : 0)
@@ -1069,7 +1133,29 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 onScrollToEnd={handleScrollToEnd}
                 stashTabHeight={stashTabHeight}
               />
+              <ThreadQueueControl
+                queue={queue}
+                editingRunId={editingRunId}
+                contentMaxWidth={contentMaxWidth}
+              />
               <View className="w-full self-center" style={{ maxWidth: contentMaxWidth }}>
+                {props.queuedRunEdit !== null ? (
+                  <Animated.View
+                    className="shrink-0"
+                    entering={FadeInDown.duration(180)}
+                    exiting={FadeOut.duration(120)}
+                  >
+                    <ComposerQueuedEditBanner
+                      saving={props.isSavingQueuedEdit}
+                      onCancel={props.onCancelQueuedRunEdit}
+                    />
+                  </Animated.View>
+                ) : null}
+                <UsageLimitRecoveryCard
+                  key={props.selectedThread.latestRun?.runId}
+                  thread={props.selectedThread}
+                  environmentId={props.environmentId}
+                />
                 {props.feedbackSubmissions.map((submission) => (
                   <ComposerFeedback
                     key={submission.id}
@@ -1157,49 +1243,94 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                     : undefined
                 }
               >
-                <GlassBlurTargetContext value={feedBlurTarget}>
-                  <ThreadComposer
-                    editorRef={composerEditorRef}
-                    onStashTabHeightChange={setStashTabHeight}
-                    draftMessage={props.draftMessage}
-                    draftAttachments={props.draftAttachments}
-                    placeholder="Send a message…"
-                    contentMaxWidth={contentMaxWidth}
-                    connectionState={props.connectionStateLabel}
-                    environmentLabel={props.environmentLabel}
-                    selectedThread={props.selectedThread}
-                    hasCompactableConversation={hasCompactableConversation && !props.isCompacting}
-                    serverConfig={props.serverConfig}
-                    queueCount={props.selectedThreadQueueCount}
-                    environmentId={props.environmentId}
-                    projectCwd={props.threadCwd ?? props.projectWorkspaceRoot}
-                    // Follow-ups typed during setup wait in the draft: queueing
-                    // them against a thread id the server may still reject
-                    // would strand them in the outbox.
-                    sendBlockedReason={
-                      props.creationState?.kind === "preparing" ? "Starting the task…" : null
-                    }
-                    bottomInset={composerBottomInset}
-                    onChangeDraftMessage={props.onChangeDraftMessage}
-                    onPickDraftMedia={props.onPickDraftMedia}
-                    onPickDraftFiles={props.onPickDraftFiles}
-                    onNativePasteImages={props.onNativePasteImages}
-                    onNativePasteText={props.onNativePasteText}
-                    onRemoveDraftImage={props.onRemoveDraftImage}
-                    onStopThread={props.onStopThread}
-                    followUpBehavior={props.followUpBehavior}
-                    canSteerActiveTurn={props.canSteerActiveTurn}
-                    activeThreadBusy={props.activeThreadBusy}
-                    canStopThread={props.canStopThread}
-                    onSendMessage={handleSendMessage}
-                    onShowUsageLimits={showUsageLimits}
-                    onUpdateModelSelection={props.onUpdateThreadModelSelection}
-                    onUpdateRuntimeMode={props.onUpdateThreadRuntimeMode}
-                    onUpdateInteractionMode={props.onUpdateThreadInteractionMode}
-                    onExpandedChange={setComposerExpanded}
-                    onEditorFocusChange={handleComposerFocusChange}
-                  />
-                </GlassBlurTargetContext>
+                {isProviderSubagent ? (
+                  <View
+                    className="self-center px-3 pt-1.5"
+                    style={{
+                      width: "100%",
+                      maxWidth: contentMaxWidth,
+                      paddingBottom: composerBottomInset + 6,
+                    }}
+                  >
+                    <ProviderSubagentBar
+                      provider={providerSubagentProvider ?? null}
+                      modelLabel={
+                        providerSubagentCatalogModel?.name ??
+                        formatModelSlugName(props.selectedThread.modelSelection.model)
+                      }
+                      effortLabel={formatModelSelectionEffort(
+                        props.selectedThread.modelSelection,
+                        providerSubagentProvider?.models,
+                      )}
+                      status={props.providerSubagentStatus}
+                      onOpenParent={
+                        props.selectedThread.lineage.parentThreadId === null
+                          ? null
+                          : () =>
+                              navigation.dispatch(
+                                StackActions.replace("Thread", {
+                                  environmentId: String(props.environmentId),
+                                  threadId: String(props.selectedThread.lineage.parentThreadId),
+                                }),
+                              )
+                      }
+                    />
+                  </View>
+                ) : (
+                  <GlassBlurTargetContext value={feedBlurTarget}>
+                    <ThreadComposer
+                      editorRef={composerEditorRef}
+                      onStashTabHeightChange={setStashTabHeight}
+                      draftMessage={props.draftMessage}
+                      draftAttachments={props.draftAttachments}
+                      placeholder="Send a message…"
+                      contentMaxWidth={contentMaxWidth}
+                      connectionState={props.connectionStateLabel}
+                      environmentLabel={props.environmentLabel}
+                      selectedThread={props.selectedThread}
+                      hasCompactableConversation={hasCompactableConversation && !props.isCompacting}
+                      serverConfig={props.serverConfig}
+                      queueCount={props.selectedThreadQueueCount}
+                      environmentId={props.environmentId}
+                      projectCwd={props.threadCwd ?? props.projectWorkspaceRoot}
+                      // Follow-ups typed during setup wait in the draft: queueing
+                      // them against a thread id the server may still reject
+                      // would strand them in the outbox.
+                      sendBlockedReason={
+                        props.creationState?.kind === "preparing" ? "Starting the task…" : null
+                      }
+                      draftKey={props.composerDraftKey ?? undefined}
+                      queuedEdit={
+                        props.queuedRunEdit === null
+                          ? null
+                          : {
+                              existingAttachments: props.queuedRunEdit.existingAttachments,
+                              saving: props.isSavingQueuedEdit,
+                              onRemoveExistingAttachment: props.onRemoveQueuedEditAttachment,
+                            }
+                      }
+                      bottomInset={composerBottomInset}
+                      onChangeDraftMessage={props.onChangeDraftMessage}
+                      onPickDraftMedia={props.onPickDraftMedia}
+                      onPickDraftFiles={props.onPickDraftFiles}
+                      onNativePasteImages={props.onNativePasteImages}
+                      onNativePasteText={props.onNativePasteText}
+                      onRemoveDraftImage={props.onRemoveDraftImage}
+                      onStopThread={props.onStopThread}
+                      followUpBehavior={props.followUpBehavior}
+                      canSteerActiveTurn={props.canSteerActiveTurn}
+                      activeThreadBusy={props.activeThreadBusy}
+                      canStopThread={props.canStopThread}
+                      onSendMessage={handleSendMessage}
+                      onShowUsageLimits={showUsageLimits}
+                      onUpdateModelSelection={props.onUpdateThreadModelSelection}
+                      onUpdateRuntimeMode={props.onUpdateThreadRuntimeMode}
+                      onUpdateInteractionMode={props.onUpdateThreadInteractionMode}
+                      onExpandedChange={setComposerExpanded}
+                      onEditorFocusChange={handleComposerFocusChange}
+                    />
+                  </GlassBlurTargetContext>
+                )}
               </View>
             </View>
           </Animated.View>

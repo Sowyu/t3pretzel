@@ -86,11 +86,13 @@ export type ThreadGitMenuProps = {
   readonly gitOperationLabel: string | null;
   readonly onOpenFilesInspector?: () => void;
   readonly onOpenGitInspector?: () => void;
+  /** Set when this fork's latest turn can be merged into its source thread. */
+  readonly onMergeBack?: () => void;
   readonly onPull: () => Promise<void>;
   readonly onRunAction: (input: GitActionRequestInput) => Promise<GitRunStackedActionResult | null>;
 };
 
-type ThreadGitControlsProps = ThreadGitMenuProps & {
+export type ThreadGitControlsProps = ThreadGitMenuProps & {
   readonly auxiliaryPaneControl?: {
     readonly accessibilityLabel: string;
     readonly onPress: () => void;
@@ -352,6 +354,17 @@ function useThreadGitHeaderActionItems(props: ThreadGitControlsProps): ThreadGit
               onPress: model.openReview,
               type: "action",
             },
+            ...(props.onMergeBack
+              ? [
+                  {
+                    description: "Bring this thread's latest turn into its source",
+                    icon: { name: "arrow.triangle.merge", type: "sfSymbol" as const },
+                    label: "Merge back to source",
+                    onPress: props.onMergeBack,
+                    type: "action" as const,
+                  },
+                ]
+              : []),
             {
               description: "Commit, files, branches",
               icon: { name: "ellipsis", type: "sfSymbol" },
@@ -381,6 +394,7 @@ function useThreadGitHeaderActionItems(props: ThreadGitControlsProps): ThreadGit
       props.canOpenFiles,
       props.canOpenTerminal,
       props.gitStatus,
+      props.onMergeBack,
       props.onOpenNewTerminal,
       props.onOpenTerminal,
       props.onRunProjectScript,
