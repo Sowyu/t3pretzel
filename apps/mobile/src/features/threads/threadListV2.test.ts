@@ -1481,5 +1481,12 @@ describe("subagent threads", () => {
         (thread) => thread.id,
       ),
     ).toEqual(["parent"]);
+    const layout = buildThreadListV2Items({
+      threads: [parent, child],
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+    });
+    expect(layout.items.map((item) => item.thread.id)).toEqual(["parent"]);
   });
 });
