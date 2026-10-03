@@ -1462,3 +1462,24 @@ describe("cross-section thread drops", () => {
     ).toEqual({ pin: false, unpin: false, unsettle: false, unsnooze: false });
   });
 });
+
+describe("subagent threads", () => {
+  it("never appear in a thread list section", () => {
+    const parent = makeThread({ id: ThreadId.make("parent"), title: "Parent" });
+    const child = makeThread({
+      id: ThreadId.make("child"),
+      title: "Subagent",
+      lineage: {
+        parentThreadId: parent.id,
+        relationshipToParent: "subagent",
+        rootThreadId: parent.id,
+      },
+    });
+
+    expect(
+      getThreadListV2OrderedSection({ threads: [parent, child], section: "active", now: NOW }).map(
+        (thread) => thread.id,
+      ),
+    ).toEqual(["parent"]);
+  });
+});

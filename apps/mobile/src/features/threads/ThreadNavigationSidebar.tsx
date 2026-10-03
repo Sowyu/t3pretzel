@@ -88,6 +88,7 @@ import {
   THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
   THREAD_LIST_V2_SETTLED_PAGE_COUNT,
   type ThreadListV2ListItem,
+  isSubagentThread,
 } from "./threadListV2";
 
 /** The sidebar list serves both lists: v1 grouped items or, when the Thread
@@ -537,7 +538,7 @@ function ThreadNavigationSidebarPane(
       };
     return buildThreadListV2Items({
       pendingOrder,
-      threads: threads.filter((thread) => thread.archivedAt === null),
+      threads: threads.filter((thread) => thread.archivedAt === null && !isSubagentThread(thread)),
       environmentId: options.selectedEnvironmentId,
       projectRefs: selectedProjectScope === null ? null : selectedProjectScope.projectRefs,
       searchQuery: props.searchQuery,

@@ -27,6 +27,14 @@ import {
   type PendingThreadOrder,
 } from "./threadOrder";
 
+/**
+ * v2 runs each subagent in a child thread of its own. They belong to the parent
+ * thread's agents pill, never to a thread list.
+ */
+export function isSubagentThread(thread: Pick<EnvironmentThreadShell, "lineage">): boolean {
+  return thread.lineage.relationshipToParent === "subagent";
+}
+
 export { snoozeWakeLabel };
 
 /**
@@ -186,7 +194,7 @@ export function getThreadListV2OrderedSection(input: {
   readonly queuedThreadKeys?: ReadonlySet<string>;
 }): EnvironmentThreadShell[] {
   const threads = input.threads.filter((thread) => {
-    if (thread.archivedAt !== null) return false;
+    if (thread.archivedAt !== null || isSubagentThread(thread)) return false;
     if (
       (input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
       thread.settledOverride === "settled" &&

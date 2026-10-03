@@ -10,6 +10,7 @@ import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
 
 import { scopedProjectKey } from "../../lib/scopedEntities";
+import { isSubagentThread } from "../threads/threadListV2";
 
 export type ArchivedThreadSortOrder = "newest" | "oldest";
 
@@ -46,7 +47,7 @@ export function buildArchivedThreadGroups(input: {
     const environmentLabel = input.environmentLabels[entry.environmentId] ?? null;
     const threadsByProjectId = new Map<string, EnvironmentThreadShell[]>();
     for (const thread of entry.snapshot.threads) {
-      if (thread.archivedAt === null) {
+      if (thread.archivedAt === null || isSubagentThread(thread)) {
         continue;
       }
       const threads = threadsByProjectId.get(thread.projectId) ?? [];
