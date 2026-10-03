@@ -1,7 +1,7 @@
 import type {
-  ApprovalRequestId,
   ProviderApprovalDecision,
   ProviderApprovalOption,
+  RuntimeRequestId,
 } from "@t3tools/contracts";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
@@ -11,9 +11,9 @@ import type { PendingApproval } from "../../lib/threadActivity";
 
 export interface PendingApprovalCardProps {
   readonly approval: PendingApproval;
-  readonly respondingApprovalId: ApprovalRequestId | null;
+  readonly respondingApprovalId: RuntimeRequestId | null;
   readonly onRespond: (
-    requestId: ApprovalRequestId,
+    requestId: RuntimeRequestId,
     decision: ProviderApprovalDecision,
   ) => Promise<unknown>;
 }
@@ -31,6 +31,8 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
   const responding = props.respondingApprovalId === props.approval.requestId;
   // The decision in flight, so only its button shows a spinner.
   const [pressedDecision, setPressedDecision] = useState<ProviderApprovalDecision | null>(null);
+  // A request whose provider process exited can no longer be answered.
+  const canRespond = props.approval.responseCapability === "live";
   // Opaque for the same reason as PendingUserInputCard: nothing blurs the feed
   // behind this card, so a translucent surface bleeds messages through it.
   return (
@@ -46,6 +48,12 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
           {props.approval.detail}
         </Text>
       ) : null}
+      {!canRespond ? (
+        <Text className="font-sans text-sm leading-5 text-foreground-muted">
+          The provider process for this request is no longer available. Interrupt or restart the run
+          to continue.
+        </Text>
+      ) : null}
       {warning ? (
         <Text className="font-sans text-xs leading-normal text-warning-foreground">{warning}</Text>
       ) : null}
@@ -59,8 +67,10 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
                 : option.decision === "decline"
                   ? "bg-danger"
                   : "bg-subtle-strong"
-            } ${responding && pressedDecision !== option.decision ? "opacity-50" : ""}`}
-            disabled={responding}
+            } ${
+              !canRespond || (responding && pressedDecision !== option.decision) ? "opacity-50" : ""
+            }`}
+            disabled={!canRespond || responding}
             onPress={() => {
               setPressedDecision(option.decision);
               void props.onRespond(props.approval.requestId, option.decision);

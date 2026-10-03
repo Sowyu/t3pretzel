@@ -1,5 +1,6 @@
 import { QuestionAttachments } from "./QuestionAttachments";
-import type { ApprovalRequestId, UserInputQuestion } from "@t3tools/contracts";
+import type { RuntimeRequestId } from "@t3tools/contracts";
+import type { ThreadUserInputQuestion } from "@t3tools/client-runtime/state/thread-requests";
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -62,14 +63,14 @@ export interface PendingUserInputCardProps {
   readonly onInputFocusChange?: (focused: boolean) => void;
   readonly drafts: Record<string, PendingUserInputDraftAnswer>;
   readonly answers: Record<string, string | ReadonlyArray<string>> | null;
-  readonly respondingUserInputId: ApprovalRequestId | null;
+  readonly respondingUserInputId: RuntimeRequestId | null;
   readonly onSelectOption: (
-    requestId: ApprovalRequestId,
-    question: UserInputQuestion,
+    requestId: RuntimeRequestId,
+    question: ThreadUserInputQuestion,
     value: string,
   ) => void;
   readonly onChangeCustomAnswer: (
-    requestId: ApprovalRequestId,
+    requestId: RuntimeRequestId,
     questionId: string,
     customAnswer: string,
   ) => void;
@@ -98,6 +99,9 @@ const CARD_LAYOUT_TRANSITION = LinearTransition.duration(200);
 export function PendingUserInputCard(props: PendingUserInputCardProps) {
   const questionCount = props.pendingUserInput.questions.length;
   const responding = props.respondingUserInputId === props.pendingUserInput.requestId;
+  // Message responses start a new run and remain available after the provider exits.
+  const canRespond = props.pendingUserInput.responseCapability !== "not_resumable";
+  const responseDisabled = !canRespond || responding;
   // Which button sent the in-flight response, so only that one shows a spinner.
   const [pressedAction, setPressedAction] = useState<"submit" | "dismiss" | null>(null);
 
@@ -266,6 +270,12 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
         showsVerticalScrollIndicator
         style={{ flexShrink: 1 }}
       >
+        {!canRespond ? (
+          <Text className="font-sans text-sm leading-5 text-foreground-muted">
+            The provider process for this request is no longer available. Interrupt or restart the
+            run to continue.
+          </Text>
+        ) : null}
         {props.pendingUserInput.questions.map((question) => {
           const draft = props.drafts[question.id];
           return (
@@ -285,6 +295,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
                   return (
                     <Pressable
                       key={optionValue}
+                      disabled={responseDisabled}
                       className={cn(
                         "min-h-12 w-full rounded-2xl border px-3.5 py-3",
                         selected ? "border-primary bg-primary/10" : "border-border bg-input",
@@ -316,17 +327,19 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
                   );
                 })}
               </View>
-              <QuestionAttachments
-                requestId={props.pendingUserInput.requestId}
-                question={question}
-                questions={props.pendingUserInput.questions}
-                disabled={responding}
-                value={draft?.customAnswer ?? ""}
-                onChangeText={(value) =>
-                  props.onChangeCustomAnswer(props.pendingUserInput.requestId, question.id, value)
-                }
-                onInputFocusChange={props.onInputFocusChange}
-              />
+              {question.allowCustomAnswer !== false ? (
+                <QuestionAttachments
+                  requestId={props.pendingUserInput.requestId}
+                  question={question}
+                  questions={props.pendingUserInput.questions}
+                  disabled={responseDisabled}
+                  value={draft?.customAnswer ?? ""}
+                  onChangeText={(value) =>
+                    props.onChangeCustomAnswer(props.pendingUserInput.requestId, question.id, value)
+                  }
+                  onInputFocusChange={props.onInputFocusChange}
+                />
+              ) : null}
             </View>
           );
         })}
@@ -337,7 +350,7 @@ export function PendingUserInputCard(props: PendingUserInputCardProps) {
           props.answers ? "bg-primary" : "bg-subtle-strong",
           responding && pressedAction !== "submit" && "opacity-50",
         )}
-        disabled={props.answers === null || responding}
+        disabled={props.answers === null || responseDisabled}
         onPress={() => {
           setPressedAction("submit");
           void props.onSubmit();

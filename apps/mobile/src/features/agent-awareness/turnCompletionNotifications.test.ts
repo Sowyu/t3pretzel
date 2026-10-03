@@ -1,4 +1,4 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -15,39 +15,46 @@ function thread(
   overrides: {
     readonly id?: string;
     readonly title?: string;
-    readonly turnState?: "running" | "completed" | "error" | "interrupted";
-    readonly completedAt?: string | null;
-    readonly sessionStatus?: string;
+    readonly runStatus?: "running" | "completed" | "failed" | "interrupted";
+    readonly lineage?: TurnCompletionThread["thread"]["lineage"];
     readonly hasPendingApprovals?: boolean;
     readonly hasPendingUserInput?: boolean;
   } = {},
 ): TurnCompletionThread {
+  const id = (overrides.id ?? "thread-1") as ThreadId;
   return {
     environmentId: ENVIRONMENT,
     projectTitle: "t3pretzel",
     thread: {
-      id: overrides.id ?? "thread-1",
+      id,
       title: overrides.title ?? "Fix the thread list",
-      modelSelection: { model: "sonnet" },
-      session:
-        overrides.sessionStatus === undefined
-          ? null
-          : { status: overrides.sessionStatus, updatedAt: "2026-01-01T00:00:00.000Z" },
-      latestTurn:
-        overrides.turnState === undefined
+      lineage: overrides.lineage ?? {
+        parentThreadId: null,
+        relationshipToParent: null,
+        rootThreadId: id,
+      },
+      modelSelection: {
+        instanceId: "claude",
+        model: "sonnet",
+      } as TurnCompletionThread["thread"]["modelSelection"],
+      pendingBackgroundTasks: [],
+      latestRun:
+        overrides.runStatus === undefined
           ? null
           : {
-              turnId: "turn-1",
-              state: overrides.turnState,
+              runId: "run-1" as RunId,
+              status: overrides.runStatus,
               requestedAt: "2026-01-01T00:00:00.000Z",
               startedAt: "2026-01-01T00:00:00.000Z",
-              completedAt: overrides.completedAt ?? null,
+              completedAt: overrides.runStatus === "running" ? null : "2026-01-01T00:00:09.000Z",
+              assistantMessageId: null,
             },
+      runtime: null,
       updatedAt: "2026-01-01T00:00:10.000Z",
       hasPendingApprovals: overrides.hasPendingApprovals ?? false,
       hasPendingUserInput: overrides.hasPendingUserInput ?? false,
     },
-  } as TurnCompletionThread;
+  };
 }
 
 function reconcile(
@@ -70,14 +77,14 @@ function reconcile(
 
 describe("reconcileTurnCompletions", () => {
   it("stays silent the first time it sees a thread", () => {
-    const result = reconcile(new Map(), [thread({ turnState: "completed" })]);
+    const result = reconcile(new Map(), [thread({ runStatus: "completed" })]);
 
     expect(result.notifications).toEqual([]);
     expect(result.phases.get(KEY)).toBe("completed");
   });
 
   it("notifies when a running turn completes", () => {
-    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "completed" })]);
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "completed" })]);
 
     expect(result.notifications).toHaveLength(1);
     expect(result.notifications[0]).toMatchObject({
@@ -88,21 +95,21 @@ describe("reconcileTurnCompletions", () => {
   });
 
   it("notifies when a running turn fails", () => {
-    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "error" })]);
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "failed" })]);
 
     expect(result.notifications[0]?.title).toBe("Fix the thread list failed");
   });
 
   it("does not repeat once the completed phase is already recorded", () => {
-    const first = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "completed" })]);
-    const second = reconcile(first.phases, [thread({ turnState: "completed" })]);
+    const first = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "completed" })]);
+    const second = reconcile(first.phases, [thread({ runStatus: "completed" })]);
 
     expect(second.notifications).toEqual([]);
   });
 
   it("does not fire for a turn the user paused for approval", () => {
     const result = reconcile(new Map([[KEY, "running"]]), [
-      thread({ turnState: "running", hasPendingApprovals: true }),
+      thread({ runStatus: "running", hasPendingApprovals: true }),
     ]);
 
     expect(result.notifications).toEqual([]);
@@ -110,7 +117,7 @@ describe("reconcileTurnCompletions", () => {
   });
 
   it("stays silent while the finished thread is open in the foreground", () => {
-    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "completed" })], {
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "completed" })], {
       foreground: true,
       openThreadKey: KEY,
     });
@@ -121,7 +128,7 @@ describe("reconcileTurnCompletions", () => {
   });
 
   it("shows the island instead of a notification for another thread in the foreground", () => {
-    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "completed" })], {
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "completed" })], {
       foreground: true,
       openThreadKey: "env-1:thread-other",
     });
@@ -133,7 +140,7 @@ describe("reconcileTurnCompletions", () => {
   });
 
   it("shows a failed island even with notifications off", () => {
-    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "error" })], {
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "failed" })], {
       enabled: false,
       foreground: true,
     });
@@ -144,12 +151,12 @@ describe("reconcileTurnCompletions", () => {
   it("shows an input island once when a thread starts waiting", () => {
     const first = reconcile(
       new Map([[KEY, "running"]]),
-      [thread({ turnState: "running", hasPendingUserInput: true })],
+      [thread({ runStatus: "running", hasPendingUserInput: true })],
       { foreground: true },
     );
     const second = reconcile(
       first.phases,
-      [thread({ turnState: "running", hasPendingUserInput: true })],
+      [thread({ runStatus: "running", hasPendingUserInput: true })],
       { foreground: true },
     );
 
@@ -162,7 +169,7 @@ describe("reconcileTurnCompletions", () => {
   it("keeps the island away from the thread already open", () => {
     const result = reconcile(
       new Map([[KEY, "running"]]),
-      [thread({ turnState: "running", hasPendingApprovals: true })],
+      [thread({ runStatus: "running", hasPendingApprovals: true })],
       { foreground: true, openThreadKey: KEY },
     );
 
@@ -170,7 +177,7 @@ describe("reconcileTurnCompletions", () => {
   });
 
   it("fires for the open thread once the app is backgrounded", () => {
-    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "completed" })], {
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "completed" })], {
       foreground: false,
       openThreadKey: KEY,
     });
@@ -179,7 +186,7 @@ describe("reconcileTurnCompletions", () => {
   });
 
   it("records phases but posts nothing while notifications are off", () => {
-    const result = reconcile(new Map([[KEY, "running"]]), [thread({ turnState: "completed" })], {
+    const result = reconcile(new Map([[KEY, "running"]]), [thread({ runStatus: "completed" })], {
       enabled: false,
     });
 

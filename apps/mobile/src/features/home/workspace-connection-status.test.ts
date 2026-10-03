@@ -15,7 +15,6 @@ function workspaceState(overrides: Partial<WorkspaceState> = {}): WorkspaceState
     connectionState: "connected",
     connectionError: null,
     shellSnapshotError: null,
-    latestCachedSnapshotReceivedAt: null,
     networkStatus: "online",
     ...overrides,
   };
@@ -133,5 +132,26 @@ describe("workspace connection status", () => {
       label: "Loading threads...",
       showsProgress: true,
     });
+  });
+
+  it("keeps a failing environment out of the title while another is ready", () => {
+    const state = workspaceState({
+      connectionError: "Could not reach Julius’s Mac mini",
+      hasConnectingEnvironment: true,
+      connectingEnvironments: [
+        {
+          environmentId: "environment-1" as never,
+          environmentLabel: "Julius’s Mac mini",
+          displayUrl: "",
+          isRelayManaged: true,
+          isEnabled: true,
+          connectionState: "reconnecting",
+          connectionError: null,
+          connectionErrorTraceId: null,
+        },
+      ],
+    });
+
+    expect(workspaceConnectionStatusPresentation(state)).toBeNull();
   });
 });

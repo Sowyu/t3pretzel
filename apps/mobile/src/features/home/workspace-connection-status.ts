@@ -51,6 +51,16 @@ export function workspaceConnectionStatusPresentation(
   options: { readonly stalled?: boolean } = {},
 ): WorkspaceConnectionStatusPresentation | null {
   if (!shouldShowWorkspaceConnectionStatus(state)) return null;
+  // With one environment ready, another one failing or reconnecting is that
+  // environment's problem, not the workspace's: only shell catch-up shows.
+  if (state.networkStatus !== "offline" && state.hasReadyEnvironment) {
+    return state.hasPendingShellSnapshot
+      ? {
+          label: state.hasLoadedShellSnapshot ? "Syncing threads..." : "Loading threads...",
+          showsProgress: true,
+        }
+      : null;
+  }
   if (state.networkStatus !== "offline" && isUnreachable(state, options.stalled === true)) {
     return null;
   }

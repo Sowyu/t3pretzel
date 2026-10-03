@@ -1,253 +1,209 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  EventId,
   MessageId,
-  TurnId,
-  type OrchestrationThread,
-  type OrchestrationThreadActivity,
+  RunId,
+  ThreadId,
+  TurnItemId,
+  type OrchestrationV2ProjectedTurnItem,
+  type OrchestrationV2TurnItem,
 } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 
-import { buildThreadFeed, deriveThreadFeedPresentation } from "./threadActivity";
+import {
+  buildThreadFeed,
+  deriveThreadFeedPresentation,
+  isReasoningTraceActivityGroup,
+  type ThreadFeedEntry,
+  type ThreadFeedLatestRun,
+} from "./threadActivity";
 
-const turnId = TurnId.make("turn-1");
-const createdAt = "2026-01-01T00:00:00.000Z";
+const threadId = ThreadId.make("thread-1");
+const runId = RunId.make("run-1");
+const startedAt = "2026-01-01T00:00:00.000Z";
 
-function message(input: {
-  readonly id: string;
-  readonly role: OrchestrationThread["messages"][number]["role"];
-  readonly text: string;
-  readonly createdAt: string;
-  readonly streaming?: boolean;
-  readonly turnId?: typeof turnId | null;
-}): OrchestrationThread["messages"][number] {
+function base(id: string, at: string, ordinal: number, run: RunId = runId) {
+  const timestamp = DateTime.makeUnsafe(at);
   return {
-    id: MessageId.make(input.id),
-    role: input.role,
-    text: input.text,
-    turnId: input.turnId === undefined ? turnId : input.turnId,
-    streaming: input.streaming === true,
-    createdAt: input.createdAt,
-    updatedAt: input.createdAt,
+    id: TurnItemId.make(id),
+    threadId,
+    runId: run,
+    nodeId: null,
+    providerThreadId: null,
+    providerTurnId: null,
+    nativeItemRef: null,
+    parentItemId: null,
+    ordinal,
+    status: "completed" as const,
+    title: null,
+    startedAt: timestamp,
+    completedAt: timestamp,
+    updatedAt: timestamp,
   };
 }
 
-function toolActivity(id: string, createdAt: string): OrchestrationThreadActivity {
-  return {
-    id: EventId.make(id),
-    tone: "tool",
-    kind: "tool.completed",
-    summary: "Ran a command",
-    payload: { toolCallId: id, detail: "ls" },
-    turnId,
-    createdAt,
-  };
-}
-
-/** The shape an earlier local server patch wrote into threads that still exist. */
-function legacyReasoningActivity(id: string, createdAt: string): OrchestrationThreadActivity {
-  return {
-    id: EventId.make(id),
-    tone: "info",
-    kind: "reasoning.text",
-    summary: "Let me read the failing test",
-    payload: { itemId: "item-a", seq: 0, text: "Let me read the failing test" },
-    turnId,
-    createdAt,
-  };
-}
-
-const prompt = message({
-  id: "message-1",
-  role: "user",
+const prompt: OrchestrationV2TurnItem = {
+  ...base("prompt", startedAt, 0),
+  type: "user_message",
+  messageId: MessageId.make("message-1"),
+  createdBy: "user",
+  creationSource: "mobile",
+  inputIntent: "turn_start",
   text: "Explain the bug",
-  createdAt,
-  turnId: null,
-});
+  attachments: [],
+};
 
-function thread(input: {
-  readonly messages: ReadonlyArray<OrchestrationThread["messages"][number]>;
-  readonly activities?: ReadonlyArray<OrchestrationThreadActivity>;
-}): Pick<OrchestrationThread, "messages" | "activities"> {
-  return { messages: [prompt, ...input.messages], activities: input.activities ?? [] };
+function thought(
+  id: string,
+  at: string,
+  options?: { readonly running?: boolean; readonly run?: RunId },
+): OrchestrationV2TurnItem {
+  const item = base(id, at, 1, options?.run);
+  return options?.running
+    ? {
+        ...item,
+        type: "reasoning",
+        status: "running",
+        completedAt: null,
+        streaming: true,
+        text: id,
+      }
+    : { ...item, type: "reasoning", streaming: false, text: id };
 }
 
-const runningTurn = {
-  turnId,
-  state: "running" as const,
-  startedAt: createdAt,
+function tool(id: string, at: string): OrchestrationV2TurnItem {
+  return {
+    ...base(id, at, 2),
+    type: "command_execution",
+    input: "ls",
+    output: "ok",
+    exitCode: 0,
+  };
+}
+
+function answer(at: string): OrchestrationV2TurnItem {
+  return {
+    ...base("answer", at, 3),
+    type: "assistant_message",
+    messageId: MessageId.make("assistant-1"),
+    text: "Fixed it",
+    streaming: false,
+  };
+}
+
+function feed(items: ReadonlyArray<OrchestrationV2TurnItem>, thinkingTraces: boolean) {
+  const rows: OrchestrationV2ProjectedTurnItem[] = [prompt, ...items].map((item, position) => ({
+    position,
+    visibility: "local",
+    sourceThreadId: threadId,
+    sourceItemId: item.id,
+    item,
+  }));
+  return buildThreadFeed(rows, { thinkingTraces });
+}
+
+function label(entry: ThreadFeedEntry): string {
+  if (entry.type === "message") return entry.message.id;
+  if (entry.type === "activity-group" && isReasoningTraceActivityGroup(entry)) {
+    return `trace:${entry.activities[0]!.projectedItem.item.id}`;
+  }
+  return entry.type;
+}
+
+const runningRun: ThreadFeedLatestRun = {
+  runId,
+  status: "running",
+  startedAt,
   completedAt: null,
 };
-const settledTurn = {
-  turnId,
-  state: "completed" as const,
-  startedAt: createdAt,
+const settledRun: ThreadFeedLatestRun = {
+  runId,
+  status: "completed",
+  startedAt,
   completedAt: "2026-01-01T00:00:09.000Z",
 };
 
-describe("reasoning messages in the feed", () => {
-  const messages = [
-    message({
-      id: "reasoning-1",
-      role: "reasoning",
-      text: "Reading the failing test",
-      createdAt: "2026-01-01T00:00:01.000Z",
-    }),
-    message({
-      id: "assistant-1",
-      role: "assistant",
-      text: "Fixed it",
-      createdAt: "2026-01-01T00:00:03.000Z",
-    }),
+describe("thinking traces in the feed", () => {
+  const items = [
+    thought("reasoning-1", "2026-01-01T00:00:01.000Z"),
+    tool("tool-1", "2026-01-01T00:00:02.000Z"),
+    answer("2026-01-01T00:00:03.000Z"),
   ];
 
-  it("adds a row per reasoning message, in order, only when the setting is on", () => {
-    const withActivity = thread({
-      messages,
-      activities: [toolActivity("tool-1", "2026-01-01T00:00:02.000Z")],
-    });
-    expect(buildThreadFeed(withActivity).map((entry) => entry.type)).toEqual([
-      "message",
+  it("stands each reasoning item alone, in order, only when the setting is on", () => {
+    expect(feed(items, false).map(label)).toEqual(["message-1", "activity-group", "assistant-1"]);
+    expect(feed(items, true).map(label)).toEqual([
+      "message-1",
+      "trace:reasoning-1",
       "activity-group",
-      "message",
+      "assistant-1",
     ]);
-    const entries = buildThreadFeed(withActivity, { thinkingTraces: true });
-    expect(
-      entries.map((entry) => (entry.type === "message" ? entry.message.id : entry.type)),
-    ).toEqual(["message-1", "reasoning-1", "activity-group", "assistant-1"]);
   });
 
-  it("never renders a legacy reasoning.text activity as a work-log row", () => {
-    for (const thinkingTraces of [false, true]) {
-      const rows = buildThreadFeed(
-        thread({
-          messages,
-          activities: [
-            legacyReasoningActivity("r-1", "2026-01-01T00:00:01.000Z"),
-            toolActivity("tool-1", "2026-01-01T00:00:02.000Z"),
-          ],
-        }),
-        { thinkingTraces },
-      ).flatMap((entry) => (entry.type === "activity-group" ? entry.activities : []));
-      expect(rows.map((activity) => activity.workEntry.sourceActivityKind)).toEqual([
-        "tool.completed",
-      ]);
-    }
+  it("gives the live slot to a running trace instead of the Thinking row", () => {
+    const rows = deriveThreadFeedPresentation(
+      feed([thought("reasoning-1", "2026-01-01T00:00:01.000Z", { running: true })], true),
+      runningRun,
+      new Set(),
+      new Set(),
+      startedAt,
+    );
+    expect(rows.map(label)).toEqual(["message-1", "trace:reasoning-1"]);
   });
 
-  it("gives the live slot to a streaming reasoning message instead of the shimmer", () => {
-    const rowTypes = (thinkingTraces: boolean) =>
-      deriveThreadFeedPresentation(
-        buildThreadFeed(
-          thread({
-            messages: [
-              message({
-                id: "reasoning-1",
-                role: "reasoning",
-                text: "Reading the failing test",
-                createdAt: "2026-01-01T00:00:01.000Z",
-                streaming: true,
-              }),
-            ],
+  it("keeps the Thinking row when the running block belongs to an older run", () => {
+    const rows = deriveThreadFeedPresentation(
+      feed(
+        [
+          thought("reasoning-1", "2026-01-01T00:00:01.000Z", {
+            running: true,
+            run: RunId.make("run-0"),
           }),
-          { thinkingTraces },
-        ),
-        runningTurn,
-        new Set(),
-        new Set(),
-        runningTurn.startedAt,
-      ).map((entry) => (entry.type === "message" ? `message:${entry.message.role}` : entry.type));
-
-    expect(rowTypes(false)).toEqual(["message:user", "thinking"]);
-    expect(rowTypes(true)).toEqual(["message:user", "message:reasoning"]);
+        ],
+        true,
+      ),
+      runningRun,
+      new Set(),
+      new Set(),
+      startedAt,
+    );
+    expect(rows.map(label)).toEqual(["message-1", "trace:reasoning-1", "thinking"]);
   });
 
-  it("keeps the shimmer when the streaming block belongs to an older turn", () => {
+  it("settles a trace once later work supersedes it", () => {
     const rows = deriveThreadFeedPresentation(
-      buildThreadFeed(
-        thread({
-          messages: [
-            message({
-              id: "reasoning-1",
-              role: "reasoning",
-              text: "Stranded by a crash",
-              createdAt: "2026-01-01T00:00:01.000Z",
-              streaming: true,
-              turnId: TurnId.make("turn-0"),
-            }),
-          ],
-        }),
-        { thinkingTraces: true },
+      feed(
+        [
+          thought("reasoning-1", "2026-01-01T00:00:01.000Z", { running: true }),
+          tool("tool-1", "2026-01-01T00:00:02.000Z"),
+        ],
+        true,
       ),
-      runningTurn,
+      runningRun,
       new Set(),
       new Set(),
-      runningTurn.startedAt,
+      startedAt,
     );
-    expect(rows.map((entry) => entry.type)).toEqual(["message", "message", "thinking"]);
+    const trace = rows.find(
+      (row) => row.type === "activity-group" && isReasoningTraceActivityGroup(row),
+    );
+    expect(trace).toMatchObject({ activities: [{ lifecycleStatus: "completed" }] });
   });
 
-  it("folds a settled turn's thinking with its work, without waiting on its streaming flag", () => {
-    const rows = deriveThreadFeedPresentation(
-      buildThreadFeed(
-        thread({
-          messages: [
-            message({
-              id: "reasoning-1",
-              role: "reasoning",
-              text: "Stranded by a crash",
-              createdAt: "2026-01-01T00:00:01.000Z",
-              streaming: true,
-            }),
-            message({
-              id: "assistant-1",
-              role: "assistant",
-              text: "Fixed it",
-              createdAt: "2026-01-01T00:00:03.000Z",
-            }),
-          ],
-          activities: [toolActivity("tool-1", "2026-01-01T00:00:02.000Z")],
-        }),
-        { thinkingTraces: true },
-      ),
-      settledTurn,
-      new Set(),
-      new Set(),
-      null,
-    );
-    expect(rows.map((entry) => (entry.type === "message" ? entry.message.id : entry.type))).toEqual(
-      ["message-1", "turn-fold", "assistant-1"],
-    );
+  it("folds a settled run's thinking with its work", () => {
+    const rows = deriveThreadFeedPresentation(feed(items, true), settledRun, new Set());
+    expect(rows.map(label)).toEqual(["message-1", "run-fold", "assistant-1"]);
   });
 
-  it("keeps a lone thinking row visible when the fold would hide nothing else", () => {
+  it("keeps a lone trace visible when the fold would hide nothing else", () => {
     const rows = deriveThreadFeedPresentation(
-      buildThreadFeed(
-        thread({
-          messages: [
-            message({
-              id: "reasoning-1",
-              role: "reasoning",
-              text: "Thought it through",
-              createdAt: "2026-01-01T00:00:01.000Z",
-            }),
-            message({
-              id: "assistant-1",
-              role: "assistant",
-              text: "Fixed it",
-              createdAt: "2026-01-01T00:00:03.000Z",
-            }),
-          ],
-        }),
-        { thinkingTraces: true },
+      feed(
+        [thought("reasoning-1", "2026-01-01T00:00:01.000Z"), answer("2026-01-01T00:00:03.000Z")],
+        true,
       ),
-      settledTurn,
+      settledRun,
       new Set(),
-      new Set(),
-      null,
     );
-    expect(rows.map((entry) => (entry.type === "message" ? entry.message.id : entry.type))).toEqual(
-      ["message-1", "reasoning-1", "assistant-1"],
-    );
+    expect(rows.map(label)).toEqual(["message-1", "trace:reasoning-1", "assistant-1"]);
   });
 });

@@ -1,10 +1,11 @@
-import {
-  DEFAULT_SIDEBAR_PROJECT_SORT_ORDER,
-  DEFAULT_SIDEBAR_THREAD_SORT_ORDER,
-} from "@t3tools/contracts";
+import { DEFAULT_SIDEBAR_PROJECT_SORT_ORDER } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { hasCustomHomeListOptions, type HomeListOptions } from "./home-list-options";
+import {
+  DEFAULT_SIDEBAR_THREAD_SORT_ORDER,
+  hasCustomHomeListOptions,
+  type HomeListOptions,
+} from "./home-list-options";
 
 const defaults: HomeListOptions = {
   selectedEnvironmentId: null,

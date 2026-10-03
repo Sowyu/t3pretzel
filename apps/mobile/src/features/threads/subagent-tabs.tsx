@@ -1,11 +1,6 @@
-import {
-  foldSubagentActivities,
-  formatSubagentModelLabel,
-  formatSubagentTokenCount,
-  isActiveSubagentStatus,
-  type RuntimeSubagent,
-  type RuntimeSubagentStatus,
-} from "@t3tools/client-runtime/state/subagentRuntime";
+import type { EnvironmentId, OrchestrationV2Subagent, ThreadId } from "@t3tools/contracts";
+import { isActiveSubagentStatus } from "@t3tools/client-runtime/state/subagentRuntime";
+import { deriveThreadTurnSubagents } from "@t3tools/client-runtime/state/thread-subagents";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/unstable/reactivity";
 import { memo, useEffect, useMemo } from "react";
@@ -15,10 +10,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/AppText";
 import { GlassControl } from "../../components/GlassControl";
 import { cn } from "../../lib/cn";
-import { deriveSubagentTabs, subagentToolCalls } from "../../lib/subagentTabs";
-import { useSelectedThreadDetail } from "../../state/use-thread-detail";
+import {
+  deriveSubagentTabs,
+  selectSubagents,
+  subagentTitle,
+  subagentToolCalls,
+} from "../../lib/subagentTabs";
+import { useSelectedThreadProjection, useThreadProjection } from "../../state/use-thread-detail";
 import { selectionHaptic } from "../../lib/haptics";
 import { appAtomRegistry } from "../../state/atom-registry";
+
+type SubagentStatus = OrchestrationV2Subagent["status"];
 
 const STATUS_LABEL = {
   pending: "Starting",
@@ -29,7 +31,7 @@ const STATUS_LABEL = {
   failed: "Failed",
   cancelled: "Cancelled",
   interrupted: "Interrupted",
-} as const satisfies Record<RuntimeSubagentStatus, string>;
+} as const satisfies Record<SubagentStatus, string>;
 
 const STATUS_DOT = {
   pending: "bg-adaptive-sky-600-400",
@@ -40,7 +42,7 @@ const STATUS_DOT = {
   failed: "bg-adaptive-rose-600-400",
   cancelled: "bg-foreground-muted",
   interrupted: "bg-foreground-muted",
-} as const satisfies Record<RuntimeSubagentStatus, string>;
+} as const satisfies Record<SubagentStatus, string>;
 
 /**
  * The open subagent sheet: the agents it lists and the one shown. It keeps the
@@ -64,15 +66,17 @@ export function openSubagentSheet(agentIds: ReadonlyArray<string>, selectedId: s
  * by ThreadDetailScreen over the feed; `top` clears the header.
  */
 export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: number }) {
-  const thread = useSelectedThreadDetail();
-  const activities = thread?.activities;
-  const sessionStatus = thread?.session?.status;
-  const sessionLive = sessionStatus === "running" || sessionStatus === "starting";
-  const roster = useMemo(
-    () => (activities ? foldSubagentActivities(activities, { sessionLive }) : []),
-    [activities, sessionLive],
+  const thread = useSelectedThreadProjection();
+  const runs = thread?.projection.runs;
+  const roster = thread?.projection.subagents;
+  // Keyed on runs and subagents so streaming turn items do not recompute it.
+  const tabs = useMemo(
+    () =>
+      runs && roster
+        ? deriveSubagentTabs(deriveThreadTurnSubagents({ runs, subagents: roster }))
+        : [],
+    [runs, roster],
   );
-  const tabs = useMemo(() => deriveSubagentTabs(roster), [roster]);
   const liveTabs = tabs.filter((agent) => isActiveSubagentStatus(agent.status));
   const doneCount = tabs.length - liveTabs.length;
   const pillLabel = [
@@ -87,11 +91,8 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
   useEffect(() => () => setSheet(null), [setSheet]);
 
   const sheetAgents = useMemo(() => {
-    if (sheet === null) return [];
-    const ids = new Set([...sheet.agentIds, ...tabs.map((agent) => agent.id)]);
-    return roster
-      .filter((agent) => ids.has(agent.id))
-      .sort((a, b) => a.firstSeenAt.localeCompare(b.firstSeenAt) || a.id.localeCompare(b.id));
+    if (sheet === null || !roster) return [];
+    return selectSubagents(roster, new Set([...sheet.agentIds, ...tabs.map((agent) => agent.id)]));
   }, [sheet, roster, tabs]);
 
   return (
@@ -126,10 +127,10 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
       ) : null}
       {sheet !== null ? (
         <SubagentSheet
+          environmentId={thread?.environmentId ?? null}
           agents={sheetAgents}
           selectedId={sheet.selectedId}
           onSelect={(selectedId) => setSheet({ ...sheet, selectedId })}
-          activities={activities ?? []}
           onClose={() => setSheet(null)}
         />
       ) : null}
@@ -138,25 +139,16 @@ export const SubagentTabs = memo(function SubagentTabs(props: { readonly top: nu
 });
 
 function SubagentSheet(props: {
-  readonly agents: ReadonlyArray<RuntimeSubagent>;
+  readonly environmentId: EnvironmentId | null;
+  readonly agents: ReadonlyArray<OrchestrationV2Subagent>;
   readonly selectedId: string | null;
   readonly onSelect: (agentId: string) => void;
-  readonly activities: NonNullable<ReturnType<typeof useSelectedThreadDetail>>["activities"];
   readonly onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const agent = props.agents.find((entry) => entry.id === props.selectedId) ?? props.agents[0];
-  const tools = useMemo(
-    () => (agent ? subagentToolCalls(props.activities, agent.id) : []),
-    [agent, props.activities],
-  );
-  const meta = agent
-    ? [
-        agent.role,
-        formatSubagentModelLabel(agent.model, agent.effort),
-        agent.usage ? `${formatSubagentTokenCount(agent.usage.totalTokens)} tokens` : null,
-      ].filter(Boolean)
-    : [];
+  const meta = agent?.model ? [agent.model] : [];
+  const failed = agent?.status === "failed";
 
   return (
     <Modal visible animationType="slide" onRequestClose={props.onClose}>
@@ -197,7 +189,7 @@ function SubagentSheet(props: {
               >
                 <View className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[entry.status])} />
                 <Text className="shrink text-sm text-foreground" numberOfLines={1}>
-                  {`${index + 1}. ${entry.title}`}
+                  {`${index + 1}. ${subagentTitle(entry)}`}
                 </Text>
               </Pressable>
             );
@@ -207,7 +199,7 @@ function SubagentSheet(props: {
           <ScrollView className="flex-1" contentContainerClassName="gap-4 px-5 pb-6 pt-2">
             <View className="gap-1">
               <Text selectable className="font-t3-semibold text-lg text-foreground">
-                {agent.title}
+                {subagentTitle(agent)}
               </Text>
               <View className="flex-row items-center gap-1.5">
                 <View className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[agent.status])} />
@@ -221,40 +213,19 @@ function SubagentSheet(props: {
                 {agent.progress}
               </Text>
             ) : null}
-            <View className="gap-2">
-              <Text className="font-t3-medium text-xs uppercase text-foreground-muted">
-                {tools.length === 0 ? "No tool calls yet" : `Tool calls (${tools.length})`}
-              </Text>
-              {tools.map((tool) => (
-                <View key={tool.id} className="flex-row gap-2">
-                  <View
-                    className={cn(
-                      "mt-1.5 h-1.5 w-1.5 rounded-full",
-                      tool.done ? "bg-foreground-muted" : "bg-adaptive-sky-600-400",
-                    )}
-                  />
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-sm text-foreground">{tool.title}</Text>
-                    {tool.detail ? (
-                      <Text
-                        selectable
-                        className="font-mono text-xs text-foreground-muted"
-                        numberOfLines={4}
-                      >
-                        {tool.detail}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              ))}
-            </View>
-            {agent.result || agent.error ? (
+            {agent.childThreadId !== null && props.environmentId !== null ? (
+              <SubagentToolCalls
+                environmentId={props.environmentId}
+                threadId={agent.childThreadId}
+              />
+            ) : null}
+            {agent.result ? (
               <View className="gap-1">
                 <Text className="font-t3-medium text-xs uppercase text-foreground-muted">
-                  {agent.error ? "Error" : "Result"}
+                  {failed ? "Error" : "Result"}
                 </Text>
                 <Text selectable className="text-sm text-foreground">
-                  {agent.error ?? agent.result}
+                  {agent.result}
                 </Text>
               </View>
             ) : null}
@@ -262,5 +233,64 @@ function SubagentSheet(props: {
         ) : null}
       </View>
     </Modal>
+  );
+}
+
+/**
+ * The selected agent's tool calls, read from its child thread. Mounted only
+ * for the agent shown in the open sheet, so at most one extra thread
+ * subscription is live. Agents without a child thread (some provider-native
+ * ones) show only their progress and result.
+ */
+function SubagentToolCalls(props: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+}) {
+  const child = useThreadProjection({
+    environmentId: props.environmentId,
+    threadId: props.threadId,
+  });
+  const turnItems = child?.projection.turnItems;
+  // Only the child's own items: a forked child can carry its parent's history.
+  const tools = useMemo(
+    () =>
+      turnItems
+        ? subagentToolCalls(turnItems.filter((item) => item.threadId === props.threadId))
+        : [],
+    [props.threadId, turnItems],
+  );
+
+  return (
+    <View className="gap-2">
+      <Text className="font-t3-medium text-xs uppercase text-foreground-muted">
+        {child === null
+          ? "Loading tool calls"
+          : tools.length === 0
+            ? "No tool calls yet"
+            : `Tool calls (${tools.length})`}
+      </Text>
+      {tools.map((tool) => (
+        <View key={tool.id} className="flex-row gap-2">
+          <View
+            className={cn(
+              "mt-1.5 h-1.5 w-1.5 rounded-full",
+              tool.done ? "bg-foreground-muted" : "bg-adaptive-sky-600-400",
+            )}
+          />
+          <View className="min-w-0 flex-1">
+            <Text className="text-sm text-foreground">{tool.title}</Text>
+            {tool.detail ? (
+              <Text
+                selectable
+                className="font-mono text-xs text-foreground-muted"
+                numberOfLines={4}
+              >
+                {tool.detail}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }

@@ -1,19 +1,12 @@
-import { RemoteEnvironmentAuthorization } from "@t3tools/client-runtime/authorization";
 import {
   ConnectionBlockedError,
   CredentialStore,
   type PreparedConnection,
   ProfileStore,
 } from "@t3tools/client-runtime/connection";
-import {
-  ClientPresentation,
-  CloudSession,
-  ConnectionTargetStore,
-  EnvironmentCacheStore,
-  RelayDeviceIdentity,
-} from "@t3tools/client-runtime/platform";
+import { ClientCapabilities, Persistence } from "@t3tools/client-runtime/platform";
 import { ManagedRelay, type ManagedRelaySession } from "@t3tools/client-runtime/relay";
-import { fetchEnvironmentShellSnapshot } from "@t3tools/client-runtime/state/shell";
+import { ShellSnapshotLoader } from "@t3tools/client-runtime/state/shell";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -23,6 +16,10 @@ import * as BackgroundTask from "expo-background-task";
 import * as TaskManager from "expo-task-manager";
 import { AppState } from "react-native";
 
+// ponytail: client-runtime does not export the authorization service and is
+// read-only here, so the worker reaches into its source. Switch to the package
+// path if upstream ever exports it from "@t3tools/client-runtime/authorization".
+import * as RemoteEnvironmentAuthorization from "../../../../packages/client-runtime/src/authorization/service.ts";
 import { resolveHeadlessCloudSession } from "../features/cloud/headlessCloudSession";
 import * as Runtime from "../lib/runtime";
 import * as MobilePreferences from "../persistence/mobile-preferences";
@@ -75,9 +72,9 @@ function backgroundRefreshLayer(readSession: () => ManagedRelaySession | null) {
   const capabilitiesLayer = Layer.effectContext(
     Effect.gen(function* () {
       const storage = yield* MobileStorage.MobileStorage;
-      return Context.make(CloudSession, mobileCloudSession(readSession)).pipe(
-        Context.add(RelayDeviceIdentity, mobileRelayDeviceIdentity(storage)),
-        Context.add(ClientPresentation, mobileClientPresentation),
+      return Context.make(ClientCapabilities.CloudSession, mobileCloudSession(readSession)).pipe(
+        Context.add(ClientCapabilities.RelayDeviceIdentity, mobileRelayDeviceIdentity(storage)),
+        Context.add(ClientCapabilities.ClientPresentation, mobileClientPresentation),
       );
     }),
   );
@@ -144,7 +141,11 @@ const fetchShell = Effect.fn("mobile.backgroundRefresh.fetchShell")(function* (
   const remoteAuthorization = yield* Effect.serviceOption(
     RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization,
   );
-  return yield* fetchEnvironmentShellSnapshot({ prepared, signer, remoteAuthorization });
+  return yield* ShellSnapshotLoader.fetchEnvironmentShellSnapshot({
+    prepared,
+    signer,
+    remoteAuthorization,
+  });
 });
 
 const refreshEnvironment = Effect.fn("mobile.backgroundRefresh.environment")(function* (
@@ -166,7 +167,7 @@ const refreshEnvironment = Effect.fn("mobile.backgroundRefresh.environment")(fun
       } satisfies BackgroundRefreshEnvironmentResult;
     }
   }
-  const cache = yield* EnvironmentCacheStore;
+  const cache = yield* Persistence.EnvironmentCacheStore;
   const snapshot = yield* fetchShell(target).pipe(
     Effect.retry({
       times: 1,
@@ -206,7 +207,7 @@ const refreshEnvironment = Effect.fn("mobile.backgroundRefresh.environment")(fun
 const refreshAllEnvironments = Effect.fn("mobile.backgroundRefresh.run")(function* (
   session: Promise<SessionResolution>,
 ) {
-  const targetStore = yield* ConnectionTargetStore;
+  const targetStore = yield* Persistence.ConnectionTargetStore;
   const targets = backgroundRefreshTargets(
     yield* targetStore.list,
     yield* targetStore.listDisabled,
@@ -547,7 +548,7 @@ TaskManager.defineTask(BACKGROUND_REFRESH_TASK, async () => {
 const countRefreshableEnvironments = Effect.fn(
   "mobile.backgroundRefresh.countRefreshableEnvironments",
 )(function* () {
-  const targetStore = yield* ConnectionTargetStore;
+  const targetStore = yield* Persistence.ConnectionTargetStore;
   return backgroundRefreshTargets(yield* targetStore.list, yield* targetStore.listDisabled).length;
 });
 

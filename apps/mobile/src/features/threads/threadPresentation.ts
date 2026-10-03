@@ -1,6 +1,9 @@
 import type { StatusTone } from "../../components/StatusPill";
-import type { OrchestrationLatestTurn, OrchestrationSession } from "@t3tools/contracts";
-import { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import type {
+  EnvironmentThreadShell,
+  ThreadRunSummary,
+  ThreadRuntimeSummary,
+} from "@t3tools/client-runtime/state/shell";
 
 export type ThreadStatusKind =
   | "pending-approval"
@@ -20,20 +23,27 @@ export interface ThreadStatusPresentation extends StatusTone {
   readonly pulse: boolean;
 }
 
-function isLatestTurnSettled(
-  latestTurn: OrchestrationLatestTurn | null,
-  session: OrchestrationSession | null,
+function isLatestRunSettled(
+  latestRun: ThreadRunSummary | null,
+  runtime: ThreadRuntimeSummary | null,
 ): boolean {
-  if (!latestTurn?.startedAt) return false;
-  if (!latestTurn.completedAt) return false;
-  if (!session) return true;
-  return session.status !== "running";
+  if (latestRun === null) return false;
+  if (
+    latestRun.status === "preparing" ||
+    latestRun.status === "queued" ||
+    latestRun.status === "starting" ||
+    latestRun.status === "running" ||
+    latestRun.status === "waiting"
+  ) {
+    return false;
+  }
+  return runtime?.activeRunId !== latestRun.runId;
 }
 
 /**
  * Resolves the user-facing status of a thread, in priority order. Returns
  * `null` for quiescent threads so rows stay free of "Idle"-style noise.
- * Mirrors `resolveThreadStatusPill` in apps/web/src/components/Sidebar.logic.ts.
+ * Mirrors upstream web `resolveThreadStatusPill` (Sidebar.logic.ts) on the v2 run/runtime shell.
  */
 export function resolveThreadStatus(
   thread: EnvironmentThreadShell,
@@ -62,7 +72,7 @@ export function resolveThreadStatus(
     };
   }
 
-  if (thread.session?.status === "running") {
+  if (thread.runtime?.status === "running" || thread.runtime?.status === "waiting") {
     return {
       kind: "working",
       label: "Working",
@@ -74,7 +84,11 @@ export function resolveThreadStatus(
     };
   }
 
-  if (thread.session?.status === "starting") {
+  if (
+    thread.runtime?.status === "preparing" ||
+    thread.runtime?.status === "starting" ||
+    thread.runtime?.status === "queued"
+  ) {
     return {
       kind: "connecting",
       label: "Connecting",
@@ -86,7 +100,7 @@ export function resolveThreadStatus(
     };
   }
 
-  if (thread.session?.status === "error" || thread.latestTurn?.state === "error") {
+  if (thread.runtime?.status === "failed" || thread.latestRun?.status === "failed") {
     return {
       kind: "error",
       label: "Error",
@@ -100,7 +114,7 @@ export function resolveThreadStatus(
 
   const hasPlanReadyPrompt =
     thread.interactionMode === "plan" &&
-    isLatestTurnSettled(thread.latestTurn, thread.session) &&
+    isLatestRunSettled(thread.latestRun, thread.runtime) &&
     thread.hasActionableProposedPlan;
   if (hasPlanReadyPrompt) {
     return {

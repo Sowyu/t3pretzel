@@ -20,10 +20,6 @@ import {
 } from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
-import {
-  isDefaultThreadEnvModeSettled,
-  resolveDefaultThreadEnvMode,
-} from "@t3tools/shared/threadEnvMode";
 import * as Arr from "effect/Array";
 import { pipe } from "effect/Function";
 
@@ -431,25 +427,26 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       : null,
   );
   const t3ProjectFileData = t3ProjectFileQuery.data as ProjectReadFileResult | null;
-  const t3ProjectFileDefaultMode = useMemo(() => {
-    if (t3ProjectFileData === null || t3ProjectFileData.truncated) return null;
-    return parseT3ProjectFile(t3ProjectFileData.contents)?.defaultThreadEnvMode ?? null;
-  }, [t3ProjectFileData]);
-  // Environment settings with the project's overrides applied; the
-  // aggregate's own legacy fields still count until the server folds them.
+  const t3ProjectFile = useMemo(
+    () =>
+      t3ProjectFileData === null || t3ProjectFileData.truncated
+        ? null
+        : parseT3ProjectFile(t3ProjectFileData.contents),
+    [t3ProjectFileData],
+  );
+  // Environment settings with the project's overrides and its t3.json
+  // applied; the aggregate's own legacy fields still count until the server
+  // folds them.
   const projectSettings = useMemo(
     () =>
       resolveProjectSettings(
         selectedEnvironmentServerConfig?.settings ?? DEFAULT_SERVER_SETTINGS,
         selectedProject?.id ?? null,
         selectedProject,
+        t3ProjectFile,
       ),
-    [selectedEnvironmentServerConfig?.settings, selectedProject],
+    [selectedEnvironmentServerConfig?.settings, selectedProject, t3ProjectFile],
   );
-  const projectThreadEnvMode =
-    projectSettings.sources.defaultThreadEnvMode === "project"
-      ? projectSettings.settings.defaultThreadEnvMode
-      : undefined;
   // The ref actually checked out in the project root, serialized onto new
   // local threads. It comes from the live status stream rather than listRefs'
   // `current` flag, which is served from a cache that can lag an out-of-band
@@ -467,11 +464,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
       : null,
   );
   const currentCheckoutBranchName = projectGitStatus.data?.refName ?? null;
-  const configuredWorkspaceMode: WorkspaceMode = resolveDefaultThreadEnvMode({
-    projectSetting: projectThreadEnvMode,
-    projectFile: t3ProjectFileDefaultMode,
-    globalDefault: projectSettings.settings.defaultThreadEnvMode,
-  });
+  const configuredWorkspaceMode: WorkspaceMode = projectSettings.settings.defaultThreadEnvMode;
   // A worktree needs a git repository. Web falls back to the current checkout
   // for non-git projects (resolveSendEnvMode); without the same fallback the
   // draft sits on "New worktree" with no branch to pick and Start stays disabled.
@@ -480,20 +473,18 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     configuredWorkspaceMode === "worktree" && projectIsRepo === false
       ? "local"
       : configuredWorkspaceMode;
-  // While unsettled the resolved default is provisional. Nothing may write
-  // it into the draft during that window (the auto-branch effect does), or
-  // the frozen interim value beats the t3.json default once it loads. A
-  // worktree default also waits for the repository check that can demote it.
+  // While the file read is pending and nothing above it decided, the
+  // resolved default is provisional. Nothing may write it into the draft
+  // during that window (the auto-branch effect does), or the frozen interim
+  // value beats the t3.json default once it loads. A worktree default also
+  // waits for the repository check that can demote it.
   const defaultWorkspaceModeSettled =
-    isDefaultThreadEnvModeSettled({
-      explicitMode: selectedProjectDraft.workspaceSelection?.mode,
-      projectSetting: projectThreadEnvMode,
-      projectFilePending: t3ProjectFileQuery.isPending,
-    }) &&
-    (selectedProjectDraft.workspaceSelection?.mode !== undefined ||
-      configuredWorkspaceMode !== "worktree" ||
-      projectIsRepo !== null ||
-      projectGitStatus.error !== null);
+    selectedProjectDraft.workspaceSelection?.mode !== undefined ||
+    ((projectSettings.sources.defaultThreadEnvMode !== "environment" ||
+      !t3ProjectFileQuery.isPending) &&
+      (configuredWorkspaceMode !== "worktree" ||
+        projectIsRepo !== null ||
+        projectGitStatus.error !== null));
   const workspaceMode = selectedProjectDraft.workspaceSelection?.mode ?? defaultWorkspaceMode;
   const selectedBranchName = selectedProjectDraft.workspaceSelection?.branch ?? null;
   const selectedWorktreePath = selectedProjectDraft.workspaceSelection?.worktreePath ?? null;

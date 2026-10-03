@@ -8,10 +8,11 @@ import type {
   EnvironmentId,
   MessageId,
   OrchestrationMessageContext,
+  RunId,
   ThreadId,
-  TurnId,
 } from "@t3tools/contracts";
 import { renderAssistantCitationsAsText } from "@t3tools/shared/assistantCitations";
+import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
 import { encodeComposerContextFragment } from "@t3tools/shared/composerContextClipboard";
 import {
   parseComposerContextHref,
@@ -144,10 +145,13 @@ import {
 } from "@t3tools/mobile-markdown-text/links";
 import {
   deriveThreadFeedPresentation,
-  deriveUnsettledTurnId,
+  failedFeedRunIds,
   isContextCompactionActivityGroup,
+  isContextHandoffActivityGroup,
+  isReasoningTraceActivityGroup,
+  threadFeedRunIsUnsettled,
   type ThreadFeedEntry,
-  type ThreadFeedLatestTurn,
+  type ThreadFeedLatestRun,
 } from "../../lib/threadActivity";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import {
@@ -158,7 +162,6 @@ import {
 } from "./thread-feed-live-follow";
 import {
   collapsedWorkLogHeight,
-  ThreadAgentSpawnCard,
   ThreadDisclosureChevron,
   ThreadWorkGroupToggle,
   ThreadThinkingRow,
@@ -174,6 +177,10 @@ import {
   type TimelineRailItem,
 } from "./thread-timeline-rail.logic";
 import { appendPendingThreadMessages, type PendingThreadFeedEntry } from "./pending-thread-feed";
+import { resolveUserMessageIntentBadge } from "./userMessageIntentBadge";
+import { useThreadQueuedRuns } from "./use-thread-queued-runs";
+
+type QueuedRunActions = Omit<ReturnType<typeof useThreadQueuedRuns>, "queuedRuns">;
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
 import { useMarkdownCodeHighlight } from "./markdownCodeHighlightState";
 import {
@@ -256,7 +263,9 @@ export interface ThreadFeedProps {
   readonly feed: ReadonlyArray<ThreadFeedEntry>;
   readonly contentPresentation: ThreadContentPresentation;
   readonly agentLabel: string;
-  readonly latestTurn: ThreadFeedLatestTurn | null;
+  readonly latestRun: ThreadFeedLatestRun | null;
+  /** The live work is a provider-native subagent's runless root turn. */
+  readonly runlessWorkActive?: boolean;
   readonly activeWorkStartedAt: string | null;
   readonly listRef: RefObject<LegendListRef | null>;
   readonly freeze: SharedValue<boolean>;
@@ -1382,12 +1391,14 @@ function renderFeedEntry(
     readonly workRowSizing: ReturnType<typeof deriveThreadWorkLogSizing>;
     readonly workGroupScrollPositions: Map<string, ThreadWorkGroupScrollPosition>;
     readonly terminalAssistantMessageIds: ReadonlySet<string>;
-    readonly unsettledTurnId: TurnId | null;
+    readonly unsettledTurnId: RunId | null;
+    readonly failedRunIds: ReadonlySet<RunId>;
+    readonly queuedRunActions: QueuedRunActions;
     readonly isWorking: boolean;
     readonly onCopyWorkRow: (rowId: string, value: string) => void;
     readonly onToggleWorkGroup: (groupId: string, anchorKey: string) => void;
     readonly onToggleWorkRow: (rowId: string, anchorKey: string) => void;
-    readonly onToggleTurnFold: (turnId: TurnId) => void;
+    readonly onToggleTurnFold: (runId: RunId) => void;
     readonly onPressPreview: (source: FilePreviewSource) => void;
     readonly onPressVideo: (attachment: ChatFileAttachment, sourceIdentifier: string) => void;
     readonly markdownLinkHandlers: MarkdownLinkHandlers;
@@ -1408,12 +1419,12 @@ function renderFeedEntry(
   const entry = info.item;
   const { markdownStyles, iconSubtleColor, userBubbleColor } = props;
 
-  if (entry.type === "turn-fold") {
+  if (entry.type === "run-fold") {
     return (
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: entry.expanded }}
-        onPress={() => props.onToggleTurnFold(entry.turnId)}
+        onPress={() => props.onToggleTurnFold(entry.runId)}
         hitSlop={4}
         className="mb-1 min-h-11 flex-row items-center gap-2 border-b border-adaptive-neutral-200-a80-white-a8 px-2"
         style={{
@@ -1440,19 +1451,6 @@ function renderFeedEntry(
     return <ThreadThinkingRow rowSizing={props.workRowSizing} iconSubtleColor={iconSubtleColor} />;
   }
 
-  if (entry.type === "agent-spawn") {
-    return (
-      <ThreadAgentSpawnCard
-        summary={entry.summary}
-        expanded={entry.expanded}
-        iconSubtleColor={iconSubtleColor}
-        rowSizing={props.workRowSizing}
-        onToggle={() => props.onToggleWorkGroup(entry.id, entry.id)}
-        onCopy={() => props.onCopyWorkRow(entry.activity.id, entry.activity.getCopyText())}
-      />
-    );
-  }
-
   if (entry.type === "work-toggle") {
     return (
       <ThreadWorkGroupToggle
@@ -1474,7 +1472,33 @@ function renderFeedEntry(
     );
   }
 
-  if (entry.type === "activity-group" && isContextCompactionActivityGroup(entry)) {
+  if (entry.type === "activity-group" && isReasoningTraceActivityGroup(entry)) {
+    const activity = entry.activities[0]!;
+    const item = activity.projectedItem.item;
+    // Only the live run may claim to still be thinking, and only while the
+    // thread is actually working: a block left open by a crashed provider
+    // must not keep fading on a run that settled long ago.
+    const live =
+      activity.lifecycleStatus === "inProgress" &&
+      props.isWorking &&
+      entry.runId !== null &&
+      entry.runId === props.unsettledTurnId;
+    return (
+      <ThreadReasoningRow
+        rowId={activity.id}
+        text={item.type === "reasoning" ? item.text : ""}
+        live={live}
+        expanded={props.expandedWorkRows[activity.id] ?? false}
+        onToggle={props.onToggleWorkRow}
+      />
+    );
+  }
+
+  // A context handoff reads like a compaction: one divider with its label.
+  if (
+    entry.type === "activity-group" &&
+    (isContextCompactionActivityGroup(entry) || isContextHandoffActivityGroup(entry))
+  ) {
     const label = entry.activities[0]!.summary;
     return (
       <View
@@ -1499,31 +1523,14 @@ function renderFeedEntry(
 
   if (entry.type === "message") {
     const { message } = entry;
-    if (message.role === "reasoning") {
-      // Only the live turn may claim to still be thinking, and only while the
-      // thread is actually working: a block left open by a crashed provider
-      // must not keep fading on a turn that settled long ago.
-      const live =
-        message.streaming &&
-        props.isWorking &&
-        message.turnId !== null &&
-        message.turnId === props.unsettledTurnId;
-      return (
-        <ThreadReasoningRow
-          rowId={message.id}
-          text={message.text}
-          live={live}
-          expanded={props.expandedWorkRows[message.id] ?? false}
-          onToggle={props.onToggleWorkRow}
-        />
-      );
-    }
     const isUser = message.role === "user";
-    const renderedText = renderAssistantCitationsAsText(message.text);
+    // Older scheduled prompts carry their attribution in the text itself.
+    const presentation = resolveUserMessagePresentation(message);
+    const renderedText = renderAssistantCitationsAsText(presentation.text);
     const styles = isUser ? markdownStyles.user : markdownStyles.assistant;
     const timestampLabel = formatMessageTime(isUser ? message.createdAt : message.updatedAt);
     const attachments = message.attachments ?? [];
-    const hasReviewCommentContext = message.text.includes("<review_comment");
+    const hasReviewCommentContext = presentation.text.includes("<review_comment");
     // A bubble that sizes itself from its content cannot lay out a block whose
     // intrinsic width overflows `maxWidth`: Android positions the bubble's
     // children during the unclamped pass and never moves them once the width
@@ -1533,7 +1540,7 @@ function renderFeedEntry(
     const assistantTurnStillInProgress =
       message.role === "assistant" &&
       props.unsettledTurnId !== null &&
-      message.turnId === props.unsettledTurnId;
+      message.runId === props.unsettledTurnId;
     const showAssistantMeta =
       message.role === "assistant" &&
       props.terminalAssistantMessageIds.has(message.id) &&
@@ -1541,6 +1548,7 @@ function renderFeedEntry(
       !message.streaming;
 
     if (isUser) {
+      const intentBadge = resolveUserMessageIntentBadge(message.inputIntent);
       const referenceIds = new Set(
         collectComposerContextReferences(message.text).map((reference) => reference.contextId),
       );
@@ -1556,6 +1564,11 @@ function renderFeedEntry(
       );
       return (
         <View className="mb-5 items-end">
+          {presentation.isAutomation || message.createdBy === "agent" ? (
+            <Text className="mb-1 pr-1 font-t3-medium text-2xs text-foreground-muted">
+              {presentation.isAutomation ? "Sent by automation" : "Sent by another agent"}
+            </Text>
+          ) : null}
           <View
             className="min-w-0 gap-2 rounded-[20px] px-3.5 py-2.5"
             style={{
@@ -1622,7 +1635,7 @@ function renderFeedEntry(
                 })}
               </View>
             ) : null}
-            {message.text.trim().length > 0 ? (
+            {presentation.text.trim().length > 0 ? (
               <MarkdownImageAvailableWidthContext
                 value={props.userBubbleMaxWidth - USER_BUBBLE_HORIZONTAL_PADDING * 2}
               >
@@ -1640,9 +1653,50 @@ function renderFeedEntry(
             ) : null}
           </View>
           <View className="mt-1 flex-row items-center justify-end gap-1 pr-0.5">
+            {intentBadge ? (
+              <Text
+                accessibilityLabel={intentBadge.accessibilityLabel}
+                className="font-t3-medium text-xs text-adaptive-neutral-600-400"
+              >
+                {intentBadge.label}
+              </Text>
+            ) : null}
             <Text className="font-t3-medium text-xs tabular-nums text-adaptive-neutral-600-400">
-              {entry.pendingMessage && !entry.acknowledged ? "Pending" : timestampLabel}
+              {entry.queuedRun
+                ? "Queued"
+                : entry.pendingMessage && !entry.acknowledged
+                  ? "Pending"
+                  : timestampLabel}
             </Text>
+            {entry.queuedRun && props.queuedRunActions.canSteer ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Steer now"
+                accessibilityHint="Interrupts what the agent is doing with this message"
+                disabled={props.queuedRunActions.busyRunId !== null}
+                hitSlop={8}
+                className="size-7 items-center justify-center disabled:opacity-40"
+                onPress={() => {
+                  if (entry.queuedRun) props.queuedRunActions.onSteer(entry.queuedRun.run.id);
+                }}
+              >
+                <SymbolView name="arrow.turn.left.up" size={14} tintColor={iconSubtleColor} />
+              </Pressable>
+            ) : null}
+            {entry.queuedRun ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Remove queued message"
+                disabled={props.queuedRunActions.busyRunId !== null}
+                hitSlop={8}
+                className="size-7 items-center justify-center disabled:opacity-40"
+                onPress={() => {
+                  if (entry.queuedRun) props.queuedRunActions.onRemove(entry.queuedRun.run.id);
+                }}
+              >
+                <SymbolView name="xmark" size={13} tintColor={iconSubtleColor} />
+              </Pressable>
+            ) : null}
             {entry.pendingMessage &&
             !entry.acknowledged &&
             !entry.pendingMessage.creation &&
@@ -1659,14 +1713,14 @@ function renderFeedEntry(
                 <SymbolView name="pencil" size={14} tintColor={iconSubtleColor} />
               </Pressable>
             ) : null}
-            {message.text.trim().length > 0 ? (
+            {presentation.text.trim().length > 0 ? (
               <CopyTextButton
                 accessibilityLabel="Copy message"
-                text={message.text}
+                text={presentation.text}
                 onCopy={
                   message.context
                     ? () =>
-                        writeComposerContextClipboard(message.text, {
+                        writeComposerContextClipboard(presentation.text, {
                           version: 1,
                           source: { environmentId: props.environmentId, messageId: message.id },
                           records: message.context!.records,
@@ -1692,7 +1746,11 @@ function renderFeedEntry(
     const enterAnimated = isFreshTimestamp(message.createdAt);
     return (
       <Animated.View
-        className={cn(showAssistantMeta ? "mb-5 px-1" : "mb-1 px-1")}
+        className={cn(
+          showAssistantMeta && !(message.runId && props.failedRunIds.has(message.runId))
+            ? "mb-5 px-1"
+            : "mb-1 px-1",
+        )}
         {...(enterAnimated ? { entering: FadeIn.duration(220) } : {})}
       >
         {renderedText.trim().length > 0 ? (
@@ -1955,7 +2013,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const disclosureSettleSecondFrameRef = useRef<number | null>(null);
   const disclosureAnchorKeyRef = useRef<string | null>(null);
   const headerMaterialVisibleRef = useRef(false);
-  const previousLatestTurnRef = useRef(props.latestTurn);
+  const previousLatestTurnRef = useRef(props.latestRun);
   const userScrollSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const { appearance } = useAppearancePreferences();
@@ -2024,7 +2082,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     readonly copiedRowId: string | null;
     readonly expandedWorkGroups: Record<string, boolean>;
     readonly expandedWorkRows: Record<string, boolean>;
-    readonly expandedTurnIds: ReadonlySet<TurnId>;
+    readonly expandedTurnIds: ReadonlySet<RunId>;
   }>({
     copiedRowId: null,
     expandedWorkGroups: {},
@@ -2287,7 +2345,15 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const reviewCommentColors = useReviewCommentColors();
   // One definition of "still live", shared with the fold derivation: two
   // copies of this test are what let a row and the fold beside it disagree.
-  const unsettledTurnId = deriveUnsettledTurnId(props.latestTurn);
+  const unsettledTurnId = threadFeedRunIsUnsettled(props.latestRun) ? props.latestRun.runId : null;
+  const { queuedRuns, canSteer, busyRunId, onSteer, onRemove } = useThreadQueuedRuns(
+    props.environmentId,
+    props.threadId,
+  );
+  const queuedRunActions = useMemo<QueuedRunActions>(
+    () => ({ canSteer, busyRunId, onSteer, onRemove }),
+    [busyRunId, canSteer, onRemove, onSteer],
+  );
   // LegendList does not invalidate visible rows when only the renderItem closure changes.
   // Include turn completion so unchanged message rows reveal their footer and spacing
   // even when the final message update arrives before the turn settles.
@@ -2295,6 +2361,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     () => ({
       dispatchingMessageId: props.dispatchingMessageId,
       unsettledTurnId,
+      queuedRunActions,
       copiedRowId,
       expandedWorkRows,
       workRowSizing,
@@ -2308,6 +2375,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     [
       props.dispatchingMessageId,
       unsettledTurnId,
+      queuedRunActions,
       copiedRowId,
       expandedWorkRows,
       workRowSizing,
@@ -2455,28 +2523,35 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       appendPendingThreadMessages(
         deriveThreadFeedPresentation(
           props.feed,
-          props.latestTurn,
+          props.latestRun,
           expandedTurnIds,
           expandedWorkGroupIds,
           props.activeWorkStartedAt,
+          props.runlessWorkActive ?? false,
         ),
         props.feed,
         props.queuedMessages,
+        queuedRuns,
       ),
     [
       props.queuedMessages,
+      queuedRuns,
       expandedTurnIds,
       expandedWorkGroupIds,
       props.activeWorkStartedAt,
+      props.runlessWorkActive,
       props.feed,
-      props.latestTurn,
+      props.latestRun,
     ],
   );
   // The empty↔filled key below remounts the list and resets its imperative
   // content-inset override. Seed the fresh instance synchronously with the
   // current overlay height before the scroll integration's next reaction;
   // on Android the declarative contentInset floor covers this same window.
-  const listMountKey = `${feedThreadKey}:${presentedFeed.length === 0 ? "empty" : "filled"}`;
+  // The thinking row a running thread shows while its messages load is not
+  // content: the list must still remount, and so open at the end, when they
+  // arrive.
+  const listMountKey = `${feedThreadKey}:${presentedFeed.some((entry) => entry.type !== "thinking") ? "filled" : "empty"}`;
   useLayoutEffect(() => {
     const bottom = props.contentInsetEndAdjustment.value;
     if (bottom > 0) {
@@ -2550,24 +2625,28 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     },
     [props.listRef, setEndFollow, topContentInset],
   );
+  const failedRunIds = useMemo(
+    () => failedFeedRunIds(props.feed, props.latestRun),
+    [props.feed, props.latestRun],
+  );
   const terminalAssistantMessageIds = useMemo(() => {
-    const terminalIdsByTurn = new Map<TurnId, string>();
+    const terminalIdsByTurn = new Map<RunId, string>();
     for (const entry of props.feed) {
-      if (entry.type === "message" && entry.message.role === "assistant" && entry.message.turnId) {
-        terminalIdsByTurn.set(entry.message.turnId, entry.message.id);
+      if (entry.type === "message" && entry.message.role === "assistant" && entry.message.runId) {
+        terminalIdsByTurn.set(entry.message.runId, entry.message.id);
       }
     }
     return new Set(terminalIdsByTurn.values());
   }, [props.feed]);
   useEffect(() => {
     const previous = previousLatestTurnRef.current;
-    previousLatestTurnRef.current = props.latestTurn;
-    if (!props.latestTurn || !previous) {
+    previousLatestTurnRef.current = props.latestRun;
+    if (!props.latestRun || !previous) {
       return;
     }
-    if (props.latestTurn.turnId === previous.turnId) {
-      if (previous.state === "running" && props.latestTurn.state === "interrupted") {
-        const interruptedTurnId = props.latestTurn.turnId;
+    if (props.latestRun.runId === previous.runId) {
+      if (previous.status === "running" && props.latestRun.status === "interrupted") {
+        const interruptedTurnId = props.latestRun.runId;
         setInteractionState((current) => ({
           ...current,
           expandedTurnIds: new Set(current.expandedTurnIds).add(interruptedTurnId),
@@ -2576,14 +2655,14 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       return;
     }
     setInteractionState((current) => {
-      if (!current.expandedTurnIds.has(previous.turnId)) {
+      if (!current.expandedTurnIds.has(previous.runId)) {
         return current;
       }
       const next = new Set(current.expandedTurnIds);
-      next.delete(previous.turnId);
+      next.delete(previous.runId);
       return { ...current, expandedTurnIds: next };
     });
-  }, [props.latestTurn]);
+  }, [props.latestRun]);
 
   useEffect(() => {
     return () => {
@@ -2706,14 +2785,14 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   );
 
   const onToggleTurnFold = useCallback(
-    (turnId: TurnId) => {
-      suspendEndScrollMaintenanceForDisclosure(`turn-fold:${turnId}`);
+    (runId: RunId) => {
+      suspendEndScrollMaintenanceForDisclosure(`run-fold:${runId}`);
       setInteractionState((current) => {
         const next = new Set(current.expandedTurnIds);
-        if (next.has(turnId)) {
-          next.delete(turnId);
+        if (next.has(runId)) {
+          next.delete(runId);
         } else {
-          next.add(turnId);
+          next.add(runId);
         }
         return { ...current, expandedTurnIds: next };
       });
@@ -2747,20 +2826,28 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         return undefined;
       }
       switch (entry.type) {
-        case "turn-fold":
+        case "run-fold":
           return TURN_FOLD_HEIGHT;
         case "work-toggle":
         case "thinking":
           return WORK_GROUP_TOGGLE_HEIGHT;
         case "activity-group":
-          if (isContextCompactionActivityGroup(entry)) {
+          // Subagent cards, dividers and thinking traces size to their text.
+          if (
+            entry.activities[0]?.projectedItem.item.type === "subagent" ||
+            isContextCompactionActivityGroup(entry) ||
+            isContextHandoffActivityGroup(entry) ||
+            isReasoningTraceActivityGroup(entry)
+          ) {
             return undefined;
           }
           // Expanded rows append a variable detail block — fall back to
           // measurement for those groups.
-          return entry.activities.some((activity) => expandedWorkRows[activity.id])
+          return entry.activities.some(
+            (activity) => activity.prominent || expandedWorkRows[activity.id],
+          )
             ? undefined
-            : collapsedWorkLogHeight(entry.activities);
+            : collapsedWorkLogHeight(entry.activities, entry.continuesWorkLog);
         default:
           return undefined;
       }
@@ -2788,6 +2875,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             workGroupScrollPositions,
             terminalAssistantMessageIds,
             unsettledTurnId,
+            queuedRunActions,
+            failedRunIds,
             isWorking: props.activeWorkStartedAt !== null,
             onCopyWorkRow,
             onToggleWorkGroup,
@@ -2824,6 +2913,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       workGroupScrollPositions,
       terminalAssistantMessageIds,
       unsettledTurnId,
+      queuedRunActions,
+      failedRunIds,
       props.activeWorkStartedAt,
       iconSubtleColor,
       screenColor,

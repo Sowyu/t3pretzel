@@ -1,10 +1,18 @@
+import { useMemo } from "react";
+
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import {
   normalizeProviderAccentColor,
   resolveProviderInstanceDisplayName,
   shouldShowInstanceBadge,
 } from "@t3tools/client-runtime/state/provider-instance-display";
-import type { EnvironmentId, ProviderDriverKind, ServerConfig } from "@t3tools/contracts";
+import type { EnvironmentId, ProviderDriverKind, ServerProvider } from "@t3tools/contracts";
+
+/** The slice of a server provider entry a thread row reads. `ServerConfig["providers"]` fits. */
+export type ThreadListProvider = Pick<
+  ServerProvider,
+  "instanceId" | "driver" | "displayName" | "accentColor"
+>;
 
 /** What a thread row needs to draw the provider glyph and its account badge. */
 export interface ThreadRowProviderInstance {
@@ -14,29 +22,17 @@ export interface ThreadRowProviderInstance {
   readonly showBadge: boolean;
 }
 
-// Rows are memoized, so the same provider list must hand back the same object.
-// A new server config brings a new providers array, which drops its cache entry.
-const resolvedByProviders = new WeakMap<
-  ServerConfig["providers"],
-  Map<string, ThreadRowProviderInstance>
->();
-
 /**
  * Resolve the provider instance a thread runs on, scoped to the thread's own
  * environment: default instance ids are the driver slug, so the same id
- * names a different account on every server. Returns the same object for the
- * same provider list and instance id.
+ * names a different account on every server.
  */
 export function resolveThreadProviderInstance(
-  serverConfigs: ReadonlyMap<EnvironmentId, ServerConfig>,
+  providers: ReadonlyArray<ThreadListProvider> | undefined,
   thread: EnvironmentThreadShell,
 ): ThreadRowProviderInstance | null {
-  const providers = serverConfigs.get(thread.environmentId)?.providers;
-  if (!providers) return null;
-  const instanceId = thread.session?.providerInstanceId ?? thread.modelSelection.instanceId;
-  let resolved = resolvedByProviders.get(providers);
-  const cached = resolved?.get(instanceId);
-  if (cached) return cached;
+  if (providers === undefined) return null;
+  const instanceId = thread.runtime?.providerInstanceId ?? thread.modelSelection.instanceId;
   const snapshot = providers.find((provider) => provider.instanceId === instanceId);
   if (!snapshot) return null;
   const entry = {
@@ -44,17 +40,47 @@ export function resolveThreadProviderInstance(
     displayName: resolveProviderInstanceDisplayName(snapshot),
     accentColor: normalizeProviderAccentColor(snapshot.accentColor),
   };
-  const instance = {
+  return {
     ...entry,
     showBadge: shouldShowInstanceBadge(
       entry,
       providers.map((provider) => ({ driverKind: provider.driver })),
     ),
   };
-  if (!resolved) {
-    resolved = new Map();
-    resolvedByProviders.set(providers, resolved);
-  }
-  resolved.set(instanceId, instance);
-  return instance;
+}
+
+/**
+ * Builds a resolver handing out reference-stable `ThreadRowProviderInstance`
+ * objects. `resolveThreadProviderInstance` builds a fresh object per call,
+ * which breaks the memoized row's props comparison on every parent render —
+ * the result only depends on (environment, instance id), so one cache per
+ * provider-list generation keeps each row's `providerInstance` prop stable
+ * until the instance behind the row actually changes.
+ */
+export function createThreadRowProviderInstanceResolver(
+  providersByEnvironmentId: ReadonlyMap<EnvironmentId, ReadonlyArray<ThreadListProvider>>,
+): (thread: EnvironmentThreadShell) => ThreadRowProviderInstance | null {
+  const cache = new Map<string, ThreadRowProviderInstance | null>();
+  return (thread) => {
+    const instanceId = thread.runtime?.providerInstanceId ?? thread.modelSelection.instanceId;
+    const cacheKey = `${thread.environmentId}|${instanceId ?? ""}`;
+    const cached = cache.get(cacheKey);
+    if (cached !== undefined) return cached;
+    const resolved = resolveThreadProviderInstance(
+      providersByEnvironmentId.get(thread.environmentId),
+      thread,
+    );
+    cache.set(cacheKey, resolved);
+    return resolved;
+  };
+}
+
+/** List-scoped wrapper: one cache per provider-list generation. */
+export function useThreadRowProviderInstanceResolver(
+  providersByEnvironmentId: ReadonlyMap<EnvironmentId, ReadonlyArray<ThreadListProvider>>,
+): (thread: EnvironmentThreadShell) => ThreadRowProviderInstance | null {
+  return useMemo(
+    () => createThreadRowProviderInstanceResolver(providersByEnvironmentId),
+    [providersByEnvironmentId],
+  );
 }

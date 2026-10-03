@@ -41,6 +41,7 @@ import { cn } from "../../lib/cn";
 import { THREAD_WORK_ROW_MIN_HEIGHT, type deriveThreadWorkLogSizing } from "../../lib/layout";
 import {
   type AgentSpawnSummary,
+  subagentGroupSummary,
   type ThreadFeedActivity,
   workEntryRowLabel,
 } from "../../lib/threadActivity";
@@ -362,8 +363,12 @@ function workRowSymbolName(icon: ThreadFeedActivity["icon"]): AppSymbolName {
       return { ios: "eye", android: "visibility" };
     case "globe":
       return { ios: "globe", android: "public" };
+    case "search":
+      return "magnifyingglass";
     case "hammer":
       return { ios: "hammer", android: "construction" };
+    case "lock":
+      return { ios: "lock", android: "lock" };
     case "message":
       return { ios: "bubble.left", android: "chat_bubble" };
     case "warning":
@@ -400,18 +405,23 @@ function workLogRowsHeight(
   return activities.length * rowHeight + Math.max(0, activities.length - 1) * WORK_ROW_GAP;
 }
 
-export function collapsedWorkLogHeight(activities: ReadonlyArray<ThreadFeedActivity>): number {
+/** `continues`: the next feed row is more of the same work log, so no bottom margin. */
+export function collapsedWorkLogHeight(
+  activities: ReadonlyArray<ThreadFeedActivity>,
+  continues = false,
+): number {
   if (activities.length === 0) {
     return 0;
   }
   const height = workLogRowsHeight(activities);
   return (
-    WORK_LOG_BOTTOM_MARGIN +
+    (continues ? 0 : WORK_LOG_BOTTOM_MARGIN) +
     (activities[0]?.groupedToolDetail ? Math.min(height, WORK_GROUP_MAX_HEIGHT) : height)
   );
 }
 
 interface ThreadWorkLogProps {
+  readonly continuesWorkLog?: boolean | undefined;
   readonly activities: ReadonlyArray<ThreadFeedActivity>;
   readonly anchorKey: string;
   readonly environmentId: EnvironmentId;
@@ -462,8 +472,13 @@ export function ThreadWorkLog(props: ThreadWorkLogProps) {
     return null;
   }
 
+  // v2 groups a turn's subagents together; they render as one spawn card.
+  if (props.activities[0]?.projectedItem.item.type === "subagent") {
+    return <ThreadSubagentGroupCard {...props} />;
+  }
+
   return (
-    <View className="-mx-1 mb-1 px-1 py-0">
+    <View className={cn("-mx-1 px-1 py-0", props.continuesWorkLog ? null : "mb-1")}>
       {props.activities[0]?.groupedToolDetail ? (
         <ThreadWorkGroupList
           activities={props.activities}
@@ -997,6 +1012,23 @@ export function ThreadWorkGroupToggle(props: {
   );
 }
 
+function ThreadSubagentGroupCard(props: ThreadWorkLogProps) {
+  const summary = useMemo(() => subagentGroupSummary(props.activities), [props.activities]);
+  const { anchorKey, activities, onCopyRow, onToggleRow } = props;
+  return (
+    <ThreadAgentSpawnCard
+      summary={summary}
+      expanded={props.expandedRows[anchorKey] ?? false}
+      iconSubtleColor={props.iconSubtleColor}
+      rowSizing={props.rowSizing}
+      onToggle={() => onToggleRow(anchorKey, anchorKey)}
+      onCopy={() =>
+        onCopyRow(anchorKey, activities.map((activity) => activity.getCopyText()).join("\n\n"))
+      }
+    />
+  );
+}
+
 const AGENT_SPAWN_TONE_DOT_CLASS = {
   working: "bg-adaptive-sky-600-400",
   completed: "bg-adaptive-emerald-600-400",
@@ -1282,6 +1314,8 @@ function toolGroupSummarySymbolName(kind: ToolGroupSummaryKind): AppSymbolName {
       return { ios: "eye", android: "visibility" };
     case "edit":
       return { ios: "square.and.pencil", android: "edit" };
+    case "thread-create":
+      return { ios: "bubble.left", android: "chat" };
     case "command":
       return { ios: "terminal", android: "terminal" };
     case "device":
@@ -1293,6 +1327,8 @@ function toolGroupSummarySymbolName(kind: ToolGroupSummaryKind): AppSymbolName {
       return "magnifyingglass";
     case "other":
       return { ios: "wrench", android: "build" };
+    case "reasoning":
+      return { ios: "brain", android: "psychology" };
     case "agent-tool":
       return { ios: "sparkles", android: "auto_awesome" };
     case "tone-tool":

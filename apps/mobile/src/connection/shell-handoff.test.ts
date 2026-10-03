@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { EnvironmentId, type OrchestrationShellSnapshot } from "@t3tools/contracts";
+import { EnvironmentId, type OrchestrationV2ShellSnapshot } from "@t3tools/contracts";
 
 import { offerShell, takeShell, trackShellFetch } from "./shell-handoff";
 
-const snapshot = { snapshotSequence: 7 } as unknown as OrchestrationShellSnapshot;
+const snapshot = { snapshotSequence: 7 } as unknown as OrchestrationV2ShellSnapshot;
 
 describe("shell handoff", () => {
   it("waits for a fetch in flight, then hands its snapshot over once", async () => {

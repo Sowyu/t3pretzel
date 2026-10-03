@@ -27,7 +27,6 @@ export interface WorkspaceState {
   readonly connectionState: EnvironmentConnectionPhase;
   readonly connectionError: string | null;
   readonly shellSnapshotError: string | null;
-  readonly latestCachedSnapshotReceivedAt: string | null;
   readonly networkStatus: NetworkStatus;
 }
 
@@ -64,6 +63,9 @@ function overallConnectionState(
   }
   if (environments.some((environment) => environment.connectionState === "connecting")) {
     return "connecting";
+  }
+  if (environments.some((environment) => environment.connectionState === "unsupported")) {
+    return "unsupported";
   }
   if (environments.some((environment) => environment.connectionState === "error")) {
     return "error";
@@ -104,7 +106,6 @@ export function projectWorkspaceState(input: {
       activeEnvironments.find((environment) => environment.connectionError !== null)
         ?.connectionError ?? null,
     shellSnapshotError: input.shellSummary.firstError,
-    latestCachedSnapshotReceivedAt: input.shellSummary.latestSnapshotUpdatedAt,
     networkStatus: input.networkStatus,
   };
 }

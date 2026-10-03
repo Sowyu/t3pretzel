@@ -3,10 +3,7 @@ import type {
   SidebarProjectGroupingMode,
   SidebarThreadSortOrder,
 } from "@t3tools/contracts";
-import {
-  DEFAULT_SIDEBAR_PROJECT_SORT_ORDER,
-  DEFAULT_SIDEBAR_THREAD_SORT_ORDER,
-} from "@t3tools/contracts";
+import { DEFAULT_SIDEBAR_PROJECT_SORT_ORDER } from "@t3tools/contracts";
 import {
   createContext,
   createElement,
@@ -20,6 +17,9 @@ import {
 } from "react";
 
 import type { HomeProjectSortOrder } from "./homeThreadList";
+
+// Contracts keep this default private; it matches the server's settings default.
+export const DEFAULT_SIDEBAR_THREAD_SORT_ORDER: SidebarThreadSortOrder = "updated_at";
 
 export interface HomeListOptions {
   readonly selectedEnvironmentId: EnvironmentId | null;
