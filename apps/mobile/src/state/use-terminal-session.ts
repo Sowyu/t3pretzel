@@ -12,10 +12,18 @@ import { useMemo } from "react";
 import { useEnvironmentQuery } from "./query";
 import { terminalEnvironment } from "./terminal";
 
-type LegacyTerminalSessionState = TerminalSessionState & { readonly buffer: string };
+type LegacyTerminalSessionState = TerminalSessionState & {
+  readonly buffer: string;
+  /** Output offset of `buffer[0]`. Grows once old output is trimmed off the front. */
+  readonly bufferStartOffset: number;
+  /** Changes when offsets restart, so the native view rebuilds instead of appending. */
+  readonly bufferResetKey: string;
+};
 const EMPTY_LEGACY_TERMINAL_SESSION_STATE: LegacyTerminalSessionState = {
   ...EMPTY_TERMINAL_SESSION_STATE,
   buffer: "",
+  bufferStartOffset: 0,
+  bufferResetKey: "",
 };
 
 export function useAttachedTerminalSession(input: {
@@ -42,6 +50,8 @@ export function useAttachedTerminalSession(input: {
   // Installed native binaries still accept initialBuffer. Keep materialization
   // at this mobile boundary until the native streaming API is released.
   const buffer = useMemo(() => terminalOutputText(output), [output]);
+  const bufferStartOffset = output.chunks[0]?.startOffset ?? output.nextOffset;
+  const bufferResetKey = `${output.generation}:${output.resetVersion}`;
 
   return useMemo(() => {
     if (input.environmentId === null || input.terminal === null) {
@@ -56,9 +66,20 @@ export function useAttachedTerminalSession(input: {
     const state = {
       ...combineTerminalSessionState(summary, attach.data ?? EMPTY_TERMINAL_BUFFER_STATE),
       buffer,
+      bufferStartOffset,
+      bufferResetKey,
     };
     return attach.error === null ? state : { ...state, error: attach.error, status: "error" };
-  }, [attach.data, attach.error, buffer, input.environmentId, input.terminal, metadata.data]);
+  }, [
+    attach.data,
+    attach.error,
+    buffer,
+    bufferResetKey,
+    bufferStartOffset,
+    input.environmentId,
+    input.terminal,
+    metadata.data,
+  ]);
 }
 
 export function useKnownTerminalSessions(input: {

@@ -35,6 +35,10 @@ interface TerminalResizeEvent {
 interface TerminalSurfaceProps extends ViewProps {
   readonly terminalKey: string;
   readonly buffer: string;
+  /** Output offset of `buffer[0]`; lets the native view append only the new tail. */
+  readonly bufferStartOffset: number;
+  /** Changes when output offsets restart; the native view rebuilds instead of appending. */
+  readonly bufferResetKey: string;
   readonly fontSize?: number;
   readonly isRunning: boolean;
   readonly autoFocus?: boolean;
@@ -227,6 +231,8 @@ export const TerminalSurface = memo(function TerminalSurface(props: TerminalSurf
           mutedForegroundColor={theme.mutedForeground}
           terminalKey={props.terminalKey}
           initialBuffer={props.buffer}
+          bufferStartOffset={props.bufferStartOffset}
+          bufferResetKey={props.bufferResetKey}
           fontSize={fontSize}
           style={{ flex: 1 }}
           themeConfig={buildGhosttyThemeConfig(theme)}

@@ -51,7 +51,13 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
       onCapture(mapOf("text" to text))
     }
   private var terminalHandle = 0L
-  private var fedBuffer = ""
+
+  // Output offset just past the last fed byte, NOTHING_FED for a fresh terminal.
+  private var fedEnd = NOTHING_FED
+  private var fedResetKey = ""
+
+  // Buffer props arrive one setter at a time; feed only once the batch is complete.
+  private var bufferPropsPending = false
   private var cols = 0
   private var rows = 0
   private var clearingInput = false
@@ -74,7 +80,23 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
     set(value) {
       if (field == value) return
       field = value
-      feedPendingBuffer()
+      bufferPropsPending = true
+    }
+
+  /** Output offset of initialBuffer[0]. Grows once JS trims old output off the front. */
+  var bufferStartOffset: Long = 0L
+    set(value) {
+      if (field == value) return
+      field = value
+      bufferPropsPending = true
+    }
+
+  /** Changes when output offsets restart; forces a rebuild instead of an append. */
+  var bufferResetKey: String = ""
+    set(value) {
+      if (field == value) return
+      field = value
+      bufferPropsPending = true
     }
 
   var fontSize: Float = 10f
@@ -136,6 +158,7 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
 
   init {
     terminalCanvas.fontSizeSp = fontSize
+    terminalCanvas.cursorBlinkEnabled = false
     terminalCanvas.onRequestKeyboard = { requestKeyboardFocus() }
     terminalCanvas.onScrollRows = { delta ->
       if (terminalHandle != 0L) {
@@ -212,6 +235,13 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
     if (changed) emitResize()
   }
 
+  /** Called by the view manager after each prop batch. */
+  fun onPropsUpdated() {
+    if (!bufferPropsPending) return
+    bufferPropsPending = false
+    feedPendingBuffer()
+  }
+
   fun cleanup() {
     if (isCleanedUp) return
     isCleanedUp = true
@@ -243,6 +273,7 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
     inputView.setPadding(0, 0, 0, 0)
     // Lets the JS keyboard-recovery quarantine lift when the terminal takes focus.
     inputView.setOnFocusChangeListener { _, hasFocus ->
+      terminalCanvas.cursorBlinkEnabled = hasFocus
       if (hasFocus) onTerminalFocus(emptyMap<String, Any>())
     }
     inputView.onDeleteSurroundingText = { beforeLength, afterLength ->
@@ -270,25 +301,11 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
         if (event.action == KeyEvent.ACTION_DOWN) onInput(mapOf("data" to "\r"))
         return@setOnKeyListener true
       }
-      if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-      when {
-        keyCode == KeyEvent.KEYCODE_DEL -> {
-          onInput(mapOf("data" to "\u007F"))
-          true
-        }
-        keyCode == KeyEvent.KEYCODE_FORWARD_DEL -> {
-          onInput(mapOf("data" to FORWARD_DELETE))
-          true
-        }
-        // Hardware keyboard Ctrl+A..Z -> control bytes 0x01..0x1A (Ctrl+C, Ctrl+Z, ...).
-        event.isCtrlPressed && keyCode in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z -> {
-          onInput(
-            mapOf("data" to (keyCode - KeyEvent.KEYCODE_A + 1).toChar().toString()),
-          )
-          true
-        }
-        else -> false
-      }
+      val sequence = terminalKeySequence(keyCode, event.isCtrlPressed, event.isShiftPressed)
+        ?: return@setOnKeyListener false
+      // Consume both halves: unhandled Tab and arrows move focus off the hidden field.
+      if (event.action == KeyEvent.ACTION_DOWN) onInput(mapOf("data" to sequence))
+      true
     }
     inputView.addTextChangedListener(
       object : TextWatcher {
@@ -365,7 +382,7 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
       cursorColorValue,
       paletteColors,
     )
-    fedBuffer = ""
+    fedEnd = NOTHING_FED
   }
 
   private fun recreateTerminal() {
@@ -380,19 +397,31 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
     if (terminalHandle == 0L) return
     GhosttyBridge.nativeDestroy(terminalHandle)
     terminalHandle = 0L
-    fedBuffer = ""
+    fedEnd = NOTHING_FED
     terminalCanvas.resetSelectionState()
   }
 
   private fun feedPendingBuffer() {
-    if (terminalHandle == 0L || initialBuffer == fedBuffer) return
-    if (!initialBuffer.startsWith(fedBuffer)) {
-      recreateTerminal()
-      if (terminalHandle == 0L) return
+    if (terminalHandle == 0L || bufferPropsPending) return
+    val bufferEnd = bufferStartOffset + initialBuffer.length
+    if (fedEnd == bufferEnd && fedResetKey == bufferResetKey) return
+    // The first feed into a fresh terminal replays history. Ghostty answers the
+    // queries in it (DA, CPR) again, and those stale answers must not reach the shell.
+    val isLive = fedEnd != NOTHING_FED
+    val feedFrom = if (isLive) {
+      terminalFeedStart(fedEnd, fedResetKey, bufferStartOffset, initialBuffer.length, bufferResetKey)
+    } else {
+      0
     }
-    val suffix = initialBuffer.substring(fedBuffer.length)
+    if (feedFrom == null) {
+      // Offsets restarted or output was lost: rebuild and replay (recurses once, not live).
+      recreateTerminal()
+      return
+    }
+    val suffix = initialBuffer.substring(feedFrom)
     if (suffix.isNotEmpty()) {
-      emitResponse(GhosttyBridge.nativeFeed(terminalHandle, suffix.toByteArray(Charsets.UTF_8)))
+      val replies = GhosttyBridge.nativeFeed(terminalHandle, suffix.toByteArray(Charsets.UTF_8))
+      if (isLive) emitResponse(replies)
       // New output invalidates an active selection (matches the web drawer);
       // otherwise the copy toolbar drifts out of sync with the grid.
       if (terminalCanvas.hasActiveSelection()) {
@@ -400,7 +429,8 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
         terminalCanvas.resetSelectionState()
       }
     }
-    fedBuffer = initialBuffer
+    fedEnd = bufferEnd
+    fedResetKey = bufferResetKey
     renderSnapshot()
   }
 
@@ -482,12 +512,57 @@ class T3TerminalView(context: Context, appContext: AppContext) : ExpoView(contex
     }
 
   private companion object {
-    const val FORWARD_DELETE = "\u001B[3~"
+    const val NOTHING_FED = -1L
 
     fun isEnterKey(keyCode: Int): Boolean =
       keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
   }
 }
+
+/**
+ * Where to resume feeding the retained output window [startOffset, startOffset + bufferLength),
+ * given that everything before [fedEnd] is already in the terminal. Null means the window
+ * no longer continues what was fed (reset, or a gap), so the terminal must be rebuilt.
+ */
+internal fun terminalFeedStart(
+  fedEnd: Long,
+  fedResetKey: String,
+  startOffset: Long,
+  bufferLength: Int,
+  resetKey: String,
+): Int? {
+  if (fedResetKey != resetKey) return null
+  val start = fedEnd - startOffset
+  return if (start in 0..bufferLength) start.toInt() else null
+}
+
+private const val FORWARD_DELETE = "\u001B[3~"
+
+/**
+ * Bytes a hardware key sends to the PTY, or null to let Android handle it. Arrows and
+ * Home/End use normal cursor mode (CSI), which shells and full-screen TUIs both accept.
+ */
+// ponytail: ignores DECCKM application cursor mode (ESC O A); route through ghostty's key encoder if an app needs it
+@Suppress("CyclomaticComplexMethod")
+internal fun terminalKeySequence(keyCode: Int, ctrl: Boolean, shift: Boolean): String? =
+  when {
+    keyCode == KeyEvent.KEYCODE_DEL -> "\u007F"
+    keyCode == KeyEvent.KEYCODE_FORWARD_DEL -> FORWARD_DELETE
+    keyCode == KeyEvent.KEYCODE_ESCAPE -> "\u001B"
+    keyCode == KeyEvent.KEYCODE_TAB -> if (shift) "\u001B[Z" else "\t"
+    keyCode == KeyEvent.KEYCODE_DPAD_UP -> "\u001B[A"
+    keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> "\u001B[B"
+    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> "\u001B[C"
+    keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> "\u001B[D"
+    keyCode == KeyEvent.KEYCODE_MOVE_HOME -> "\u001B[H"
+    keyCode == KeyEvent.KEYCODE_MOVE_END -> "\u001B[F"
+    keyCode == KeyEvent.KEYCODE_PAGE_UP -> "\u001B[5~"
+    keyCode == KeyEvent.KEYCODE_PAGE_DOWN -> "\u001B[6~"
+    // Ctrl+A..Z -> control bytes 0x01..0x1A (Ctrl+C, Ctrl+Z, ...).
+    ctrl && keyCode in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z ->
+      (keyCode - KeyEvent.KEYCODE_A + 1).toChar().toString()
+    else -> null
+  }
 
 /**
  * Hidden field that owns the IME session. Its text is always empty: the text watcher

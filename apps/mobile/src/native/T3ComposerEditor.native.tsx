@@ -101,6 +101,7 @@ interface NativeComposerEditorProps extends ViewProps {
   readonly maxInputChars: number;
   readonly onComposerPasteText?: (event: NativePasteTextEvent) => void;
   readonly onComposerFocus?: () => void;
+  readonly onComposerSubmit?: () => void;
   readonly onComposerBlur?: () => void;
   readonly onComposerContentSizeChange?: (
     event: NativeSyntheticEvent<{ readonly height: number }>,
@@ -378,6 +379,7 @@ export function ComposerEditor({
           forceNativeEventRender((sequence) => sequence + 1);
         }}
         onComposerFocus={onFocus}
+        onComposerSubmit={props.onSubmit}
         onComposerBlur={onBlur}
         onComposerContentSizeChange={
           onContentHeightChange

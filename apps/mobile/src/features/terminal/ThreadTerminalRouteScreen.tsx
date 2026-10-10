@@ -58,7 +58,7 @@ import { getMobileTerminalTheme } from "./terminalTheme";
 import { terminalDebugLog } from "./terminalDebugLog";
 import {
   getTerminalBufferReplayKey,
-  getTerminalSurfaceReplayBuffer,
+  getTerminalSurfaceReplayWindow,
   TERMINAL_BUFFER_REPLAY_STABILITY_DELAY_MS,
 } from "./terminalBufferReplay";
 import {
@@ -352,8 +352,10 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
   if (lastBufferReplayKeyRef.current === null) {
     lastBufferReplayKeyRef.current = bufferReplayKey;
   }
-  const terminalSurfaceBuffer = getTerminalSurfaceReplayBuffer({
+  const terminalSurfaceWindow = getTerminalSurfaceReplayWindow({
     buffer: terminal.buffer,
+    startOffset: terminal.bufferStartOffset,
+    resetKey: terminal.bufferResetKey,
     replayKey: bufferReplayKey,
     readyReplayKey: readyBufferReplayKey,
   });
@@ -421,7 +423,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     terminalDebugLog("surface:props", {
       terminalKey,
       atomBufferLen: terminal.buffer.length,
-      surfaceBufferLen: terminalSurfaceBuffer.length,
+      surfaceBufferLen: terminalSurfaceWindow.buffer.length,
       replayKey: bufferReplayKey,
       readyReplayKey: readyBufferReplayKey,
       status: terminal.status,
@@ -434,7 +436,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     terminal.status,
     terminal.version,
     terminalKey,
-    terminalSurfaceBuffer.length,
+    terminalSurfaceWindow.buffer.length,
   ]);
 
   useEffect(() => {
@@ -1330,7 +1332,9 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
               />
               <TerminalSurface
                 autoFocus={!SHOWCASE_ENABLED}
-                buffer={terminalSurfaceBuffer}
+                buffer={terminalSurfaceWindow.buffer}
+                bufferStartOffset={terminalSurfaceWindow.startOffset}
+                bufferResetKey={terminalSurfaceWindow.resetKey}
                 fontSize={fontSize}
                 isRunning={isRunning}
                 keyboardFocusRequest={keyboardFocusRequest}
@@ -1355,8 +1359,11 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   KeyboardController.dismiss();
                   setCaptureRequest((value) => value + 1);
                 }}
-                className="px-4 py-2"
-                style={isAttachRowBelowInset ? { marginBottom: terminalBottomInset } : undefined}
+                className="justify-center px-4 py-2"
+                style={[
+                  { minHeight: 48 },
+                  isAttachRowBelowInset ? { marginBottom: terminalBottomInset } : null,
+                ]}
               >
                 <Text style={{ color: terminalTheme.foreground }}>Attach visible output</Text>
               </Pressable>

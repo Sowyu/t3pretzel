@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { getTerminalBufferReplayKey, getTerminalSurfaceReplayBuffer } from "./terminalBufferReplay";
+import { getTerminalBufferReplayKey, getTerminalSurfaceReplayWindow } from "./terminalBufferReplay";
 
 describe("terminalBufferReplay", () => {
   it("keys replay readiness by terminal identity and font metrics", () => {
@@ -19,25 +19,31 @@ describe("terminalBufferReplay", () => {
     });
 
     expect(
-      getTerminalSurfaceReplayBuffer({
+      getTerminalSurfaceReplayWindow({
         buffer: "fastfetch output",
+        startOffset: 40,
+        resetKey: "0:1",
         replayKey,
         readyReplayKey: null,
       }),
-    ).toBe("fastfetch output");
+    ).toEqual({ buffer: "fastfetch output", startOffset: 40, resetKey: "0:1" });
     expect(
-      getTerminalSurfaceReplayBuffer({
+      getTerminalSurfaceReplayWindow({
         buffer: "fastfetch output",
+        startOffset: 40,
+        resetKey: "0:1",
         replayKey,
         readyReplayKey: "env-1:thread-1:default:11",
       }),
-    ).toBe("");
+    ).toEqual({ buffer: "", startOffset: 0, resetKey: `stale:${replayKey}` });
     expect(
-      getTerminalSurfaceReplayBuffer({
+      getTerminalSurfaceReplayWindow({
         buffer: "fastfetch output",
+        startOffset: 40,
+        resetKey: "0:1",
         replayKey,
         readyReplayKey: replayKey,
       }),
-    ).toBe("fastfetch output");
+    ).toEqual({ buffer: "fastfetch output", startOffset: 40, resetKey: "0:1" });
   });
 });
