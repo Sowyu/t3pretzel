@@ -807,9 +807,10 @@ function ThreadNavigationSidebarPane(
   const { swipeEnabled, scrollGateHandlers } = useSwipeableScrollGate({
     onScrollBeginDrag: handleScrollBeginDrag,
   });
-  // Project shells load after the first rows draw, so the maps they feed have
-  // to bust the recycler's memoization — otherwise a row keeps the blank
-  // favicon and fallback title it was first rendered with.
+  // Rows render from a cache keyed on [itemKey, item, extraData], so every
+  // value renderListItem reads outside `item` has to be listed here. Otherwise
+  // a row keeps the favicon, queued icon, move buttons or swipe width it was
+  // first rendered with.
   const listExtraData = useMemo(
     () => ({
       selectedThreadKey: props.selectedThreadKey ?? "",
@@ -819,6 +820,12 @@ function ThreadNavigationSidebarPane(
       serverConfigs,
       snoozePresetMinute: nowMinute,
       threadSearchMatchByKey,
+      searchQuery: props.searchQuery,
+      queuedThreadKeys,
+      pendingOrder,
+      threadMovePlanners,
+      machineByEnvironmentId,
+      width: props.width,
     }),
     [
       props.selectedThreadKey,
@@ -828,6 +835,12 @@ function ThreadNavigationSidebarPane(
       serverConfigs,
       nowMinute,
       threadSearchMatchByKey,
+      props.searchQuery,
+      queuedThreadKeys,
+      pendingOrder,
+      threadMovePlanners,
+      machineByEnvironmentId,
+      props.width,
     ],
   );
   const sidebarItemsAreEqual = useCallback(

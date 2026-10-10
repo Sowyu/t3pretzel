@@ -433,6 +433,11 @@ export function GitOverviewSheet(props: GitOverviewSheetProps) {
                 ? "absolute right-3 top-4 z-[1] h-9 w-9 items-center justify-center rounded-full bg-subtle opacity-[0.45]"
                 : "absolute right-3 top-4 z-[1] h-9 w-9 items-center justify-center rounded-full bg-subtle"
             }
+            accessibilityRole="button"
+            accessibilityLabel="Refresh git status"
+            accessibilityState={{ disabled: busy, busy }}
+            // h-9 is 36dp; the slop brings the target to 48dp.
+            hitSlop={6}
             disabled={busy}
             onPress={() => void gitActions.refreshSelectedThreadGitStatus()}
           >

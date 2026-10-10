@@ -1,8 +1,10 @@
+import { useIsFocused } from "@react-navigation/native";
 import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 import { GlassContainer, GlassView } from "expo-glass-effect";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   type LayoutChangeEvent,
   Pressable,
   Text as SystemText,
@@ -397,12 +399,22 @@ function WorkingDuration(props: {
   readonly onLayout: (event: LayoutChangeEvent) => void;
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now());
+  // Ticks only while the screen is focused and the app is foregrounded, like SubagentElapsed.
+  const focused = useIsFocused();
+  const [appActive, setAppActive] = useState(() => AppState.currentState === "active");
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) =>
+      setAppActive(state === "active"),
+    );
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     setNowMs(Date.now());
+    if (!focused || !appActive) return;
     const intervalId = setInterval(() => setNowMs(Date.now()), 1_000);
     return () => clearInterval(intervalId);
-  }, [props.startedAt]);
+  }, [appActive, focused, props.startedAt]);
 
   const duration = formatWorkingDuration(props.startedAt, nowMs);
   const label = `Working for ${duration}`;

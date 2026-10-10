@@ -18,6 +18,9 @@ const ROW_EXITING = FadeOut.duration(120).reduceMotion(ReduceMotion.System);
 // About three pills; a longer queue scrolls inside the panel.
 const PANEL_MAX_HEIGHT = 156;
 const PILL_CLASS = "border border-border bg-card shadow-md shadow-black/10";
+// Vertical only: the buttons sit flush against neighbouring controls in the row.
+// Takes the h-7 Resume and h-8 Steer buttons past 44dp.
+const QUEUE_BUTTON_HIT_SLOP = { top: 10, bottom: 10 } as const;
 
 /**
  * The messages the server holds behind the running turn, as glass pills
@@ -49,6 +52,7 @@ export const ThreadQueueControl = memo(function ThreadQueueControl(props: {
                 accessibilityLabel="Resume queue"
                 disabled={queue.busyRunId !== null}
                 onPress={queue.onResume}
+                hitSlop={QUEUE_BUTTON_HIT_SLOP}
                 className="h-7 justify-center rounded-full bg-primary px-3 active:opacity-70 disabled:opacity-40"
               >
                 <Text className="font-t3-medium text-xs text-primary-foreground">Resume</Text>
@@ -171,6 +175,7 @@ const QueuedRunPill = memo(function QueuedRunPill(props: {
               accessibilityLabel={`Steer with message ${props.index + 1} now`}
               disabled={!controls.canSteer}
               onPress={() => onAction(runId, "steer")}
+              hitSlop={QUEUE_BUTTON_HIT_SLOP}
               className="h-8 shrink-0 justify-center rounded-full bg-primary px-3 active:opacity-70 disabled:opacity-40"
             >
               <Text className="font-t3-medium text-xs text-primary-foreground">Steer</Text>

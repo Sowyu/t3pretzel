@@ -302,6 +302,8 @@ export interface ThreadFeedProps {
   readonly onAwayFromEndChange?: (away: boolean) => void;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill>;
   readonly onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
+  /** Android passes true while the keyboard is up: the rail's bottom ticks would sit under it. */
+  readonly hideTimelineRail?: boolean;
   /** Non-null when older turns exist beyond the loaded window. */
   readonly loadEarlier?: {
     readonly loading: boolean;
@@ -416,7 +418,7 @@ function AgentMessageAttribution(props: {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Open sending thread"
-      hitSlop={4}
+      hitSlop={12}
       onPress={() =>
         navigation.navigate("Thread", {
           environmentId: String(props.environmentId),
@@ -2483,8 +2485,10 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       themeAppearance,
       userBubbleColor,
       viewportWidth,
+      skills: props.skills,
     }),
     [
+      props.skills,
       props.worktreeSetup,
       props.setupWorkingStartedAt,
       props.dispatchingMessageId,
@@ -3223,9 +3227,14 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
                 ) : null}
                 {props.loadEarlier != null ? (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      disabled: props.loadEarlier.loading,
+                      busy: props.loadEarlier.loading,
+                    }}
                     onPress={props.loadEarlier.onLoadEarlier}
                     disabled={props.loadEarlier.loading}
-                    className="items-center py-2"
+                    className="min-h-12 items-center justify-center py-2"
                   >
                     <Text className="text-xs text-foreground-secondary">
                       {props.loadEarlier.loading ? "Loading earlier turns…" : "Load earlier turns"}
@@ -3241,14 +3250,16 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             }}
           />
         </View>
-        <ThreadTimelineRail
-          items={railItems}
-          currentIndex={railCurrentIndex}
-          inViewRange={railInViewRange}
-          onSelect={handleRailSelect}
-          topInset={topContentInset}
-          bottomInset={bottomContentInset}
-        />
+        {props.hideTimelineRail === true ? null : (
+          <ThreadTimelineRail
+            items={railItems}
+            currentIndex={railCurrentIndex}
+            inViewRange={railInViewRange}
+            onSelect={handleRailSelect}
+            topInset={topContentInset}
+            bottomInset={bottomContentInset}
+          />
+        )}
         {presentedFeed.length === 0 &&
         !props.worktreeSetup &&
         props.activeWorkStartedAt === null &&

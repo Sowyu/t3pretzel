@@ -23,7 +23,17 @@ export function ThreadContextDivider(props: {
     >
       <View className="h-px min-w-2 flex-1 bg-adaptive-neutral-200-a80-white-a8" />
       <View className="shrink flex-row flex-wrap items-center justify-center gap-1.5">
-        <SymbolView name={props.icon} size={12} tintColor={props.iconColor} type="monochrome" />
+        {props.failed ? (
+          // Matches the label's danger token in both themes.
+          <SymbolView
+            name={props.icon}
+            size={12}
+            tintColorClassName="accent-danger-foreground"
+            type="monochrome"
+          />
+        ) : (
+          <SymbolView name={props.icon} size={12} tintColor={props.iconColor} type="monochrome" />
+        )}
         {props.active ? (
           <ShimmeringWorkContent
             className="flex-none"

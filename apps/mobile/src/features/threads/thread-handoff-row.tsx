@@ -48,12 +48,11 @@ export const ThreadHandoffRow = memo(function ThreadHandoffRow(props: {
   const endpoints = useAtomValue(endpointsAtom);
   const config = useAtomValue(serverEnvironment.configValueAtom(props.environmentId));
   if (item.type !== "handoff" || endpoints === null) return null;
-  const color = item.status === "failed" ? "#e11d48" : props.iconColor;
   return (
     <ThreadContextDivider
       label="Context handoff"
       icon="arrow.left.arrow.right"
-      iconColor={color}
+      iconColor={props.iconColor}
       failed={item.status === "failed"}
     >
       <View className="flex-row flex-wrap items-center justify-center gap-1.5">
@@ -68,7 +67,15 @@ export const ThreadHandoffRow = memo(function ThreadHandoffRow(props: {
           </Fragment>
         ))}
         {endpoints.from.length > 0 ? (
-          <SymbolView name="arrow.right" size={12} tintColor={color} />
+          item.status === "failed" ? (
+            <SymbolView
+              name="arrow.right"
+              size={12}
+              tintColorClassName="accent-danger-foreground"
+            />
+          ) : (
+            <SymbolView name="arrow.right" size={12} tintColor={props.iconColor} />
+          )
         ) : null}
         <HandoffEndpoint {...endpoints.to} providers={config?.providers ?? []} />
       </View>

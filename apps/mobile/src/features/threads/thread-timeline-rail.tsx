@@ -23,6 +23,8 @@ const TICK_HEIGHT = 2;
 // chrome at either end.
 const RAIL_VERTICAL_RESERVE = 288;
 const PREVIEW_WIDTH = 260;
+// Screen reader swipe up/down on the rail steps one message.
+const ADJUSTABLE_ACTIONS = [{ name: "increment" }, { name: "decrement" }] as const;
 
 /**
  * Ticks down the right edge of the thread, one per user message. Tap a tick
@@ -35,7 +37,7 @@ export function ThreadTimelineRail(props: {
   readonly currentIndex: number | null;
   readonly inViewRange: readonly [number, number] | null;
   readonly onSelect: (item: TimelineRailItem) => void;
-  /** Header and composer (plus keyboard) heights over the feed; Android keeps the rail between them. */
+  /** Header and composer heights over the feed; Android keeps the rail between them. The keyboard is not included, so Android hides the rail while it is up. */
   readonly topInset: number;
   readonly bottomInset: number;
 }) {
@@ -125,6 +127,19 @@ export function ThreadTimelineRail(props: {
         <View
           accessibilityLabel="Message timeline"
           accessibilityRole="adjustable"
+          accessibilityValue={
+            props.currentIndex === null
+              ? { text: `${items.length} messages` }
+              : { text: `message ${props.currentIndex + 1} of ${items.length}` }
+          }
+          accessibilityActions={ADJUSTABLE_ACTIONS}
+          onAccessibilityAction={(event) => {
+            const step = event.nativeEvent.actionName === "increment" ? 1 : -1;
+            // Nothing in view yet: the first swipe lands on the first or last message.
+            const from = props.currentIndex ?? (step > 0 ? -1 : items.length);
+            const item = items[from + step];
+            if (item) onSelect(item);
+          }}
           style={{ height: railHeight, width: HIT_WIDTH }}
         >
           {items.map((item, index) => {

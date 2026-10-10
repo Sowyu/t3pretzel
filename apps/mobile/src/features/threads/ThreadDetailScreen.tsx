@@ -1082,6 +1082,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             skills={selectedProviderSkills}
             onUseArtifactTemplate={handleUseArtifactTemplate}
             loadEarlier={props.loadEarlier ?? null}
+            hideTimelineRail={Platform.OS === "android" && isKeyboardAnimationUsable}
           />
         </BlurTargetView>
       ) : (
