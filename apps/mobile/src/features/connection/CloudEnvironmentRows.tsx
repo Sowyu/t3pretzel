@@ -144,7 +144,14 @@ function CloudEnvironmentRowsContent(
               ) : null}
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Refresh T3 Connect environments"
+                accessibilityState={{
+                  busy: controller.relayDiscovery.isRefreshing,
+                  disabled: controller.relayDiscovery.isRefreshing,
+                }}
                 disabled={controller.relayDiscovery.isRefreshing}
+                // 36dp drawn, 48dp touch target.
+                hitSlop={6}
                 onPress={() => {
                   void controller.refreshRelayEnvironments();
                 }}

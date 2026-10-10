@@ -52,12 +52,21 @@ const usageByWindowAtom = Atom.family((windowKey: string) =>
     for (const [environmentId, presentation] of presentations) {
       const result = get(serverEnvironment.usageSummary({ environmentId, input }));
       const summary = Option.getOrNull(AsyncResult.value(result));
+      const isConnected = presentation.connection.phase === "connected";
+      // The query never runs before the environment connects, so one that is
+      // connecting or backing off with nothing saved has nothing to wait for.
+      const unreachable = !isConnected && summary === null;
       statuses.push({
         environmentId,
         label: presentation.entry.target.label,
-        isPending: result.waiting,
-        isConnected: presentation.connection.phase === "connected",
-        error: result._tag === "Failure" ? "This environment could not report usage." : null,
+        isPending: unreachable ? false : result.waiting,
+        isConnected,
+        error:
+          result._tag === "Failure"
+            ? "This environment could not report usage."
+            : unreachable
+              ? "Not connected."
+              : null,
         summary,
         needsCursorKeychainAccess: needsCursorKeychainAccess(
           summary,

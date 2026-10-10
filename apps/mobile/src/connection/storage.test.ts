@@ -94,4 +94,38 @@ describe("mobile connection catalog storage", () => {
       expect(memory.values.has(LEGACY_CONNECTIONS_KEY)).toBe(false);
     }),
   );
+
+  it.effect("a second store over the same storage does not write back a stale copy", () =>
+    Effect.gen(function* () {
+      const memory = makeStorage({
+        [LEGACY_CONNECTIONS_KEY]: JSON.stringify({
+          connections: [
+            {
+              environmentId: "legacy-environment",
+              environmentLabel: "Legacy",
+              pairingUrl: "https://legacy.example.test/pair",
+              displayUrl: "https://legacy.example.test",
+              httpBaseUrl: "https://legacy.example.test",
+              wsBaseUrl: "wss://legacy.example.test",
+              bearerToken: "legacy-token",
+              authenticationMethod: "bearer",
+            },
+          ],
+        }),
+      });
+      const provide = Effect.provideService(
+        MobileSecureStorage.MobileSecureStorage,
+        memory.storage,
+      );
+      const live = yield* make().pipe(provide);
+      const refresh = yield* make().pipe(provide);
+
+      expect((yield* refresh.read).targets).toHaveLength(1);
+      yield* live.update((document) => ({ ...document, targets: [] }));
+      yield* refresh.update((document) => document);
+
+      expect((yield* live.read).targets).toEqual([]);
+      expect(JSON.parse(memory.values.get(CONNECTION_CATALOG_KEY) ?? "{}").targets).toEqual([]);
+    }),
+  );
 });

@@ -6,6 +6,7 @@ import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { useCallback, useMemo } from "react";
 import { Alert } from "react-native";
 
+import { describePairingFailure } from "../features/connection/pairing";
 import { useConnectionController } from "../features/connection/useConnectionController";
 import { environmentPresentations } from "./presentation";
 import { useWorkspaceState } from "../state/workspace";
@@ -29,6 +30,18 @@ const pendingConnectionErrorAtom = Atom.make<string | null>(null).pipe(
 
 export function setPendingConnectionError(message: string | null): void {
   appAtomRegistry.set(pendingConnectionErrorAtom, message);
+}
+
+// Separate from the pending error above, which composer, outbox, git and review
+// code also write, so Add Environment only shows what pairing itself reported.
+const pairingConnectionErrorAtom = Atom.make<string | null>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("mobile:pairing-connection-error"),
+);
+
+/** Add Environment calls this on mount so a previous visit's error is gone. */
+export function clearPairingConnectionError(): void {
+  appAtomRegistry.set(pairingConnectionErrorAtom, null);
 }
 
 const remoteEnvironmentProjections = createRemoteEnvironmentProjectionAtoms({
@@ -114,7 +127,7 @@ export function useRemoteConnections() {
   const controller = useConnectionController();
   const navigation = useNavigation();
   const connectionPairingUrl = useAtomValue(connectionPairingUrlAtom);
-  const pendingConnectionError = useAtomValue(pendingConnectionErrorAtom);
+  const pairingConnectionError = useAtomValue(pairingConnectionErrorAtom);
   const { connectedEnvironments, connectionError, connectionState } = useRemoteConnectionStatus();
 
   const onChangeConnectionPairingUrl = useCallback((pairingUrl: string) => {
@@ -124,12 +137,15 @@ export function useRemoteConnections() {
   const onConnectPress = useCallback(
     async (pairingUrl?: string) => {
       const nextPairingUrl = pairingUrl ?? connectionPairingUrl;
-      setPendingConnectionError(null);
+      clearPairingConnectionError();
       const result = await controller.connectPairingUrl(nextPairingUrl);
       if (AsyncResult.isFailure(result)) {
         const error = Cause.squash(result.cause);
-        const message =
+        const detail =
           error instanceof Error ? error.message : "Failed to pair with the environment.";
+        const friendly = describePairingFailure(error, nextPairingUrl);
+        if (friendly !== null) console.warn("[pairing] could not reach the environment", detail);
+        const message = friendly ?? detail;
         if (
           error !== null &&
           typeof error === "object" &&
@@ -138,7 +154,7 @@ export function useRemoteConnections() {
         ) {
           Alert.alert("Client not supported", message);
         } else {
-          setPendingConnectionError(message);
+          appAtomRegistry.set(pairingConnectionErrorAtom, message);
         }
       } else {
         appAtomRegistry.set(connectionPairingUrlAtom, "");
@@ -210,7 +226,7 @@ export function useRemoteConnections() {
     connectionPairingUrl,
     connectionState,
     connectionError,
-    pairingConnectionError: pendingConnectionError,
+    pairingConnectionError,
     connectedEnvironments,
     connectedEnvironmentCount: connectedEnvironments.length,
     onChangeConnectionPairingUrl,

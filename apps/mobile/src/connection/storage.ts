@@ -37,6 +37,23 @@ function targetPersistenceError(
   });
 }
 
+const targetListeners = new Set<() => void>();
+
+/**
+ * Fires after an environment is added, removed, or switched on or off, so
+ * background refresh can register its task when the first one is paired.
+ */
+export function onConnectionTargetsChanged(listener: () => void): () => void {
+  targetListeners.add(listener);
+  return () => {
+    targetListeners.delete(listener);
+  };
+}
+
+const notifyTargetsChanged = Effect.sync(() => {
+  for (const listener of targetListeners) listener();
+});
+
 export const connectionStorageLayer = Layer.effectContext(
   Effect.gen(function* () {
     const catalog = yield* CatalogStore.make();
@@ -60,15 +77,22 @@ export const connectionStorageLayer = Layer.effectContext(
       register: (registration) =>
         catalog
           .update((document) => registerConnectionInCatalog(document, registration))
-          .pipe(Effect.mapError((error) => targetPersistenceError("register-connection", error))),
+          .pipe(
+            Effect.tap(() => notifyTargetsChanged),
+            Effect.mapError((error) => targetPersistenceError("register-connection", error)),
+          ),
       remove: (target) =>
         catalog
           .update((document) => removeConnectionFromCatalog(document, target))
-          .pipe(Effect.mapError((error) => targetPersistenceError("remove-connection", error))),
+          .pipe(
+            Effect.tap(() => notifyTargetsChanged),
+            Effect.mapError((error) => targetPersistenceError("remove-connection", error)),
+          ),
       setEnabled: (environmentId, enabled) =>
         catalog
           .update((document) => setConnectionEnabledInCatalog(document, environmentId, enabled))
           .pipe(
+            Effect.tap(() => notifyTargetsChanged),
             Effect.mapError((error) => targetPersistenceError("set-connection-enabled", error)),
           ),
     });

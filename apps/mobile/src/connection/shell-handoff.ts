@@ -11,9 +11,12 @@ import type { EnvironmentId, OrchestrationV2ShellSnapshot } from "@t3tools/contr
  * one still in flight, and subscribes from its sequence for just the changes.
  */
 
-// Older than one worker interval plus slack means the worker stopped running;
-// the socket still replays from the cursor, but a fresh fetch is cheaper then.
-const MAX_AGE_MS = 20 * 60_000;
+// A snapshot only replaces the reconnect's own fetch when the reconnect waited
+// for it or it is seconds old. An older one may predate events the live state
+// already applied: a resume that resubscribed on the same session never takes
+// it, and a later new session (Wi-Fi to cellular) would roll the shell back and
+// replay completions, which re-fires "finished" alerts.
+const HANDOFF_WINDOW_MS = 30_000;
 
 const fresh = new Map<EnvironmentId, { snapshot: OrchestrationV2ShellSnapshot; atMs: number }>();
 const pending = new Map<EnvironmentId, Promise<unknown>>();
@@ -27,8 +30,12 @@ export function trackShellFetch<A>(environmentId: EnvironmentId, run: Promise<A>
   return run;
 }
 
-export function offerShell(environmentId: EnvironmentId, snapshot: OrchestrationV2ShellSnapshot) {
-  fresh.set(environmentId, { snapshot, atMs: Date.now() });
+export function offerShell(
+  environmentId: EnvironmentId,
+  snapshot: OrchestrationV2ShellSnapshot,
+  atMs: number = Date.now(),
+) {
+  fresh.set(environmentId, { snapshot, atMs });
 }
 
 /** One use per snapshot: a later reconnect must not rewind to it. */
@@ -36,8 +43,11 @@ export async function takeShell(
   environmentId: EnvironmentId,
   nowMs: () => number = Date.now,
 ): Promise<OrchestrationV2ShellSnapshot | null> {
+  const askedAtMs = nowMs();
   await pending.get(environmentId)?.catch(() => undefined);
   const entry = fresh.get(environmentId);
   fresh.delete(environmentId);
-  return entry && nowMs() - entry.atMs <= MAX_AGE_MS ? entry.snapshot : null;
+  if (entry === undefined) return null;
+  const waitedOn = entry.atMs >= askedAtMs;
+  return waitedOn || nowMs() - entry.atMs <= HANDOFF_WINDOW_MS ? entry.snapshot : null;
 }

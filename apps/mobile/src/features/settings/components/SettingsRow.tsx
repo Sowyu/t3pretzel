@@ -34,10 +34,12 @@ export function SettingsRow(props: {
         type="monochrome"
         weight="regular"
       />
-      <Text className="shrink-0 text-lg text-foreground" numberOfLines={1}>
+      {/* The label gives way first, so a long one ellipsizes instead of
+          pushing the value and chevron off the row. */}
+      <Text className="min-w-0 shrink text-lg text-foreground" numberOfLines={1}>
         {props.label}
       </Text>
-      <View className="min-w-0 flex-1 items-end">
+      <View className="shrink-0 grow items-end">
         {props.value ? (
           <Text
             className="max-w-[180px] text-right text-base text-foreground-muted"

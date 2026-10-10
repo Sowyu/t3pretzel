@@ -347,6 +347,12 @@ export function UsageRouteScreen() {
                     ? "Connect an environment to see usage."
                     : "Select an environment to see usage."}
                 </Text>
+              ) : selectedEnvironments.every(
+                  (environment) => !environment.isConnected && environment.summary === null,
+                ) ? (
+                <Text className="py-16 text-center text-base text-foreground-muted">
+                  Not connected. Usage shows up once an environment connects.
+                </Text>
               ) : (
                 <>
                   {sourceMessages.map((message) => (

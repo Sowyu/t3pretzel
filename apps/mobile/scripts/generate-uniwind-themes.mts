@@ -137,13 +137,26 @@ const ADAPTIVE_COLORS: Readonly<Record<string, readonly [light: string, dark: st
   "--color-adaptive-zinc-600-300": [color("zinc", 600), color("zinc", 300)],
 };
 
+// Fixed palette for custom pages inside Clerk's native user profile. Mirrors
+// clerk-theme.json, which themes the SDK's own screens, so ours match them.
+// Keep in sync with clerk-theme.json. Only the appearance picks the value: a
+// palette theme must not restyle Clerk's chrome, but Uniwind needs every theme
+// to declare the same variables, or the profile page loses these colors.
+const CLERK_COLORS: Readonly<Record<string, readonly [light: string, dark: string]>> = {
+  "--color-clerk-page": ["#f2f2f7", "#0e0e0e"],
+  "--color-clerk-foreground": ["#262626", "#f5f5f5"],
+  "--color-clerk-foreground-muted": ["#737373", "#a3a3a3"],
+  "--color-clerk-border": ["rgba(229, 229, 234, 0.06)", "rgba(42, 42, 42, 0.06)"],
+  "--color-clerk-danger": ["#dc2626", "#fca5a5"],
+};
+
 export const customThemeNames = BUILT_IN_THEME_IDS.flatMap((themeId) =>
   APPEARANCES.map((appearance) => `${themeId}-${appearance}`),
 );
 
 const adaptiveVariablesFor = (appearance: MobileThemeAppearance) =>
   Object.fromEntries(
-    Object.entries(ADAPTIVE_COLORS).map(([name, [light, dark]]) => [
+    Object.entries({ ...ADAPTIVE_COLORS, ...CLERK_COLORS }).map(([name, [light, dark]]) => [
       name,
       appearance === "light" ? light : dark,
     ]),

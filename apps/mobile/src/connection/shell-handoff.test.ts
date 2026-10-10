@@ -18,9 +18,26 @@ describe("shell handoff", () => {
     expect(await takeShell(environmentId)).toBeNull();
   });
 
-  it("ignores a snapshot older than a worker interval", async () => {
+  it("drops a snapshot nobody waited on once it is more than seconds old", async () => {
     const environmentId = EnvironmentId.make("env-b");
-    offerShell(environmentId, snapshot);
-    expect(await takeShell(environmentId, () => Date.now() + 21 * 60_000)).toBeNull();
+    offerShell(environmentId, snapshot, Date.now() - 31_000);
+    expect(await takeShell(environmentId)).toBeNull();
+  });
+
+  it("still hands over a snapshot offered seconds ago", async () => {
+    const environmentId = EnvironmentId.make("env-c");
+    offerShell(environmentId, snapshot, Date.now() - 5_000);
+    expect(await takeShell(environmentId)).toBe(snapshot);
+  });
+
+  it("does not hand a stale snapshot to a reconnect whose own wait came back empty", async () => {
+    const environmentId = EnvironmentId.make("env-d");
+    // Offered by a resume refresh, then the resume resubscribed and never took it.
+    offerShell(environmentId, snapshot, Date.now() - 10 * 60_000);
+    let finish = () => {};
+    void trackShellFetch(environmentId, new Promise<void>((resolve) => (finish = resolve)));
+    const taken = takeShell(environmentId);
+    finish();
+    expect(await taken).toBeNull();
   });
 });

@@ -14,7 +14,10 @@ import { ErrorBanner } from "../../components/ErrorBanner";
 import { ConnectionFormField } from "./ConnectionFormField";
 import { ConnectionSheetButton } from "./ConnectionSheetButton";
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
-import { useRemoteConnections } from "../../state/use-remote-environment-registry";
+import {
+  clearPairingConnectionError,
+  useRemoteConnections,
+} from "../../state/use-remote-environment-registry";
 
 type ConnectionsNewRouteParams = {
   readonly mode?: string;
@@ -52,6 +55,9 @@ export function ConnectionsNewRouteScreen({
   const headerIconColor = useUniwindTheme()["--color-icon"];
 
   const connectDisabled = isSubmitting || hostInput.trim().length === 0;
+
+  // A failure from an earlier visit is not news on a fresh form.
+  useEffect(clearPairingConnectionError, []);
 
   useEffect(() => {
     const { host, code } = parsePairingUrl(connectionPairingUrl);
@@ -271,7 +277,7 @@ export function ConnectionsNewRouteScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
-                placeholder="192.168.1.100:8080"
+                placeholder="192.168.1.100:3773"
                 value={hostInput}
                 onChangeText={handleHostChange}
               />

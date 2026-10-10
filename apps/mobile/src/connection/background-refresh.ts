@@ -50,7 +50,7 @@ import {
   mobileRelayDeviceIdentity,
 } from "./platform";
 import { offerShell, trackShellFetch } from "./shell-handoff";
-import { connectionStorageLayer } from "./storage";
+import { connectionStorageLayer, onConnectionTargetsChanged } from "./storage";
 
 const BACKGROUND_REFRESH_TASK = "t3code.connection.background-refresh";
 
@@ -62,11 +62,9 @@ const LAST_RUN_KEY = "t3code.background-refresh.last-run";
  * supervisor, its socket, and its retry ladder are deliberately absent: a
  * wakeup is too short for them and the snapshot endpoint is the whole payload.
  *
- * ponytail: this builds its own connection catalog store, so a relay token
- * minted here and a catalog write made by a live foreground session can
- * overwrite each other. Android only runs the worker while the app is
- * backgrounded and a lost token is re-minted on the next use, so the window is
- * small and self-healing. Share one catalog store if either stops being true.
+ * The catalog store built here shares its cache and lock with the live
+ * connection's (see catalog-store.ts), so a run never writes back a catalog
+ * the user changed while it was in flight.
  */
 function backgroundRefreshLayer(readSession: () => ManagedRelaySession | null) {
   const capabilitiesLayer = Layer.effectContext(
@@ -620,6 +618,11 @@ function refreshOnResume(): void {
 export async function startBackgroundRefresh(): Promise<void> {
   void loadRecordOnce();
   refreshOnResume();
+  // Pairing the first environment mid-session has to register the task, and
+  // removing the last one has to drop it, without waiting for a relaunch.
+  onConnectionTargetsChanged(() => {
+    void reconcileBackgroundRefreshRegistration(enabledPreference);
+  });
   const preferences = await Runtime.runtime
     .runPromise(
       MobilePreferences.MobilePreferencesStore.pipe(

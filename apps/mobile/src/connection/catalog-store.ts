@@ -5,8 +5,6 @@ import {
 } from "@t3tools/client-runtime/platform";
 import { ConnectionTransientError } from "@t3tools/client-runtime/connection";
 import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 
@@ -48,16 +46,32 @@ interface CatalogStore {
   ) => Effect.Effect<void, ConnectionTransientError>;
 }
 
+/**
+ * Every store over the same secure storage shares one cached document and one
+ * lock. The live connection, the foreground resume refresh, and the background
+ * worker each build their own store, and with separate caches one of them
+ * wrote its stale copy back over an environment the user had just removed.
+ */
+const sharedByStorage = new WeakMap<
+  MobileSecureStorage.MobileSecureStorage["Service"],
+  { cached: ConnectionCatalogDocumentType | null; readonly lock: Semaphore.Semaphore }
+>();
+
 export const make = Effect.fn("mobile.connectionStorage.makeCatalogStore")(function* () {
   const storage = yield* MobileSecureStorage.MobileSecureStorage;
+  let shared = sharedByStorage.get(storage);
+  if (shared === undefined) {
+    shared = { cached: null, lock: Semaphore.makeUnsafe(1) };
+    sharedByStorage.set(storage, shared);
+  }
+  const state = shared;
   const getItem = (key: string) =>
     storage.getItem(key).pipe(Effect.mapError((cause) => catalogError("load", cause)));
   const setItem = (key: string, value: string) =>
     storage.setItem(key, value).pipe(Effect.mapError((cause) => catalogError("save", cause)));
   const deleteItem = (key: string) =>
     storage.removeItem(key).pipe(Effect.mapError((cause) => catalogError("delete", cause)));
-  const state = yield* Ref.make<Option.Option<ConnectionCatalogDocumentType>>(Option.none());
-  const lock = yield* Semaphore.make(1);
+  const lock = state.lock;
 
   const loadLegacyCatalog = Effect.fn("mobile.connectionStorage.loadLegacyCatalog")(function* () {
     const legacyRaw = yield* getItem(LEGACY_CONNECTIONS_KEY);
@@ -81,9 +95,8 @@ export const make = Effect.fn("mobile.connectionStorage.makeCatalogStore")(funct
   });
 
   const loadUnlocked = Effect.fn("mobile.connectionStorage.loadCatalog")(function* () {
-    const cached = yield* Ref.get(state);
-    if (Option.isSome(cached)) {
-      return cached.value;
+    if (state.cached !== null) {
+      return state.cached;
     }
     const raw = yield* getItem(CONNECTION_CATALOG_KEY);
     let catalog: ConnectionCatalogDocumentType;
@@ -99,7 +112,7 @@ export const make = Effect.fn("mobile.connectionStorage.makeCatalogStore")(funct
     } else {
       catalog = yield* loadLegacyCatalog();
     }
-    yield* Ref.set(state, Option.some(catalog));
+    state.cached = catalog;
     return catalog;
   });
 
@@ -111,7 +124,7 @@ export const make = Effect.fn("mobile.connectionStorage.makeCatalogStore")(funct
           const next = transform(yield* loadUnlocked());
           const encoded = yield* encodeCatalog(next);
           yield* setItem(CONNECTION_CATALOG_KEY, encoded);
-          yield* Ref.set(state, Option.some(next));
+          state.cached = next;
         }),
       );
     },
