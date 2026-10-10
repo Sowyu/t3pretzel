@@ -8,6 +8,7 @@ import {
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 
 import { useCheckpointDiff } from "../../state/queries";
+import { resolveReviewSectionError } from "./reviewAvailability";
 import { useEnvironmentQuery } from "../../state/query";
 import { reviewEnvironment } from "../../state/review";
 import { useSelectedThreadProjection } from "../../state/use-thread-detail";
@@ -154,6 +155,15 @@ export function useReviewSections(input: {
     setReviewAsyncError(reviewCache.threadKey, null);
   }, [activeSectionId, activeTurnDiff.data, reviewCache.threadKey]);
 
+  // The sticky turn error belongs to the section that failed. Declared before the effect
+  // that sets it so a cached failure for the newly selected turn still wins.
+  const selectedSectionId = selectedSection?.id ?? null;
+  useEffect(() => {
+    if (reviewCache.threadKey) {
+      setReviewAsyncError(reviewCache.threadKey, null);
+    }
+  }, [reviewCache.threadKey, selectedSectionId]);
+
   useEffect(() => {
     if (reviewCache.threadKey && activeTurnDiff.error) {
       setReviewAsyncError(reviewCache.threadKey, activeTurnDiff.error);
@@ -181,7 +191,12 @@ export function useReviewSections(input: {
   );
 
   return {
-    error: diffPreview.error ?? activeTurnDiff.error ?? reviewCache.asyncState.error,
+    error: resolveReviewSectionError({
+      selectedKind: selectedSection?.kind ?? null,
+      diffPreviewError: diffPreview.error,
+      turnDiffError: activeTurnDiff.error,
+      stickyTurnError: reviewCache.asyncState.error,
+    }),
     isSelectedSectionPending:
       selectedSection?.kind === "turn" ? activeTurnDiff.isPending : diffPreview.isPending,
     loadingGitDiffs: diffPreview.isPending,

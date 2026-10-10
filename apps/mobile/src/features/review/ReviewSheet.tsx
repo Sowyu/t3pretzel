@@ -137,6 +137,8 @@ function ReviewSelectionActionBar(props: {
       )}
 
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Clear selection"
         className="h-12 w-12 items-center justify-center rounded-full bg-primary"
         onPress={props.onClear}
       >

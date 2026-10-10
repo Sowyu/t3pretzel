@@ -183,8 +183,10 @@ export function ThreadFileNavigatorPane(props: {
           />
           {searchQuery.length > 0 ? (
             <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Clear search"
-              hitSlop={10}
+              // 15dp glyph + 2 x 17 slop clears the 48dp touch target.
+              hitSlop={17}
               onPress={() => setSearchQuery("")}
             >
               <SymbolView

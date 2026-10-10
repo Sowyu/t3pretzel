@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { resolveReviewAvailability } from "./reviewAvailability";
+import { resolveReviewAvailability, resolveReviewSectionError } from "./reviewAvailability";
 
 describe("resolveReviewAvailability", () => {
   it("keeps section navigation available when another section is cached offline", () => {
@@ -43,5 +43,25 @@ describe("resolveReviewAvailability", () => {
       showConnectionNotice: false,
       showSectionToolbar: true,
     });
+  });
+});
+
+describe("resolveReviewSectionError", () => {
+  it("ignores a failed latest-turn diff while a git section is open", () => {
+    const errors = {
+      diffPreviewError: null,
+      turnDiffError: "turn failed",
+      stickyTurnError: "turn failed",
+    };
+    expect(resolveReviewSectionError({ ...errors, selectedKind: "working-tree" })).toBeNull();
+    expect(resolveReviewSectionError({ ...errors, selectedKind: "turn" })).toBe("turn failed");
+    expect(
+      resolveReviewSectionError({
+        selectedKind: "turn",
+        diffPreviewError: "git failed",
+        turnDiffError: null,
+        stickyTurnError: null,
+      }),
+    ).toBeNull();
   });
 });

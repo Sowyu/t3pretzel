@@ -522,8 +522,10 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
               />
               {searchQuery.length > 0 ? (
                 <Pressable
+                  accessibilityRole="button"
                   accessibilityLabel="Clear search"
-                  hitSlop={10}
+                  // 17dp glyph + 2 x 16 slop clears the 48dp touch target.
+                  hitSlop={16}
                   onPress={() => setSearchQuery("")}
                 >
                   <SymbolView
@@ -862,8 +864,21 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
             },
           } as const)
         : null,
+      // The Android native code canvas has no pull-to-refresh, so the menu is the only way to
+      // reload a file that changed on disk.
+      needsFileContents
+        ? ({
+            id: "refresh-contents",
+            title: "Refresh",
+            icon: "arrow.clockwise",
+            inline: false,
+            onPress: () => fileQuery.refresh(),
+          } as const)
+        : null,
     ].filter((action) => action !== null);
   }, [
+    needsFileContents,
+    fileQuery.refresh,
     appearance.codeWordBreak,
     setCodeWordBreak,
     assetPreviewUri,

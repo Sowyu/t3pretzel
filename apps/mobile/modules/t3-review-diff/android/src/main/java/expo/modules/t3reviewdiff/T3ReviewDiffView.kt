@@ -218,12 +218,15 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
           val deltaY = event.y - lastTouchY
           if (max(abs(deltaX), abs(deltaY)) > touchSlop) {
             dragAxis = if (abs(deltaY) >= abs(deltaX)) {
-              DragAxis.VERTICAL
+              // A diff shorter than its frame, like a review comment card, can't scroll.
+              // Leave the drag to the parent feed instead of swallowing it.
+              DragAxis.VERTICAL.takeIf { canvasView.maxVerticalOffset() > 0 }
             } else {
               horizontalDragTarget
                 ?.takeIf { canvasView.maxHorizontalOffset(it) > 0 }
                 ?.let { DragAxis.HORIZONTAL }
             }
+            if (dragAxis == null) parent?.requestDisallowInterceptTouchEvent(false)
           }
         }
         return dragAxis != null

@@ -259,6 +259,29 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
     return () => cancelAnimationFrame(frame);
   }, [props.path, targetIndex]);
 
+  // With word wrap on there is no getItemLayout, so a far target throws until its row is
+  // measured. Jump near it by the average measured height, then retry a few frames later.
+  const scrollRetriesRef = useRef(0);
+  useEffect(() => {
+    scrollRetriesRef.current = 0;
+  }, [props.path, targetIndex]);
+  const handleScrollToIndexFailed = useCallback(
+    (info: { index: number; averageItemLength: number }) => {
+      listRef.current?.scrollToOffset({
+        offset: info.averageItemLength * info.index,
+        animated: false,
+      });
+      if (scrollRetriesRef.current >= 5) {
+        return;
+      }
+      scrollRetriesRef.current += 1;
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 0.3 });
+      });
+    },
+    [],
+  );
+
   const renderLine = useCallback(
     ({ item, index }: { item: string; index: number }) => (
       <HighlightedSourceLine
@@ -331,6 +354,7 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
       initialNumToRender={80}
       maxToRenderPerBatch={80}
       windowSize={12}
+      onScrollToIndexFailed={handleScrollToIndexFailed}
       {...(codeWordBreak
         ? {}
         : {

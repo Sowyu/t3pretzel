@@ -55,16 +55,14 @@ const FileTreeRow = memo(function FileTreeRow(props: {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={node.path}
-      onPressIn={() => {
-        if (node.kind === "file") {
-          props.onPreviewFile?.(node.path);
-        }
-      }}
       onPress={() => {
         if (node.kind === "directory") {
           props.onPressDirectory(node.path);
           return;
         }
+        // Not onPressIn: that fires for every row a scroll starts on. Starting the read here
+        // still overlaps it with the navigation transition.
+        props.onPreviewFile?.(node.path);
         props.onPressFile(node.path);
       }}
       className={cn(

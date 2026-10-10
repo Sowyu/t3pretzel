@@ -11,6 +11,7 @@ import {
 import { Platform, RefreshControl, ScrollView, Text as NativeText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { useFontFamily } from "../../lib/useFontFamily";
 import {
@@ -201,6 +202,7 @@ export function FileMarkdownPreview(props: {
   readonly onRefresh?: () => Promise<void> | void;
 }) {
   const insets = useSafeAreaInsets();
+  const [imagePreview, setImagePreview] = useState<FilePreviewSource | null>(null);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const handlePullToRefresh = useCallback(async () => {
     if (!props.onRefresh) {
@@ -241,7 +243,7 @@ export function FileMarkdownPreview(props: {
           resource={media.resource}
           alt={image.alt}
           srcFragment={media.srcFragment}
-          onPressPreview={() => undefined}
+          onPressPreview={setImagePreview}
         />
       );
     },
@@ -253,41 +255,44 @@ export function FileMarkdownPreview(props: {
   }, []);
 
   return (
-    <ScrollView
-      className="flex-1 bg-sheet"
-      contentContainerStyle={{
-        padding: 18,
-        // Android draws under the nav bar, so the end of the document needs the bottom inset.
-        paddingBottom: Platform.OS === "android" ? Math.max(insets.bottom, 8) + 18 : 18,
-      }}
-      refreshControl={
-        props.onRefresh ? (
-          <RefreshControl
-            refreshing={isPullRefreshing}
-            onRefresh={() => void handlePullToRefresh()}
-          />
-        ) : undefined
-      }
-    >
-      <View className="mx-auto w-full max-w-[760px]">
-        {hasNativeSelectableMarkdownText() ? (
-          <SelectableMarkdownText
-            markdown={props.markdown}
-            onLinkPress={onLinkPress}
-            renderImage={renderImage}
-            textStyle={styles.nativeTextStyle}
-          />
-        ) : (
-          <Markdown
-            options={{ gfm: true }}
-            renderers={styles.renderers}
-            styles={styles.styles}
-            theme={styles.theme}
-          >
-            {props.markdown}
-          </Markdown>
-        )}
-      </View>
-    </ScrollView>
+    <>
+      <ScrollView
+        className="flex-1 bg-sheet"
+        contentContainerStyle={{
+          padding: 18,
+          // Android draws under the nav bar, so the end of the document needs the bottom inset.
+          paddingBottom: Platform.OS === "android" ? Math.max(insets.bottom, 8) + 18 : 18,
+        }}
+        refreshControl={
+          props.onRefresh ? (
+            <RefreshControl
+              refreshing={isPullRefreshing}
+              onRefresh={() => void handlePullToRefresh()}
+            />
+          ) : undefined
+        }
+      >
+        <View className="mx-auto w-full max-w-[760px]">
+          {hasNativeSelectableMarkdownText() ? (
+            <SelectableMarkdownText
+              markdown={props.markdown}
+              onLinkPress={onLinkPress}
+              renderImage={renderImage}
+              textStyle={styles.nativeTextStyle}
+            />
+          ) : (
+            <Markdown
+              options={{ gfm: true }}
+              renderers={styles.renderers}
+              styles={styles.styles}
+              theme={styles.theme}
+            >
+              {props.markdown}
+            </Markdown>
+          )}
+        </View>
+      </ScrollView>
+      <FilePreviewModal source={imagePreview} onRequestClose={() => setImagePreview(null)} />
+    </>
   );
 }
