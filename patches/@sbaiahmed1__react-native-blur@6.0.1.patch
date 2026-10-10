@@ -381,7 +381,7 @@ index df28970916f61e522b3a740deda8af498ea2f397..72a3253bba53cbd1e863751582cf939e
    override fun setReducedTransparencyFallbackColor(view: ReactNativeLiquidGlassView?, reducedTransparencyFallbackColor: String?) {
      // no-op
 diff --git a/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt b/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
-index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e4f1f8e9e 100644
+index c15ec61def88ce869f8aea3a774edae52ad4df35..3cbcca89d920f97cc2db74807552fc99b184c20b 100644
 --- a/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
 +++ b/android/src/main/java/com/sbaiahmed1/reactnativeblur/SharedBackdropCapture.kt
 @@ -2,8 +2,9 @@ package com.sbaiahmed1.reactnativeblur
@@ -485,7 +485,7 @@ index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e
      val entry = entries[source] ?: return null
      if (source.width <= 0 || source.height <= 0) return null
  
-@@ -72,39 +104,69 @@ internal object SharedBackdropCapture {
+@@ -72,39 +111,69 @@ internal object SharedBackdropCapture {
        bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
        entry.bitmap = bitmap
        entry.canvas = Canvas(bitmap)
@@ -571,7 +571,7 @@ index c15ec61def88ce869f8aea3a774edae52ad4df35..539a313ba5e81e3dfa3ab5d92707fa5e
     * to skip re-recording when neither the bitmap nor their sub-rect moved. */
    fun generationOf(source: View): Long = entries[source]?.generation ?: 0L
 diff --git a/android/src/main/res/raw/rnblur_liquidglass_effect.agsl b/android/src/main/res/raw/rnblur_liquidglass_effect.agsl
-index cce751fc18a2f6ca174249060971c267f90ec122..fa2ff1eb73e3d7678401e0c61942f6558315592d 100644
+index cce751fc18a2f6ca174249060971c267f90ec122..66c16139a993c54293d18c47dfa9e5e33fe41431 100644
 --- a/android/src/main/res/raw/rnblur_liquidglass_effect.agsl
 +++ b/android/src/main/res/raw/rnblur_liquidglass_effect.agsl
 @@ -49,6 +49,17 @@ uniform float chromaMultiplier;
@@ -592,7 +592,7 @@ index cce751fc18a2f6ca174249060971c267f90ec122..fa2ff1eb73e3d7678401e0c61942f655
  const half3 rgbToY = half3(0.2126, 0.7152, 0.0722);
  
  float radiusAt(float2 coord, float4 radii) {
-@@ -99,6 +110,24 @@ float2 gradSdRoundedRect(float2 coord, float2 halfSize, float radius) {
+@@ -99,6 +110,30 @@ float2 gradSdRoundedRect(float2 coord, float2 halfSize, float radius) {
      }
  }
  
@@ -611,13 +611,19 @@ index cce751fc18a2f6ca174249060971c267f90ec122..fa2ff1eb73e3d7678401e0c61942f655
 +    float2 capHalf = capRect.zw * 0.5;
 +    float2 capCoord = p - (capRect.xy + capHalf);
 +    float sdCap = sdRoundedRect(capCoord, capHalf, min(capRadius, min(capHalf.x, capHalf.y)));
-+    return smoothMin(sdBody, sdCap, max(joinSmooth, 0.001));
++    float sdUnion = smoothMin(sdBody, sdCap, max(joinSmooth, 0.001));
++    // Where the cap and body share an edge (a tab flush with the side), the
++    // blend bulges past the view and the rim is clipped with it. Clamping to
++    // the view keeps that edge, and its rim, inside.
++    float2 boxDist = abs(p - size * 0.5) - size * 0.5;
++    float sdView = length(max(boxDist, 0.0)) + min(max(boxDist.x, boxDist.y), 0.0);
++    return max(sdUnion, sdView);
 +}
 +
  float circleMap(float x) {
      return 1.0 - sqrt(1.0 - x * x);
  }
-@@ -115,8 +144,16 @@ half4 main(float2 coord) {
+@@ -115,8 +150,16 @@ half4 main(float2 coord) {
      float2 halfSize = size * 0.5;
      float2 centeredCoord = (coord + offset) - halfSize;
      float radius = radiusAt(centeredCoord, cornerRadii);
@@ -636,7 +642,7 @@ index cce751fc18a2f6ca174249060971c267f90ec122..fa2ff1eb73e3d7678401e0c61942f655
      if (-sd >= refractionHeight) {
          half4 baseColor = content.eval(coord);
  
-@@ -134,8 +171,22 @@ half4 main(float2 coord) {
+@@ -134,8 +177,22 @@ half4 main(float2 coord) {
      float smoothRadius = max(radius * 1.5, 30.0);
      float gradRadius = min(smoothRadius, min(halfSize.x, halfSize.y));
  
@@ -661,7 +667,7 @@ index cce751fc18a2f6ca174249060971c267f90ec122..fa2ff1eb73e3d7678401e0c61942f655
      float2 grad = safeNormalize(shapeGrad + depthEffect * depthGrad, shapeGrad);
  
      float2 refractedCoord = coord + d * grad;
-@@ -182,5 +233,11 @@ half4 main(float2 coord) {
+@@ -182,5 +239,11 @@ half4 main(float2 coord) {
      color.rgb = (color.rgb - 0.5) * (1.0 + contrast) + 0.5;
  
      half3 tintedRGB = mix(color.rgb, tintColor, tintAlpha);

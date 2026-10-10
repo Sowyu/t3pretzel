@@ -341,8 +341,9 @@ export function ComposerSurface(props: {
   }, []);
   const crownCap = props.crown ? props.crownCap : null;
   // The cap's corners match the body's, capped at a half-height pill. It
-  // reaches that far into the body so its own bottom corners vanish inside
-  // the union; only its top corners and the smooth join show.
+  // reaches past the body's own corner so its bottom corners vanish inside
+  // the union, and a tab flush with the side runs straight down into it;
+  // only its top corners and the smooth join show.
   const capRadius = crownCap ? Math.min(targetBorderRadius, crownCap.height / 2) : 0;
   const glassShape: GlassShape | null =
     crownCap && crownHeight > 0
@@ -352,7 +353,7 @@ export function ComposerSurface(props: {
             x: crownCap.x,
             y: crownCap.y,
             width: crownCap.width,
-            height: crownCap.height + capRadius,
+            height: crownCap.height + targetBorderRadius + capRadius,
             radius: capRadius,
           },
         }
