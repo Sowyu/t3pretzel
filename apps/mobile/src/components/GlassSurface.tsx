@@ -141,7 +141,13 @@ export function GlassSurface({
         {...props}
         ref={ref}
         className={glassShape ? cn("border-0 border-transparent", className) : borderClassName}
-        style={[surfaceStyle, layoutOf(flattened)]}
+        // With a cap the shader masks the union; a rounded clip here would
+        // round the cap's corner at the view's edge and cut its rim off.
+        style={[
+          surfaceStyle,
+          layoutOf(flattened),
+          glassShape ? { overflow: "visible", borderRadius: 0 } : null,
+        ]}
       >
         <LiquidGlassView
           glassType="regular"
