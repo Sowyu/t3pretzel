@@ -4,6 +4,7 @@ import {
   Image,
   type LayoutChangeEvent,
   type LayoutRectangle,
+  Platform,
   Pressable,
   ScrollView,
   View,
@@ -262,7 +263,12 @@ export function ComposerStashPanel(props: {
   // the tab is a plain view: the surface shapes the material around it.
   return (
     <View className={listOpen ? "items-stretch" : "items-end"}>
-      <View onLayout={props.onTabLayout}>
+      {/* Android: inset past the composer's corner so the tab joins the flat
+          top edge on both sides, with the same curve and rim on each. */}
+      <View
+        onLayout={props.onTabLayout}
+        style={Platform.OS === "android" && !listOpen ? { marginRight: 36 } : undefined}
+      >
         <Pressable
           accessibilityLabel={listOpen ? "Close stash" : `Open stash, ${entries.length} saved`}
           accessibilityRole="button"
