@@ -378,10 +378,9 @@ function useEnvironmentOptions(): ReadonlyArray<EnvironmentOption> {
         supportsCloneTracking: config?.environment.capabilities.projectCloneTracking === true,
       };
     });
-    return Arr.sort(
-      options.filter((environment) => canCreateProjectInEnvironment(environment.connectionState)),
-      environmentOptionOrder,
-    );
+    // Disconnected environments stay listed; the picker shows them disabled
+    // with their connection status.
+    return Arr.sort(options, environmentOptionOrder);
   }, [connectedEnvironments, savedConnectionsById, serverConfigByEnvironmentId]);
 }
 
@@ -891,7 +890,8 @@ export function AddProjectNewScreen(props: { readonly environmentId?: string | s
   const navigation = useNavigation();
   // Starts on the machine picked in Add project; the rows below switch it.
   const environmentOptions = useEnvironmentOptions().filter(
-    (option) => option.newProjectsRoot !== null,
+    (option) =>
+      option.newProjectsRoot !== null && canCreateProjectInEnvironment(option.connectionState),
   );
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState(
     () => stringParam(props.environmentId) as EnvironmentId | null,

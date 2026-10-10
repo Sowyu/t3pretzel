@@ -39,7 +39,7 @@ import {
 } from "./showcaseRenderSignal";
 import { stageShowcaseAgentActivity } from "./stageShowcaseAgentActivity";
 
-const SHOWCASE_ENABLED = process.env.EXPO_PUBLIC_SHOWCASE === "1";
+export const SHOWCASE_ENABLED = process.env.EXPO_PUBLIC_SHOWCASE === "1";
 const SHOWCASE_THREAD_ID = "remote-command-center";
 
 type ShowcaseResetRoute = PartialState<NavigationState>["routes"][number];

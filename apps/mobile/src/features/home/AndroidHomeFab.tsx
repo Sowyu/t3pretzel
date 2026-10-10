@@ -6,13 +6,15 @@ import { SymbolView } from "../../components/AppSymbol";
 
 /**
  * Android-only wrapper that overlays a bottom-right new-task FAB on a thread
- * list. Other platforms render children unchanged.
+ * list. Other platforms render children unchanged. `hidden` drops the FAB
+ * when there is nowhere to start a task (no saved environments).
  */
 export function AndroidHomeFabLayout(props: {
   readonly onStartNewTask: () => void;
+  readonly hidden?: boolean;
   readonly children: ReactNode;
 }) {
-  if (Platform.OS !== "android") {
+  if (Platform.OS !== "android" || props.hidden) {
     return <>{props.children}</>;
   }
 

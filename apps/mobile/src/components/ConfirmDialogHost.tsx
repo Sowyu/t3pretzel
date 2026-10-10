@@ -112,7 +112,7 @@ export function ConfirmDialogHost() {
               <View className="overflow-hidden rounded-full">
                 <Pressable
                   accessibilityRole="button"
-                  className="min-h-10 items-center justify-center px-4 active:bg-subtle"
+                  className="min-h-12 items-center justify-center px-4 active:bg-subtle"
                   onPress={handleCancel}
                 >
                   <AppText className="text-base font-t3-medium">
@@ -124,7 +124,7 @@ export function ConfirmDialogHost() {
                 <Pressable
                   accessibilityRole="button"
                   disabled={confirmDisabled}
-                  className="min-h-10 items-center justify-center px-4 active:bg-subtle"
+                  className="min-h-12 items-center justify-center px-4 active:bg-subtle"
                   onPress={handleConfirm}
                 >
                   <AppText

@@ -231,7 +231,9 @@ function deriveEmptyState(props: {
 
   return {
     title: "No threads yet",
-    detail: "Create a task to start a new coding session in one of your connected projects.",
+    detail: catalogState.hasReadyEnvironment
+      ? "Create a task to start a new coding session in one of your connected projects."
+      : "Connect an environment to start a coding session.",
     loading: false,
   };
 }
@@ -1125,6 +1127,10 @@ export function HomeScreen(props: HomeScreenProps) {
     projectCount: props.projects.length,
   });
 
+  // Saved environments that are still loading or connecting are not missing.
+  const canAddFirstEnvironment =
+    !props.catalogState.isLoadingConnections && !props.catalogState.hasConnections;
+
   if (!hasAnyThreads) {
     return (
       <View className="flex-1 bg-screen">
@@ -1139,8 +1145,8 @@ export function HomeScreen(props: HomeScreenProps) {
             <EmptyState
               title={emptyState.title}
               detail={emptyState.detail}
-              actionLabel={!props.catalogState.hasReadyEnvironment ? "Add environment" : undefined}
-              onAction={!props.catalogState.hasReadyEnvironment ? props.onAddConnection : undefined}
+              actionLabel={canAddFirstEnvironment ? "Add environment" : undefined}
+              onAction={canAddFirstEnvironment ? props.onAddConnection : undefined}
               variant="plain"
             />
             {emptyState.loading ? (
@@ -1174,7 +1180,14 @@ export function HomeScreen(props: HomeScreenProps) {
         detail="Choose another environment or create a new task."
       />
     ) : (
-      <EmptyState title="No threads yet" detail="Create a task to start a new coding session." />
+      <EmptyState
+        title="No threads yet"
+        detail={
+          props.catalogState.hasConnections
+            ? "Create a task to start a new coding session."
+            : "Add an environment to start a coding session."
+        }
+      />
     )
   ) : null;
   // Use the v2 project scope for its empty state. Snoozed threads need no

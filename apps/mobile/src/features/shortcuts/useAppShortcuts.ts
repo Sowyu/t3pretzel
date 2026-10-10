@@ -17,17 +17,10 @@ import {
 } from "./appShortcuts";
 
 /**
- * Owns the launcher app shortcuts (Android long-press menu): keeps the
- * static "New task" entry plus the recently opened threads in sync, and
- * routes shortcut taps — cold start included — to their in-app screens.
- * Mounted once in the root stack layout.
+ * Routes launcher app shortcut taps (Android long-press menu), cold start
+ * included, to their in-app screens. Mounted once in the root stack layout.
  */
-export function useAppShortcuts(state: NavigationState): void {
-  useShortcutNavigation();
-  useRecentThreadShortcutSync(state);
-}
-
-function useShortcutNavigation(): void {
+export function useAppShortcuts(): void {
   const linkTo = useLinkTo();
   const handledInitialAction = useRef(false);
 
@@ -53,11 +46,18 @@ function useShortcutNavigation(): void {
   }, [linkTo]);
 }
 
+/**
+ * Keeps the launcher's static "New task" entry plus the recently opened
+ * threads in sync. Android-only. A null-rendering leaf: it subscribes to the
+ * open thread's shell, and hosting that in the root stack layout would
+ * re-render every screen on each title/status/session change.
+ */
+export function RecentThreadShortcutSync(props: { readonly state: NavigationState }) {
+  useRecentThreadShortcutSync(props.state);
+  return null;
+}
+
 function useRecentThreadShortcutSync(state: NavigationState): void {
-  // Launcher shortcuts are Android-only. A null ref on iOS keeps this hook
-  // (mounted in the root stack layout) from subscribing the root to the
-  // active thread's shell, which would re-render every screen on each
-  // title/status/session change.
   const threadRef = useMemo(
     () => (Platform.OS === "android" ? activeThreadRef(state) : null),
     [state],

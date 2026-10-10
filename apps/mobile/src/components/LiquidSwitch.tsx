@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -12,6 +12,7 @@ import { useAppearancePreferences } from "../features/settings/appearance/Appear
 import { selectionHaptic } from "../lib/haptics";
 import { useUniwindTheme } from "../lib/useUniwindTheme";
 import { GlassSurface, supportsLiquidGlass } from "./GlassSurface";
+import { panReleaseValue } from "./liquidSwitchRelease";
 
 // Apple's UISwitch geometry.
 const TRACK_WIDTH = 51;
@@ -53,6 +54,9 @@ export function LiquidSwitch(props: {
   const progress = useSharedValue(value ? 1 : 0);
   const stretch = useSharedValue(0);
   const dragStart = useSharedValue(0);
+  // onBegin/onFinalize also run for a plain tap the pan never claims; the
+  // Pressable commits that tap, so the pan must only commit real drags.
+  const dragActivated = useRef(false);
 
   useEffect(() => {
     progress.value = withSpring(value ? 1 : 0, SNAP_SPRING);
@@ -68,16 +72,25 @@ export function LiquidSwitch(props: {
     .runOnJS(true)
     .minDistance(6)
     .onBegin(() => {
+      dragActivated.current = false;
       dragStart.value = progress.value;
       stretch.value = withSpring(1, STRETCH_SPRING);
+    })
+    .onStart(() => {
+      dragActivated.current = true;
     })
     .onUpdate((event) => {
       progress.value = Math.max(0, Math.min(1, dragStart.value + event.translationX / TRAVEL));
     })
     .onFinalize((_event, success) => {
       stretch.value = withSpring(0, STRETCH_SPRING);
-      // A drag lands on the nearer side; a cancelled touch springs back.
-      commit(success ? progress.value >= 0.5 : value);
+      const next = panReleaseValue({
+        activated: dragActivated.current,
+        success,
+        progress: progress.value,
+        value,
+      });
+      if (next !== null) commit(next);
     });
 
   const trackStyle = useAnimatedStyle(() => ({

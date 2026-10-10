@@ -159,6 +159,7 @@ export function HomeRouteScreen() {
 
   return (
     <AndroidHomeFabLayout
+      hidden={!catalogState.isLoadingConnections && !catalogState.hasConnections}
       onStartNewTask={() => navigation.navigate("NewTaskSheet", { screen: "NewTask" })}
     >
       <>

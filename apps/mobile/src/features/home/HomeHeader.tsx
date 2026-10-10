@@ -246,7 +246,10 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
       {props.searchQuery.length > 0 ? (
         <Pressable
           accessibilityLabel="Clear search"
-          hitSlop={10}
+          accessibilityRole="button"
+          // 48dp target; the negative margin keeps the glyph where the row's
+          // padding put it.
+          className="-mr-3.5 size-12 items-center justify-center"
           onPress={() => props.onSearchQueryChange("")}
         >
           <SymbolView

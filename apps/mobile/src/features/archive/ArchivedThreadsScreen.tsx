@@ -502,7 +502,11 @@ function ArchiveError(props: { readonly message: string; readonly onRetry: () =>
         Could not load every archive
       </Text>
       <Text className="mt-1 text-sm text-foreground-muted">{props.message}</Text>
-      <Pressable className="mt-3 self-start active:opacity-60" onPress={props.onRetry}>
+      <Pressable
+        accessibilityRole="button"
+        className="-mx-3 -mb-3 min-h-12 justify-center self-start px-3 active:opacity-60"
+        onPress={props.onRetry}
+      >
         <Text className="text-sm font-t3-bold text-danger-foreground">Try again</Text>
       </Pressable>
     </View>
@@ -675,6 +679,8 @@ export function ArchivedThreadsScreen(props: {
             <RefreshControl
               onRefresh={props.onRefresh}
               refreshing={props.isLoading && !isInitialLoad}
+              colorsClassName={String("accent-icon")}
+              progressBackgroundColorClassName={String("accent-card")}
               tintColorClassName={String("accent-icon")}
             />
           }

@@ -1,6 +1,6 @@
 import type { MenuAction, MenuComponentProps } from "@react-native-menu/menu";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { isValidElement, useCallback, useEffect, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { BackHandler, Pressable, ScrollView, View } from "react-native";
 import { useKeyboardState } from "react-native-keyboard-controller";
@@ -62,6 +62,11 @@ export type AndroidAnchoredMenuProps = {
   /** Applied to the anchor wrapper — call sites flex these to fill toolbars. */
   readonly className?: string;
   readonly style?: StyleProp<ViewStyle>;
+  /**
+   * TalkBack label for the anchor that owns the press. Defaults to the plain
+   * child's own accessibilityLabel, since that child is hidden from TalkBack.
+   */
+  readonly accessibilityLabel?: string;
   /**
    * Plain children open the menu on tap (the wrapper owns the press). A
    * render function keeps the children interactive and hands them `open` to
@@ -244,13 +249,23 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
       ) : (
         <Pressable
           ref={anchorRef}
+          accessibilityLabel={
+            props.accessibilityLabel ??
+            (isValidElement<{ accessibilityLabel?: string }>(props.children)
+              ? props.children.props.accessibilityLabel
+              : undefined)
+          }
           accessibilityRole="button"
           className={props.className}
           collapsable={false}
           style={props.style}
           onPress={open}
         >
-          <View pointerEvents="none">{props.children}</View>
+          {/* The child is only the anchor's face: hide it so TalkBack focuses
+              the anchor, which has the action, not a second inert button. */}
+          <View importantForAccessibility="no-hide-descendants" pointerEvents="none">
+            {props.children}
+          </View>
         </Pressable>
       )}
       {anchor === null ? null : (
