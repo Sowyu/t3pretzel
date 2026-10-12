@@ -1,26 +1,12 @@
-import { HorizontalFloatingToolbar, Host, RNHostView } from "@expo/ui/jetpack-compose";
 import type { ReactElement } from "react";
 
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
+import { GlassSurface } from "../../components/GlassSurface";
 
-/** Native toolbar surface; hosted RN controls retain their existing menus and accessibility. */
+/** The bottom toolbar on the composer's floating surface, like the iOS glass toolbar. */
 export function MaterialFloatingToolbar(props: { readonly children: ReactElement }) {
-  const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
   return (
-    <Host
-      matchContents
-      colorScheme={themeAppearance}
-      ignoreSafeAreaKeyboardInsets
-      style={{ alignSelf: "center", maxWidth: "100%" }}
-    >
-      <HorizontalFloatingToolbar
-        colors={{
-          toolbarContainerColor: colors["--color-grouped-card"],
-          toolbarContentColor: colors["--color-foreground"],
-        }}
-      >
-        <RNHostView matchContents>{props.children}</RNHostView>
-      </HorizontalFloatingToolbar>
-    </Host>
+    <GlassSurface className="self-center px-2 py-2" style={{ maxWidth: "100%" }}>
+      {props.children}
+    </GlassSurface>
   );
 }
