@@ -2,6 +2,7 @@ import { cn } from "../lib/cn";
 import { Pressable } from "react-native";
 
 import { SymbolView, type AppSymbolName } from "./AppSymbol";
+import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
 const VARIANT_CLASS_NAMES = {
   standard: ["", "accent-foreground"],
@@ -10,6 +11,7 @@ const VARIANT_CLASS_NAMES = {
   tonal: ["rounded-full bg-secondary", "accent-secondary-foreground"],
 } as const;
 
+/** Android icon button with a 48dp target; press feedback is an opacity dip like iOS. */
 export function MaterialIconButton(props: {
   readonly accessibilityLabel: string;
   readonly icon: AppSymbolName;
@@ -19,6 +21,7 @@ export function MaterialIconButton(props: {
   readonly variant?: "standard" | "primary" | "tonal" | "danger";
   readonly tintColorClassName?: string;
 }) {
+  const { iconSize, buttonSize } = useAndroidControlSizing();
   const variant = props.variant ?? "standard";
   const [containerClassName, iconTintClassName] = VARIANT_CLASS_NAMES[variant];
   return (
@@ -29,15 +32,16 @@ export function MaterialIconButton(props: {
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(props.disabled), selected: props.selected }}
       className={cn(
-        "size-12 items-center justify-center",
+        "items-center justify-center active:opacity-50",
         props.disabled && variant !== "standard"
           ? "rounded-full bg-subtle-strong"
           : containerClassName,
       )}
+      style={{ width: buttonSize, height: buttonSize }}
     >
       <SymbolView
         name={props.icon}
-        size={24}
+        size={iconSize}
         tintColorClassName={
           props.disabled
             ? "accent-icon-subtle"
