@@ -70,7 +70,7 @@ export function useSelectedThreadGitActions() {
     }),
     [selectedThread?.environmentId, selectedThreadGitRootCwd],
   );
-  const branchState = useBranches(branchTarget);
+  const { data: branchData, refresh: refreshBranches } = useBranches(branchTarget);
   const updateThreadGitContext = useCallback(
     async (
       thread: NonNullable<typeof selectedThread>,
@@ -222,11 +222,11 @@ export function useSelectedThreadGitActions() {
   );
 
   const refreshSelectedThreadBranches = useCallback(async (): Promise<ReadonlyArray<VcsRef>> => {
-    branchState.refresh();
-    return dedupeRemoteBranchesWithLocalMatches(branchState.data?.refs ?? []).filter(
+    void refreshBranches();
+    return dedupeRemoteBranchesWithLocalMatches(branchData?.refs ?? []).filter(
       (branch) => !branch.isRemote,
     );
-  }, [branchState]);
+  }, [branchData, refreshBranches]);
 
   const syncSelectedThreadBranchState = useCallback(
     async (input: {
@@ -243,13 +243,13 @@ export function useSelectedThreadGitActions() {
       const updateResult = input.nextThreadState
         ? await updateThreadGitContext(input.thread, input.nextThreadState)
         : AsyncResult.success(undefined);
-      branchState.refresh();
+      void refreshBranches();
       await refreshSelectedThreadGitStatus({ quiet: true, cwd: input.cwd });
       return AsyncResult.isFailure(updateResult)
         ? AsyncResult.failure(updateResult.cause)
         : AsyncResult.success(undefined);
     },
-    [branchState, refreshSelectedThreadGitStatus, updateThreadGitContext],
+    [refreshBranches, refreshSelectedThreadGitStatus, updateThreadGitContext],
   );
 
   const onCheckoutSelectedThreadBranch = useCallback(
@@ -435,15 +435,29 @@ export function useSelectedThreadGitActions() {
     ],
   );
 
-  return {
-    canWriteSourceControl,
-    canChangeThreadBranch,
-    refreshSelectedThreadGitStatus,
-    refreshSelectedThreadBranches,
-    onCheckoutSelectedThreadBranch,
-    onCreateSelectedThreadBranch,
-    onCreateSelectedThreadWorktree,
-    onPullSelectedThreadBranch,
-    onRunSelectedThreadGitAction,
-  };
+  // Memoized so consumers that list the actions in effect or memo deps stay stable.
+  return useMemo(
+    () => ({
+      canWriteSourceControl,
+      canChangeThreadBranch,
+      refreshSelectedThreadGitStatus,
+      refreshSelectedThreadBranches,
+      onCheckoutSelectedThreadBranch,
+      onCreateSelectedThreadBranch,
+      onCreateSelectedThreadWorktree,
+      onPullSelectedThreadBranch,
+      onRunSelectedThreadGitAction,
+    }),
+    [
+      canWriteSourceControl,
+      canChangeThreadBranch,
+      refreshSelectedThreadGitStatus,
+      refreshSelectedThreadBranches,
+      onCheckoutSelectedThreadBranch,
+      onCreateSelectedThreadBranch,
+      onCreateSelectedThreadWorktree,
+      onPullSelectedThreadBranch,
+      onRunSelectedThreadGitAction,
+    ],
+  );
 }

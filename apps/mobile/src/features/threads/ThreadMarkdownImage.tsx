@@ -13,7 +13,7 @@ import { MediaActionsMenu } from "../../components/MediaActionsMenu";
 import { PresentationSource } from "../../components/NativePresentation";
 import { useMediaActions } from "../../state/mediaActions";
 import type { MediaActionsSource } from "../../lib/mediaActionsSource";
-import { useAssetUrlState } from "../../state/assets";
+import { useRetainedAssetUrlState } from "../../state/assets";
 import {
   MARKDOWN_IMAGE_MAX_WIDTH,
   type MarkdownImageDisplaySize,
@@ -248,7 +248,7 @@ export function ThreadMarkdownImage(props: {
   readonly onPressPreview: (source: FilePreviewSource) => void;
 }) {
   const withGallery = useFilePreviewGallery();
-  const assetUrl = useAssetUrlState(props.environmentId, props.resource);
+  const assetUrl = useRetainedAssetUrlState(props.environmentId, props.resource);
 
   return (
     <ThreadMarkdownImageView
