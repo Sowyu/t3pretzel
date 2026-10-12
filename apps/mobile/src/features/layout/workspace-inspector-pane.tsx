@@ -43,6 +43,7 @@ export function WorkspaceInspectorPane(props: {
   const inspectorVisible =
     inspectorSupported && panes.auxiliaryPaneVisible && (props.active ?? true);
   const resizeStartWidth = useRef(0);
+  const pendingResizeWidth = useRef<number | null>(null);
   const [resizing, setResizing] = useState(false);
 
   // A file-to-file replace remounts the route. Initialize an already-visible
@@ -102,22 +103,30 @@ export function WorkspaceInspectorPane(props: {
   const inspectorContentStyle = useAnimatedStyle(() => ({ width: renderedContentWidth.value }), []);
   const beginResize = useCallback(() => {
     resizeStartWidth.current = inspectorWidth ?? 0;
+    pendingResizeWidth.current = null;
     setResizing(true);
   }, [inspectorWidth]);
+  // A drag moves the shared values only; the layout state (and the React
+  // tree under AdaptiveWorkspaceLayout) updates once, on release.
   const resizeBy = useCallback(
     (delta: number) => {
-      setAuxiliaryPaneWidth(
-        constrainAuxiliaryPaneWidth({
-          preferredWidth: resizeStartWidth.current + delta,
-          availableWidth: panes.contentPaneWidth,
-        }),
-      );
+      const width = constrainAuxiliaryPaneWidth({
+        preferredWidth: resizeStartWidth.current + delta,
+        availableWidth: panes.contentPaneWidth,
+      });
+      pendingResizeWidth.current = width;
+      renderedInspectorWidth.value = width;
+      renderedContentWidth.value = width;
     },
-    [panes.contentPaneWidth, setAuxiliaryPaneWidth],
+    [panes.contentPaneWidth, renderedContentWidth, renderedInspectorWidth],
   );
   const endResize = useCallback(() => {
+    if (pendingResizeWidth.current !== null) {
+      setAuxiliaryPaneWidth(pendingResizeWidth.current);
+      pendingResizeWidth.current = null;
+    }
     setResizing(false);
-  }, []);
+  }, [setAuxiliaryPaneWidth]);
 
   return (
     <>
