@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { mediumImpactHaptic } from "../lib/haptics";
 import { cloneElement, isValidElement, type ReactElement } from "react";
 import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
 import type { ControlPillMenuProps } from "./ControlPillMenu.types";
@@ -21,7 +21,7 @@ export function ControlPillMenu(props: ControlPillMenuProps) {
         {(open) =>
           cloneElement(child, {
             onLongPress: () => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              void mediumImpactHaptic();
               open();
             },
           })

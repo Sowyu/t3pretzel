@@ -39,9 +39,8 @@ vi.mock("react-native", () => ({
       state.alerts.push({ title, buttons }),
   },
 }));
-vi.mock("expo-haptics", () => ({
-  impactAsync: async () => {},
-  ImpactFeedbackStyle: { Light: "light" },
+vi.mock("../../lib/haptics", () => ({
+  lightImpactHaptic: async () => {},
 }));
 vi.mock("../../components/ConfirmDialogHost", () => ({
   showConfirmDialog: (dialog: { onConfirm: () => void }) => state.dialogs.push(dialog),

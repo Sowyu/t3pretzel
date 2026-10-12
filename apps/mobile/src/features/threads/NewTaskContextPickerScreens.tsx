@@ -9,7 +9,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
@@ -241,7 +241,7 @@ export function NewTaskEnvironmentPickerRouteScreen() {
                 isLast={index === flow.environments.length - 1}
                 disabled={flow.switchingToEnvironmentId !== null}
                 onPress={() => {
-                  void Haptics.selectionAsync();
+                  void selectionHaptic();
                   void flow.switchEnvironment(environment.environmentId).then((switched) => {
                     if (switched) navigation.goBack();
                   });
@@ -299,7 +299,7 @@ export function NewTaskBranchPickerRouteScreen() {
         return;
       }
       selectingBranchNameRef.current = branch.name;
-      void Haptics.selectionAsync();
+      void selectionHaptic();
 
       try {
         if (!flow.selectedProject) return;

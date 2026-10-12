@@ -1,7 +1,7 @@
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { useAuth } from "@clerk/expo";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as Haptics from "expo-haptics";
+import { successHaptic, errorHaptic } from "../../lib/haptics";
 import {
   StackActions,
   useIsFocused,
@@ -143,7 +143,7 @@ export function ConnectionsNewRouteScreen({
         setScanComplete(true);
         setScannerLocked(false);
       } catch (error) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        void errorHaptic();
         Alert.alert(
           "Invalid QR code",
           error instanceof Error ? error.message : "Scanned QR code was not recognized.",
@@ -162,11 +162,7 @@ export function ConnectionsNewRouteScreen({
       onChangeConnectionPairingUrl(pairingUrl);
       try {
         const result = await onConnectPress(pairingUrl, params.routeFor);
-        void Haptics.notificationAsync(
-          AsyncResult.isSuccess(result)
-            ? Haptics.NotificationFeedbackType.Success
-            : Haptics.NotificationFeedbackType.Error,
-        );
+        void (AsyncResult.isSuccess(result) ? successHaptic() : errorHaptic());
         if (AsyncResult.isSuccess(result)) {
           if (replaceWithHome || !navigation.canGoBack()) {
             navigation.dispatch(StackActions.replace("Home"));

@@ -11,7 +11,7 @@ import {
   WorktreeSetupCard,
   type WorktreeSetupCardProps,
 } from "./worktree-setup-card";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic, successHaptic } from "../../lib/haptics";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import { useViewabilityAmount, type LegendListRef } from "@legendapp/list/react-native";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -394,7 +394,7 @@ function AssistantForkButton(props: {
       onPress={() => {
         const targetThreadId = ThreadId.make(uuidv4());
         setBusy(true);
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         void forkFromRun({
           environmentId: props.environmentId,
           input: {
@@ -1578,7 +1578,7 @@ function UserMessageContent(props: UserMessageContentProps) {
                   records: [record],
                 },
               )
-                .then(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success))
+                .then(() => successHaptic())
                 .catch(() => {
                   Alert.alert("Could not copy context", "Try copying this context again.");
                 });
@@ -1850,7 +1850,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         imageEmbed,
       });
       if (media) {
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         if (media.kind === "video") {
           setExpandedVideo((current) => current ?? media.source);
         } else {
@@ -1866,7 +1866,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           presentation.path,
         );
         if (relativePath) {
-          void Haptics.selectionAsync();
+          void selectionHaptic();
           navigation.navigate("ThreadFile", {
             environmentId: String(props.environmentId),
             threadId: String(props.threadId),
@@ -1880,7 +1880,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       // A host file outside the workspace, such as a report an agent wrote to
       // a temp directory, opens read-only in the file screen.
       if (presentation.kind === "file" && isAbsolutePath(presentation.path)) {
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         navigation.navigate("ThreadFile", {
           environmentId: String(props.environmentId),
           threadId: String(props.threadId),

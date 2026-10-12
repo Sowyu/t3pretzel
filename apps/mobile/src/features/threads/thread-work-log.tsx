@@ -12,7 +12,7 @@ import {
   getQuestionAnswerPreview,
   hasQuestionAnswer,
 } from "@t3tools/client-runtime/work-log/user-input";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { Image } from "expo-image";
 import { type AppSymbolName, SymbolView } from "../../components/AppSymbol";
 import { MaskedView } from "@expo/ui/community/masked-view";
@@ -817,7 +817,7 @@ function WorkspacePreparationRetryButton(props: {
       disabled={busy}
       onPress={() => {
         setBusy(true);
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         void retry({
           environmentId: props.environmentId,
           input: { threadId: props.threadId, runId: props.runId },
@@ -1027,7 +1027,7 @@ const ThreadWorkLogRow = memo(function ThreadWorkLogRow(
             return;
           }
           if (canExpand) {
-            void Haptics.selectionAsync();
+            void selectionHaptic();
             props.onToggleRow(row.id, props.anchorKey);
           }
         }}
@@ -1273,7 +1273,7 @@ export function ThreadWorkGroupToggle(props: {
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={`Double tap to ${props.expanded ? "hide" : "show"} ${props.hiddenCount} tool ${props.hiddenCount === 1 ? "call" : "calls"}.`}
         onPress={() => {
-          void Haptics.selectionAsync();
+          void selectionHaptic();
           props.onToggle();
         }}
         rowSizing={props.rowSizing}
@@ -1346,7 +1346,7 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
         hitSlop={4}
         onPress={() => {
           if (!canExpand) return;
-          void Haptics.selectionAsync();
+          void selectionHaptic();
           props.onToggle();
         }}
         onLongPress={props.onCopy}

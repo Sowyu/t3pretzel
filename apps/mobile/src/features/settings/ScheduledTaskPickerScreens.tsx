@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { useMemo, useState } from "react";
 
 import { AppText as Text } from "../../components/AppText";
@@ -137,7 +137,7 @@ export function ScheduledTaskBranchPickerRouteScreen() {
       onRefresh={branches.refresh}
       onLoadMore={branches.loadNext}
       onSelect={(branch) => {
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         setEditor((current) =>
           current ? { ...current, draft: { ...current.draft, baseRef: branch.name } } : current,
         );

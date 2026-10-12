@@ -1,6 +1,6 @@
 import { Host, Slider } from "@expo/ui/jetpack-compose";
 import { fillMaxWidth } from "@expo/ui/jetpack-compose/modifiers";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../../../lib/haptics";
 import { useRef, type ComponentProps } from "react";
 import { View } from "react-native";
 
@@ -23,7 +23,7 @@ export function FontSizeSliderRow(props: ComponentProps<typeof SharedFontSizeSli
       Math.max(props.min, props.min + Math.round((value - props.min) / props.step) * props.step),
     );
     if (next === props.value) return;
-    void Haptics.selectionAsync().catch(() => undefined);
+    void selectionHaptic();
     props.onChange(next);
   };
   return (

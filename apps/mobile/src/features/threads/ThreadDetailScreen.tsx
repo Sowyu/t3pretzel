@@ -47,7 +47,7 @@ import { isProviderNativeSubagentThread } from "@t3tools/contracts";
 import type { QueuedRunEdit } from "../../state/queued-run-edit";
 import type { FollowUpBehavior } from "../../lib/followUpBehavior";
 import type { ActiveTurnComposerAction } from "@t3tools/client-runtime/state/composer-dispatch";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import {
   memo,
   useCallback,
@@ -315,13 +315,20 @@ function useStreamingHaptics(threadId: ThreadId, feed: ReadonlyArray<ThreadFeedE
       return;
     }
 
+    // A tick every 320ms while a reply streams reads as the phone buzzing after
+    // every send on Android, even through the system haptic engine. One tick
+    // when a stream starts is enough there.
+    if (!isNewStream && Platform.OS === "android") {
+      return;
+    }
+
     const now = Date.now();
     if (!isNewStream && now - lastStreamHapticAtRef.current < 320) {
       return;
     }
 
     lastStreamHapticAtRef.current = now;
-    void Haptics.selectionAsync();
+    void selectionHaptic();
   }, [threadId, feed]);
 }
 
@@ -1165,7 +1172,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   );
 
   const handleScrollToEnd = useCallback(() => {
-    void Haptics.selectionAsync();
+    void selectionHaptic();
     void scrollMessageToEnd({ animated: true, closeKeyboard: false }).catch(() => {
       freeze.set(false);
     });
