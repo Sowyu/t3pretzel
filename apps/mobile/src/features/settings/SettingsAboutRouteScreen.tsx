@@ -12,6 +12,8 @@ import {
   registerHiddenUpdateTap,
   runAppUpdateCheck,
 } from "../updates/app-updates";
+import { shortCommit } from "../updates/nightly-updater";
+import { nightlyBuildCommit } from "../updates/nightly-updater-runtime";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -43,7 +45,12 @@ function AppSettingsSection() {
   // Fall back to "production" to match resolveAppVariant in app.config.ts, so a
   // missing variant never mislabels a production build as development.
   const variant = (Constants.expoConfig?.extra?.appVariant as string | undefined) ?? "production";
-  const variantLabel = variant === "production" ? "" : capitalize(variant);
+  const variantLabel =
+    variant === "production"
+      ? ""
+      : variant === "nightly"
+        ? `Nightly ${shortCommit(nightlyBuildCommit())}`
+        : capitalize(variant);
   const versionLabel = variantLabel ? `${version} · ${variantLabel}` : version;
   const updateCheckAvailable = isAppUpdateCheckAvailable();
   const busy =

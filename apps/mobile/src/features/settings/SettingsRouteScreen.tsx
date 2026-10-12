@@ -17,6 +17,13 @@ import {
   SettingsEnvironmentFilterHeader,
 } from "./components/SettingsEnvironmentFilterHeader";
 import { useSettingsEnvironmentFilter } from "./settings-environment-filter";
+import {
+  nightlyUpdaterAction,
+  nightlyUpdaterActionLabel,
+  nightlyUpdaterStatusLabel,
+  shortCommit,
+} from "../updates/nightly-updater";
+import { useNightlyUpdater, type NightlyUpdaterBinding } from "../updates/nightly-updater-runtime";
 
 export function SettingsRouteScreen() {
   const navigation = useNavigation();
@@ -213,10 +220,53 @@ function SettingsIndexSections() {
         />
       </SettingsSection>
 
-      <SettingsSection title="App">
-        <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
-        <SettingsRow icon="info.circle" label="About T3 Code" target="SettingsAbout" />
-      </SettingsSection>
+      <AppSettingsSection />
     </>
+  );
+}
+
+function AppSettingsSection() {
+  // Nightly builds sideload a whole APK from GitHub, so their update row sits one
+  // tap from the settings index. Other variants show their version under About.
+  const nightly = useNightlyUpdater();
+  return (
+    <SettingsSection title="App">
+      <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
+      <SettingsRow icon="info.circle" label="About T3 Code" target="SettingsAbout" />
+      {nightly.applies ? <NightlyUpdatesRow nightly={nightly} /> : null}
+    </SettingsSection>
+  );
+}
+
+/** Which nightly commit is running, what the updater is doing, and a tap to act on it. */
+function NightlyUpdatesRow(props: { readonly nightly: NightlyUpdaterBinding }) {
+  const { nightly } = props;
+  const action = nightlyUpdaterAction(nightly.state);
+  const status = nightlyUpdaterStatusLabel(nightly.state);
+  const actionLabel = action ? nightlyUpdaterActionLabel(action) : null;
+  const value = [status, actionLabel].filter(Boolean).join(" · ") || undefined;
+  return (
+    <SettingsRow
+      icon="arrow.down.circle"
+      label={`Nightly ${shortCommit(nightly.commit)}`}
+      value={value}
+      valuePosition="below"
+      disabled={action === null}
+      onPress={() => {
+        switch (action) {
+          case "check":
+            nightly.check();
+            return;
+          // "retry" resumes whichever step failed, or checks again when nothing is left.
+          case "update":
+          case "retry":
+            nightly.update();
+            return;
+          case "allowInstalls":
+            nightly.allowInstalls();
+            return;
+        }
+      }}
+    />
   );
 }

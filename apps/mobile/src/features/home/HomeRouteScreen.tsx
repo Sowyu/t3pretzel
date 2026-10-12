@@ -20,6 +20,7 @@ import { useNativeColumnLayoutMetrics } from "../../native/native-layout-metrics
 import { WorkspaceEmptyDetail } from "../layout/WorkspaceEmptyDetail";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { checkForAppUpdateOnLaunch, startAppUpdateForegroundRecheck } from "../updates/app-updates";
+import { startNightlyUpdater } from "../updates/nightly-updater-runtime";
 import { AndroidHomeFabLayout } from "./AndroidHomeFab";
 import { HomeScreen } from "./HomeScreen";
 import { HomeHeader } from "./HomeHeader";
@@ -82,6 +83,7 @@ export function HomeRouteScreen() {
   useEffect(() => {
     void checkForAppUpdateOnLaunch();
     startAppUpdateForegroundRecheck();
+    startNightlyUpdater();
   }, []);
 
   const {
