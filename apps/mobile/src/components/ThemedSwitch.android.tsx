@@ -17,6 +17,8 @@ const TRACK_WIDTH = 51;
 const TRACK_HEIGHT = 31;
 const THUMB_SIZE = 27;
 const INSET = (TRACK_HEIGHT - THUMB_SIZE) / 2;
+// UISwitch outlines its off track so it reads on a grouped card of nearly the same colour.
+const OUTLINE = 1;
 const TRAVEL = TRACK_WIDTH - THUMB_SIZE - INSET * 2;
 // Pads the 31px track out to Android's 48dp minimum touch target.
 const HIT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 };
@@ -43,8 +45,10 @@ export function ThemedSwitch(props: ThemedSwitchProps) {
 
   const offTrack = colors["--color-switch-inactive-track"];
   const onTrack = colors["--color-switch-active-track"];
+  const outline = colors["--color-border"];
   const trackStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(progress.value, [0, 1], [offTrack, onTrack]),
+    borderColor: interpolateColor(progress.value, [0, 1], [outline, onTrack]),
   }));
   const thumbStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: progress.value * TRAVEL }],
@@ -68,7 +72,8 @@ export function ThemedSwitch(props: ThemedSwitchProps) {
             width: TRACK_WIDTH,
             height: TRACK_HEIGHT,
             borderRadius: TRACK_HEIGHT / 2,
-            padding: INSET,
+            borderWidth: OUTLINE,
+            padding: INSET - OUTLINE,
           },
           trackStyle,
         ]}
