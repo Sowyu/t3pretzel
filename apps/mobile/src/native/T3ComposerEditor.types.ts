@@ -77,7 +77,9 @@ export interface ComposerEditorProps {
   /**
    * Hardware keyboard submission. `alternate` is true for the Command-modified
    * chord, which sends using the opposite of the configured follow-up
-   * behavior. Always false on Android, which has no hardware Return handling.
+   * behavior. Android fires it for Ctrl/Meta+Return, always with false.
    */
   readonly onSubmit?: (alternate: boolean) => void;
+  /** Height of the text itself in dp, so the box can grow with it. Android only. */
+  readonly onContentHeightChange?: (height: number) => void;
 }

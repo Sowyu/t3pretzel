@@ -50,6 +50,7 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
   private val onComposerFocus by EventDispatcher()
   private val onComposerBlur by EventDispatcher()
   private val onComposerPasteImages by EventDispatcher()
+  private val onComposerSubmit by EventDispatcher()
   private val onComposerContextPress by EventDispatcher()
   private val onComposerPasteContext by EventDispatcher()
   private val onComposerPasteText by EventDispatcher()
@@ -87,9 +88,15 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
       if (!applyingNativeValue) {
         emitSelectionChange(start, end)
       }
+      revealCursor()
     }
     editor.pasteImagesListener = { uris ->
       onComposerPasteImages(mapOf("uris" to uris))
+    }
+    // A hardware keyboard has no on-screen Send button to reach for, so
+    // Ctrl/Meta+Enter sends. Plain Enter still inserts a newline.
+    editor.submitListener = {
+      onComposerSubmit(emptyMap<String, Any>())
     }
     editor.pasteContextListener = { payload ->
       nativeEventCount += 1
@@ -175,6 +182,7 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
             ),
           )
           emitContentSizeIfNeeded()
+          revealCursor()
         }
       },
     )
@@ -423,6 +431,16 @@ class T3ComposerEditorView(context: Context, appContext: AppContext) : ExpoView(
     )
   }
 
+  // Scrolls the box so the line being typed stays visible. Posted, so it runs
+  // after the relayout the edit triggered and measures the new line.
+  private fun revealCursor() {
+    editor.post {
+      if (editor.hasFocus() && editor.layout != null) {
+        editor.bringPointIntoView(editor.selectionEnd.coerceAtLeast(0))
+      }
+    }
+  }
+
   private fun emitContentSizeIfNeeded() {
     val height = editor.layout?.height ?: editor.measuredHeight
     val contentHeight = height + contentInsetVertical * 2
@@ -645,12 +663,22 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
   }
 
   override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    val submit = submitListener
+    if (submit != null && isSubmitShortcut(keyCode, event)) {
+      submit()
+      return true
+    }
     val handled = when (keyCode) {
       KeyEvent.KEYCODE_DEL -> deleteChip(true)
       KeyEvent.KEYCODE_FORWARD_DEL -> deleteChip(false)
       else -> false
     }
     return handled || super.onKeyDown(keyCode, event)
+  }
+
+  private fun isSubmitShortcut(keyCode: Int, event: KeyEvent): Boolean {
+    val isEnter = keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+    return isEnter && (event.isCtrlPressed || event.isMetaPressed)
   }
 
   private fun deleteAdjacentChip(beforeLength: Int, afterLength: Int): Boolean = when {
