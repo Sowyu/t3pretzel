@@ -88,3 +88,17 @@ export function resolveThreadFeedLiveFollow(
       return current;
   }
 }
+
+/**
+ * The scroll-to-end button shows once the reader is away from the end. A
+ * touch that starts at the end pauses follow (so a streaming chunk cannot
+ * yank the list under the finger) but is not "away" until the list moves.
+ */
+export function resolveScrollToEndVisible(input: {
+  readonly followEnabled: boolean;
+  readonly userScrollSessionActive: boolean;
+  readonly isAtEnd: boolean;
+}): boolean {
+  if (input.followEnabled) return false;
+  return !(input.userScrollSessionActive && input.isAtEnd);
+}

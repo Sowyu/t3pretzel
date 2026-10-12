@@ -177,6 +177,7 @@ import {
 } from "../../lib/threadActivity";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import {
+  resolveScrollToEndVisible,
   resolveThreadFeedLiveFollow,
   type ThreadFeedLiveFollowEvent,
   type ThreadWorkGroupScrollPosition,
@@ -308,6 +309,8 @@ export interface ThreadFeedProps {
   readonly usesAutomaticContentInsets?: boolean;
   readonly onHeaderMaterialVisibilityChange?: (visible: boolean) => void;
   readonly onEndFollowEnabledChange?: (enabled: boolean) => void;
+  /** True while the reader is away from the end: the scroll-to-end button's cue. */
+  readonly onAwayFromEndChange?: (away: boolean) => void;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill>;
   readonly onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
 }
@@ -719,6 +722,8 @@ function MessageAttachmentUnknown(props: { readonly name: string }) {
 
 // LegendList only computes hook visibility when the list has a viewability config.
 const THREAD_MEDIA_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 0 };
+// In viewports; large enough that no thread length is ever outside it.
+const FOLLOW_FROM_ANYWHERE_THRESHOLD = 1000;
 
 function ThreadMediaVisibility(props: { readonly children: ReactNode }) {
   const [visible, setVisible] = useState(false);
@@ -1744,11 +1749,25 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     },
     [props.onEndFollowEnabledChange],
   );
+  const awayFromEndRef = useRef(false);
   const transitionEndFollow = useCallback(
     (event: ThreadFeedLiveFollowEvent) => {
       setEndFollow(resolveThreadFeedLiveFollow(endFollowEnabledRef.current, event));
+      // Follow pauses on touch-down, but a touch that starts and stays at the
+      // end must not surface the scroll-to-end button; only leaving the end does.
+      const isAtEnd =
+        "isAtEnd" in event ? event.isAtEnd : (props.listRef.current?.getState().isAtEnd ?? false);
+      const away = resolveScrollToEndVisible({
+        followEnabled: endFollowEnabledRef.current,
+        userScrollSessionActive: userScrollSessionRef.current,
+        isAtEnd,
+      });
+      if (away !== awayFromEndRef.current) {
+        awayFromEndRef.current = away;
+        props.onAwayFromEndChange?.(away);
+      }
     },
-    [setEndFollow],
+    [props.listRef, props.onAwayFromEndChange, setEndFollow],
   );
   const [interactionState, setInteractionState] = useState<{
     readonly copiedRowId: string | null;
@@ -2679,6 +2698,12 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             freeze={props.freeze}
             // Follow the measured end immediately. Animating toward an estimated
             // end races row measurement when a pending message is acknowledged.
+            // LegendList only re-pins when the list is already within a tenth
+            // of a viewport of the end. A message row that measures far taller
+            // than its estimate on open, or a streaming burst, leaves it behind
+            // for good. The follow latch above already says when following is
+            // wanted, so while it does the list re-pins from anywhere.
+            maintainScrollAtEndThreshold={FOLLOW_FROM_ANYWHERE_THRESHOLD}
             maintainScrollAtEnd={
               disclosureToggleSettling || !endFollowEnabled
                 ? false

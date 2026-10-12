@@ -65,6 +65,7 @@ import {
   useWindowDimensions,
   View,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
   type ViewInstance,
 } from "react-native";
 import {
@@ -471,6 +472,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const [anchorMessageId, setAnchorMessageId] = useState<MessageId | null>(null);
   const [submittedMessageId, setSubmittedMessageId] = useState<MessageId | null>(null);
   const [endFollowEnabled, setEndFollowEnabled] = useState(true);
+  const [awayFromEnd, setAwayFromEnd] = useState(false);
   // Android keys the safe-area padding on keyboard visibility (#5988): the
   // back gesture closes the keyboard while the editor stays focused, and a
   // focus-keyed inset would leave the toolbar under the gesture bar. iOS must
@@ -810,6 +812,32 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     },
     [],
   );
+  // The list only retargets an initial scroll that is still running when the
+  // overlay's measured height replaces the estimate; on a cold open that
+  // height lands after the scroll has settled and the tail sits under the
+  // card. Re-pin on every change of the overlay's height while following.
+  // A cold open races several late insets against the list's initial scroll,
+  // and one of them lands after every targeted re-pin. Two settle re-pins
+  // after the thread turns ready cover the rest; each is a no-op when the end
+  // is already right.
+  useEffect(() => {
+    if (contentPresentationKind !== "ready") return;
+    scheduleOverlayRepin(300);
+    const late = setTimeout(() => scheduleOverlayRepin(0), 1000);
+    return () => clearTimeout(late);
+  }, [contentPresentationKind, scheduleOverlayRepin, selectedThreadKey]);
+  const lastOverlayHeightRef = useRef<number | null>(null);
+  const handleComposerOverlayLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      onComposerLayout(event);
+      const height = event.nativeEvent.layout.height;
+      if (lastOverlayHeightRef.current !== null && lastOverlayHeightRef.current !== height) {
+        scheduleOverlayRepin(60);
+      }
+      lastOverlayHeightRef.current = height;
+    },
+    [onComposerLayout, scheduleOverlayRepin],
+  );
   useEffect(() => {
     const previous = previousWorkingControlStateRef.current;
     const threadChanged = previous.threadKey !== selectedThreadKey;
@@ -1143,7 +1171,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     });
   }, [freeze, scrollMessageToEnd]);
 
-  const showScrollToEndButton = contentPresentationKind === "ready" && !endFollowEnabled;
+  const showScrollToEndButton = contentPresentationKind === "ready" && awayFromEnd;
   const { themeAppearance } = useAppearancePreferences();
   const isDarkMode = themeAppearance === "dark";
 
@@ -1242,6 +1270,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
               usesAutomaticContentInsets={props.usesAutomaticContentInsets}
               onHeaderMaterialVisibilityChange={props.onHeaderMaterialVisibilityChange}
               onEndFollowEnabledChange={setEndFollowEnabled}
+              onAwayFromEndChange={setAwayFromEnd}
               skills={selectedProviderSkills}
               onUseArtifactTemplate={handleUseArtifactTemplate}
             />
@@ -1294,7 +1323,11 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
               {/* No paddingTop here: the overlay's measured height becomes the
                 list's bottom inset, so any padding above the pill/composer
                 pushes the resting content floor up by the same amount. */}
-              <View ref={composerOverlayRef} onLayout={onComposerLayout} className="w-full">
+              <View
+                ref={composerOverlayRef}
+                onLayout={handleComposerOverlayLayout}
+                className="w-full"
+              >
                 <FloatingWorkingControl
                   colorScheme={isDarkMode ? "dark" : "light"}
                   status={floatingStatus}
