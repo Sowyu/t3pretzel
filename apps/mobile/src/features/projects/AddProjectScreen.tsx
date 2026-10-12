@@ -180,7 +180,7 @@ function ListSection(props: { readonly children: ReactNode }) {
     <View
       className={
         Platform.OS === "android"
-          ? "overflow-hidden rounded-[28px] bg-grouped-card"
+          ? "overflow-hidden rounded-[24px] bg-grouped-card"
           : "overflow-hidden rounded-[24px] bg-grouped-card"
       }
     >
