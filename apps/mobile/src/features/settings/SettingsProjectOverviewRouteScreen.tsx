@@ -4,7 +4,7 @@ import { ProjectFavicon } from "../../components/ProjectFavicon";
 import { deriveProjectGroupLabel } from "@t3tools/client-runtime/state/project-grouping";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { useState } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { projectEnvironment } from "../../state/projects";
@@ -149,15 +149,7 @@ function ProjectOverviewContent(props: {
               key={`${member.environmentId}:${member.id}`}
               className={index === 0 ? "gap-1 p-4" : "gap-1 border-t border-border-subtle p-4"}
             >
-              <Text
-                className={
-                  Platform.OS === "android"
-                    ? "text-base text-foreground"
-                    : "text-lg text-foreground"
-                }
-              >
-                {environment?.label ?? "Environment"}
-              </Text>
+              <Text className="text-lg text-foreground">{environment?.label ?? "Environment"}</Text>
               {environment?.displayUrl ? (
                 <Text className="text-sm leading-normal text-foreground-muted">
                   {environment.displayUrl}

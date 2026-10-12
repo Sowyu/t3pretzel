@@ -521,3 +521,16 @@ describe("flattenThemeColor", () => {
     expect(flattenThemeColor("rgb(255, 0, 0)", "#000000")).toBe("#ff0000");
   });
 });
+
+describe("themeColorWithMinimumAlpha", () => {
+  it("raises a thin fill and leaves opaque or thicker colours alone", async () => {
+    const { themeColorWithMinimumAlpha } = await import("./mobileTheme");
+    expect(themeColorWithMinimumAlpha("rgba(26, 27, 27, 0.9)", 0.94)).toBe(
+      "rgba(26, 27, 27, 0.94)",
+    );
+    expect(themeColorWithMinimumAlpha("rgba(244, 244, 245, 0.97)", 0.94)).toBe(
+      "rgba(244, 244, 245, 0.97)",
+    );
+    expect(themeColorWithMinimumAlpha("#1a1b1b", 0.94)).toBe("#1a1b1b");
+  });
+});

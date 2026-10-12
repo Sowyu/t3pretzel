@@ -443,3 +443,13 @@ export function getMobileThemePreviewColors(
     messageAction: themeColorToNativeColor(colors.messageAction),
   };
 }
+
+/**
+ * Raises a translucent `rgba()` theme colour to at least `minimum` alpha. Android surfaces
+ * that cast an elevation shadow use this: the shadow shows through a thinner fill as a halo.
+ */
+export function themeColorWithMinimumAlpha(color: string, minimum: number): string {
+  const match = /^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/.exec(color);
+  if (!match || Number(match[4]) >= minimum) return color;
+  return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${minimum})`;
+}

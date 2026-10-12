@@ -2,7 +2,7 @@ import { BlurView } from "expo-blur";
 import { Platform, StyleSheet, View, type ColorValue } from "react-native";
 
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
-import { themeColorWithAlpha } from "../lib/mobileTheme";
+import { themeColorWithMinimumAlpha } from "../lib/mobileTheme";
 
 /** Frosted backdrop for containers that clip their children to their shape. */
 export function GlassBackdrop(props: { readonly fallbackColor?: ColorValue }) {
@@ -11,7 +11,7 @@ export function GlassBackdrop(props: { readonly fallbackColor?: ColorValue }) {
   const color = props.fallbackColor ?? themeVariables["--color-glass-fallback"];
   const colorStyle = {
     backgroundColor:
-      supportsBlur || typeof color !== "string" ? color : themeColorWithAlpha(color, 1),
+      supportsBlur || typeof color !== "string" ? color : themeColorWithMinimumAlpha(color, 0.94),
   };
 
   return (

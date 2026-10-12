@@ -4,7 +4,7 @@ import { Platform, Pressable } from "react-native";
 import { AppActivityIndicator } from "../../../components/AppActivityIndicator";
 import { SymbolView } from "../../../components/AppSymbol";
 import { AppText as Text } from "../../../components/AppText";
-import { MaterialListRow } from "../../../components/MaterialListRow";
+import { AndroidPressHighlight } from "../../../components/RowPressable";
 import { cn } from "../../../lib/cn";
 
 export function SettingsActionRow(props: {
@@ -21,7 +21,7 @@ export function SettingsActionRow(props: {
   const icon = (
     <SymbolView
       name={props.icon}
-      size={Platform.OS === "android" ? 24 : 22}
+      size={22}
       tintColorClassName={iconColorClassName}
       type="monochrome"
       weight="regular"
@@ -31,30 +31,22 @@ export function SettingsActionRow(props: {
     <AppActivityIndicator colorClassName={iconColorClassName} />
   ) : null;
 
-  if (Platform.OS === "android") {
-    return (
-      <MaterialListRow
-        className="bg-grouped-card"
-        title={props.label}
-        titleClassName={textClassName}
-        leading={icon}
-        trailing={spinner}
-        disabled={props.disabled}
-        onPress={props.onPress}
-      />
-    );
-  }
-
   return (
     <Pressable
       accessibilityRole="button"
       disabled={props.disabled}
       onPress={props.onPress}
-      className="flex-row items-center gap-4 p-4 disabled:opacity-40"
+      unstable_pressDelay={Platform.OS === "android" ? 50 : undefined}
+      className="relative flex-row items-center gap-4 overflow-hidden p-4 disabled:opacity-40"
     >
-      {icon}
-      <Text className={cn("flex-1 text-lg", textClassName)}>{props.label}</Text>
-      {spinner}
+      {({ pressed }) => (
+        <>
+          <AndroidPressHighlight pressed={pressed} />
+          {icon}
+          <Text className={cn("flex-1 text-lg", textClassName)}>{props.label}</Text>
+          {spinner}
+        </>
+      )}
     </Pressable>
   );
 }

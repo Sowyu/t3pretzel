@@ -189,6 +189,7 @@ const iosBundleIdentifier = isIosPersonalTeamBuild
 const dmSansFonts = {
   regular: "@expo-google-fonts/dm-sans/400Regular/DMSans_400Regular.ttf",
   medium: "@expo-google-fonts/dm-sans/500Medium/DMSans_500Medium.ttf",
+  semibold: "@expo-google-fonts/dm-sans/600SemiBold/DMSans_600SemiBold.ttf",
   bold: "@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf",
 } as const;
 
@@ -399,7 +400,7 @@ const config: ExpoConfig = {
       "expo-font",
       {
         ios: {
-          fonts: [dmSansFonts.regular, dmSansFonts.medium, dmSansFonts.bold],
+          fonts: [dmSansFonts.regular, dmSansFonts.medium, dmSansFonts.semibold, dmSansFonts.bold],
         },
         android: {
           fonts: [
@@ -410,6 +411,10 @@ const config: ExpoConfig = {
             {
               fontFamily: "DMSans-Medium",
               fontDefinitions: [{ path: dmSansFonts.medium, weight: 500 }],
+            },
+            {
+              fontFamily: "DMSans-SemiBold",
+              fontDefinitions: [{ path: dmSansFonts.semibold, weight: 600 }],
             },
             {
               fontFamily: "DMSans-Bold",

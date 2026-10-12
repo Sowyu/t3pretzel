@@ -52,7 +52,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
-import { themeColorWithAlpha } from "../../lib/mobileTheme";
+import { themeColorWithMinimumAlpha } from "../../lib/mobileTheme";
 import { armAgentAwarenessLiveActivityForLocalWork } from "../agent-awareness/remoteRegistration";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import {
@@ -319,6 +319,8 @@ export function ComposerSurface(props: {
   readonly animateLayout?: boolean;
 }) {
   const colors = useUniwindTheme();
+  const { themeAppearance } = useAppearancePreferences();
+  const isAndroid = Platform.OS === "android";
   const targetBorderRadius =
     typeof props.style.borderRadius === "number" ? props.style.borderRadius : 0;
   const animatedBorderRadius = useSharedValue(targetBorderRadius);
@@ -341,30 +343,42 @@ export function ComposerSurface(props: {
   return (
     <Animated.View
       className={
-        Platform.OS === "android" ? undefined : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
+        isAndroid
+          ? themeAppearance === "dark"
+            ? "border border-white/10"
+            : "border border-composer-border"
+          : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
       }
       layout={layoutTransition}
       style={[
         animatedShapeStyle,
-        {
-          overflow: "hidden",
-        },
+        isAndroid
+          ? {
+              overflow: "hidden",
+              // Static lift in place of the iOS shadow. The fill stays near-opaque
+              // so the shadow cannot show through it.
+              elevation: 10,
+              backgroundColor: themeColorWithMinimumAlpha(colors["--color-composer-surface"], 0.94),
+            }
+          : { overflow: "hidden" },
       ]}
     >
-      <AnimatedGlassSurface
-        chrome="none"
-        fallbackColor={colors["--color-composer-surface"]}
-        fallbackClassName="border border-composer-border"
-        glassEffectStyle="regular"
-        // The composer is a passive material containing interactive controls.
-        // Keep native glass out of the interactive content's layout path.
-        pointerEvents="none"
-        tintColor="transparent"
-        layout={layoutTransition}
-        style={[{ position: "absolute", inset: 0 }, animatedShapeStyle]}
-      >
-        {null}
-      </AnimatedGlassSurface>
+      {isAndroid ? null : (
+        <AnimatedGlassSurface
+          chrome="none"
+          fallbackColor={colors["--color-composer-surface"]}
+          fallbackClassName="border border-composer-border"
+          glassEffectStyle="regular"
+          // The composer is a passive material containing interactive controls.
+          // Keep native glass out of the interactive content's layout path.
+          pointerEvents="none"
+          tintColor="transparent"
+          layout={layoutTransition}
+          style={[{ position: "absolute", inset: 0 }, animatedShapeStyle]}
+        >
+          {null}
+        </AnimatedGlassSurface>
+      )}
       <Animated.View
         collapsable={false}
         layout={layoutTransition}
@@ -378,8 +392,6 @@ export function ComposerSurface(props: {
 
 export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposerProps) {
   const project = useProject(scopeProjectRef(props.environmentId, props.selectedThread.projectId));
-  const { themeVariables: materialTheme } = useAppearancePreferences();
-  const composerPanel = materialTheme["--color-composer-panel"];
   const navigation = useNavigation();
   const foregroundColor = useUniwindTheme()["--color-foreground"];
   const bodyText = useScaledTextRole("body");
@@ -779,19 +791,13 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
       style={{
         paddingTop: isExpanded ? 8 : 6,
         paddingBottom: (props.bottomInset ?? 0) + (isExpanded ? 8 : 6),
-        backgroundColor:
-          Platform.OS === "android" ? themeColorWithAlpha(composerPanel, 1) : undefined,
       }}
     >
       {/* The backdrop gradient lives on a plain View: Reanimated's Animated.View
           silently drops experimental_backgroundImage on Android, which left this
           strip fully transparent and the feed text legible through the composer. */}
       <View
-        className={
-          Platform.OS === "android"
-            ? "hidden"
-            : "absolute inset-0 bg-linear-to-b from-screen/0 via-screen/60 to-screen/90"
-        }
+        className="absolute inset-0 bg-linear-to-b from-screen/0 via-screen/60 to-screen/90"
         pointerEvents="none"
       />
       <Animated.View

@@ -1182,9 +1182,7 @@ function EnvironmentTasks({
         <EnvironmentMachineSymbol
           kind={resolveEnvironmentMachineKind(environment.serverConfig)}
           size={16}
-          tintColorClassName={
-            Platform.OS === "android" ? "accent-primary" : "accent-foreground-muted"
-          }
+          tintColorClassName="accent-foreground-muted"
         />
       }
     >

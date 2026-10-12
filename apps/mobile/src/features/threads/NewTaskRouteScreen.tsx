@@ -321,7 +321,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
         >
           {canStartScratch && listScopes.length > 0 ? (
             Platform.OS === "android" ? (
-              <View collapsable={false} className="overflow-hidden rounded-[28px] bg-grouped-card">
+              <View collapsable={false} className="overflow-hidden rounded-[24px] bg-grouped-card">
                 <MaterialListRow
                   className="bg-grouped-card"
                   title="No project"
@@ -451,7 +451,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               collapsable={false}
               className={
                 Platform.OS === "android"
-                  ? "overflow-hidden rounded-[28px] bg-grouped-card"
+                  ? "overflow-hidden rounded-[24px] bg-grouped-card"
                   : "overflow-hidden rounded-[24px] bg-grouped-card"
               }
             >

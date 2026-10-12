@@ -1,6 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
 import type { ComponentProps } from "react";
-import { Platform } from "react-native";
 
 import { ListRow } from "../../../components/ListRow";
 import type { SettingsLegalDocumentTarget, SettingsSheetTarget } from "./settings-sheet-targets";
@@ -16,9 +15,8 @@ export function SettingsRow(props: {
   readonly onPress?: () => void;
 }) {
   const navigation = useNavigation();
-  const valueBelow =
-    props.valuePosition === "below" ||
-    (props.valuePosition === undefined && Platform.OS === "android");
+  // Long values truncate in the middle, and stack under the label at large text sizes.
+  const valueBelow = props.valuePosition === "below";
   return (
     <ListRow
       icon={props.icon}
