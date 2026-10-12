@@ -8,22 +8,19 @@ import {
   View,
   type LayoutChangeEvent,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MenuAction } from "@react-native-menu/menu";
 
 import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { CompactBrandTitle } from "../../components/CompactBrandTitle";
-import { MaterialFloatingActionButton } from "../../components/MaterialFloatingActionButton";
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { MaterialSearchField } from "../../components/MaterialSearchField";
 import { useHardwareKeyboardCommand } from "../keyboard/hardwareKeyboardCommands";
 import { WorkspaceConnectionTitle } from "./WorkspaceConnectionTitle";
 import { useWorkspaceState } from "../../state/workspace";
-import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import { useMaterialToolbarLayout } from "../../components/useMaterialToolbarLayout";
 
-/** One toolbar height for the compact list and expanded sidebar, including search. */
+/** The Home bar for the compact list and the split-view sidebar, including search. */
 export function MaterialThreadListToolbar(props: {
   readonly searchQuery: string;
   readonly onSearchQueryChange: (query: string) => void;
@@ -35,15 +32,15 @@ export function MaterialThreadListToolbar(props: {
   readonly sidebar?: boolean;
   readonly onLayout?: (event: LayoutChangeEvent) => void;
   readonly onRequestVisibility?: () => void;
+  /** Split layouts have no tab bar, so New task joins the bar buttons. */
+  readonly onStartNewTask?: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const workspace = useWorkspaceTabs();
   const isTabActive = workspace?.isTabActive;
   const homeFocused = useNavigationState((state) => state.routes[state.index]?.name === "Home");
   const listFocused =
     homeFocused && (workspace === null || workspace.state.selectedTab === "threads");
-  const { fabSize } = useAndroidControlSizing();
   const { height: toolbarHeight, ...headerPadding } = useMaterialToolbarLayout();
   const { state } = useWorkspaceState();
   const { onRequestVisibility, onSearchQueryChange } = props;
@@ -97,70 +94,66 @@ export function MaterialThreadListToolbar(props: {
   );
 
   return (
-    <>
-      <View
-        onLayout={props.onLayout}
-        className={
-          props.sidebar ? "absolute inset-x-0 top-0 z-[4] bg-header px-2" : "bg-header px-2"
-        }
-        style={headerPadding}
-      >
-        <View className="flex-row items-center gap-1" style={{ minHeight: toolbarHeight }}>
-          {searching ? (
-            <>
-              <AndroidHeaderIconButton
-                accessibilityLabel="Close search"
-                icon="arrow.left"
-                onPress={closeSearch}
+    <View
+      onLayout={props.onLayout}
+      className={props.sidebar ? "absolute inset-x-0 top-0 z-[4] bg-drawer px-3" : "px-3"}
+      style={headerPadding}
+    >
+      <View className="flex-row items-center gap-2" style={{ minHeight: toolbarHeight }}>
+        {searching ? (
+          <>
+            <AndroidHeaderIconButton
+              accessibilityLabel="Close search"
+              icon="chevron.left"
+              onPress={closeSearch}
+            />
+            {searchField}
+          </>
+        ) : (
+          <>
+            {/* iOS's editor-style bar: the brand leads, bar buttons trail. */}
+            <View className="min-w-0 flex-1 pl-1">
+              <WorkspaceConnectionTitle
+                grow
+                onPress={props.onOpenEnvironments}
+                brand={<CompactBrandTitle allowFontScaling={false} />}
               />
-              {searchField}
-            </>
-          ) : (
-            <>
-              {/* Match the visible inset of the trailing 48dp icon button. */}
-              <View className="min-w-0 flex-1 pl-4">
-                <WorkspaceConnectionTitle
-                  grow
-                  onPress={props.onOpenEnvironments}
-                  brand={<CompactBrandTitle allowFontScaling={false} />}
-                />
-              </View>
+            </View>
+            <AndroidHeaderIconButton
+              accessibilityLabel="Search threads"
+              icon="magnifyingglass"
+              onPress={openSearch}
+            />
+            {state.hasConnections ? (
+              <AndroidAnchoredMenu
+                actions={props.filterActions}
+                onPressAction={props.onFilterAction}
+              >
+                {(open) => (
+                  <AndroidHeaderIconButton
+                    accessibilityLabel="Filter threads"
+                    icon={filterIcon}
+                    selected={props.filterCustomized}
+                    onPress={open}
+                  />
+                )}
+              </AndroidAnchoredMenu>
+            ) : null}
+            <AndroidHeaderIconButton
+              accessibilityLabel="Open settings"
+              icon="ellipsis"
+              onPress={props.onOpenSettings}
+            />
+            {props.onStartNewTask && state.hasConnections ? (
               <AndroidHeaderIconButton
-                accessibilityLabel="Search threads"
-                icon="magnifyingglass"
-                onPress={openSearch}
+                accessibilityLabel="New task"
+                icon="square.and.pencil"
+                onPress={props.onStartNewTask}
               />
-              <AndroidHeaderIconButton
-                accessibilityLabel="Open settings"
-                icon="gearshape"
-                onPress={props.onOpenSettings}
-              />
-            </>
-          )}
-        </View>
+            ) : null}
+          </>
+        )}
       </View>
-      {/* Keep the filter above the New thread FAB at every text size. */}
-      {state.hasConnections ? (
-        <View
-          className="absolute right-5 z-[5]"
-          style={{
-            bottom:
-              (props.sidebar ? Math.max(insets.bottom, 12) + 6 : Math.max(insets.bottom, 16) + 16) +
-              fabSize +
-              8,
-          }}
-        >
-          <AndroidAnchoredMenu actions={props.filterActions} onPressAction={props.onFilterAction}>
-            {(open) => (
-              <MaterialFloatingActionButton
-                label="Filter threads"
-                icon={filterIcon}
-                onPress={open}
-              />
-            )}
-          </AndroidAnchoredMenu>
-        </View>
-      ) : null}
-    </>
+    </View>
   );
 }

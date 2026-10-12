@@ -538,7 +538,7 @@ export function BranchPickerScreen(props: {
           hideBottomBorder
           onBack={() => navigation.goBack()}
         />
-        <View className="bg-header px-4 pb-3 pt-1">
+        <View className="px-4 pb-3 pt-1">
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}

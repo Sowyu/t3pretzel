@@ -1,5 +1,4 @@
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
-import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import type { ThreadMoveDestination } from "../threads/threadOrder";
 import { computeThreadMoveAvailability } from "../threads/threadOrder";
 import { LegendList, type LegendListRef } from "@legendapp/list/react-native";
@@ -31,7 +30,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { cn } from "../../lib/cn";
 import { EmptyState } from "../../components/EmptyState";
-import { MaterialFloatingActionButton } from "../../components/MaterialFloatingActionButton";
 import type { WorkspaceEnvironment, WorkspaceState } from "../../state/workspaceModel";
 import type { SavedRemoteConnection } from "../../lib/connection";
 import { scopedProjectKey, scopedThreadKey } from "../../lib/scopedEntities";
@@ -77,7 +75,6 @@ import {
 } from "./homeThreadList";
 import { createSwipeRowActivation } from "./swipe-row-activation";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-swipe-actions";
-import { useMaterialFabScroll } from "./MaterialFabScrollContext";
 import { useWorkspaceTabs } from "../workspace/WorkspaceTabsContext";
 import { ThreadListFilters } from "./ThreadListFilters";
 
@@ -276,10 +273,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const [initialScrollOffset] = useState(() => workspace?.getScrollOffset("threads") ?? 0);
   const primaryColumn = use(NativePrimaryColumnContext);
   const contentBackground = primaryColumn ? "bg-drawer" : "bg-screen";
-  const containerClassName = cn(
-    "flex-1",
-    Platform.OS === "android" ? "bg-header" : contentBackground,
-  );
+  const containerClassName = cn("flex-1", contentBackground);
   const columnMetrics = useNativeColumnLayoutMetrics();
   const selectedThreadKey = primaryColumn?.selectedThreadKey ?? null;
   const fullSwipeWidth = primaryColumn && columnMetrics ? columnMetrics.width - 20 : undefined;
@@ -288,7 +282,6 @@ export function HomeScreen(props: HomeScreenProps) {
   // Let trackpad scrolling coexist with each row's horizontal swipe gesture.
   const homeScrollGesture = useNativeGesture();
   const insets = useSafeAreaInsets();
-  const { fabClearance } = useAndroidControlSizing();
   const screenMetrics = useNativeLayoutMetrics();
   const contentSideInsets = usesNativeWorkspaceColumns
     ? (columnMetrics ?? screenMetrics)?.safeArea
@@ -344,7 +337,6 @@ export function HomeScreen(props: HomeScreenProps) {
   const handleScrollBeginDrag = useCallback(() => {
     openSwipeableRef.current?.close();
   }, []);
-  const onMaterialFabScroll = useMaterialFabScroll();
   const listRef = useRef<LegendListRef>(null);
   const searchMode = workspace?.state.tabs.threads.searchMode;
   const restoredOffset = workspace?.state.tabs.threads.scrollOffset;
@@ -372,7 +364,6 @@ export function HomeScreen(props: HomeScreenProps) {
   useEffect(() => () => clearTimeout(activationTimerRef.current), []);
   const handleListScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      onMaterialFabScroll?.(event);
       if (workspace)
         workspace.recordScrollOffset(
           "threads",
@@ -384,7 +375,7 @@ export function HomeScreen(props: HomeScreenProps) {
         200,
       );
     },
-    [activateVisibleRows, onMaterialFabScroll, workspace, insets.top],
+    [activateVisibleRows, workspace, insets.top],
   );
   const trackListTouches = useCallback(
     (event: GestureResponderEvent, started: boolean) => {
@@ -936,11 +927,7 @@ export function HomeScreen(props: HomeScreenProps) {
     return (
       <View className={containerClassName}>
         <View
-          className={cn(
-            "flex-1 items-center justify-center px-8",
-            contentBackground,
-            Platform.OS === "android" && "overflow-hidden rounded-t-[28px]",
-          )}
+          className={cn("flex-1 items-center justify-center px-8", contentBackground)}
           style={{
             paddingBottom: Platform.OS === "ios" ? iosBottomClearance : Math.max(insets.bottom, 24),
             paddingTop: NATIVE_LIQUID_GLASS_SUPPORTED ? insets.top + 72 : 0,
@@ -954,17 +941,6 @@ export function HomeScreen(props: HomeScreenProps) {
               detail={emptyState.detail}
               actionLabel={!props.catalogState.hasReadyEnvironment ? "Add environment" : undefined}
               onAction={!props.catalogState.hasReadyEnvironment ? props.onAddConnection : undefined}
-              action={
-                Platform.OS === "android" && !props.catalogState.hasReadyEnvironment ? (
-                  <MaterialFloatingActionButton
-                    label="Add environment"
-                    icon="plus"
-                    variant="extended"
-                    tone="primary"
-                    onPress={props.onAddConnection}
-                  />
-                ) : undefined
-              }
               variant="plain"
             />
             {emptyState.loading ? (
@@ -1027,26 +1003,18 @@ export function HomeScreen(props: HomeScreenProps) {
 
   if (Platform.OS === "android" && threadListV2Items.length === 0) {
     return (
-      <View className="flex-1 bg-header">
-        <View
-          className="flex-1 items-center justify-center overflow-hidden rounded-t-[28px] bg-screen px-4"
-          style={{ paddingBottom: insets.bottom }}
-        >
-          {v2ListEmpty}
-        </View>
+      <View
+        className="flex-1 items-center justify-center bg-screen px-4"
+        style={{ paddingBottom: insets.bottom }}
+      >
+        {v2ListEmpty}
       </View>
     );
   }
 
   return (
     <View className={containerClassName}>
-      <View
-        className={
-          Platform.OS === "android"
-            ? "flex-1 overflow-hidden rounded-t-[28px] bg-screen"
-            : cn("flex-1", contentBackground)
-        }
-      >
+      <View className={cn("flex-1", contentBackground)}>
         {/* Shared with the iPad sidebar: cells are reused across data
             rebuilds and `itemsAreEqual` keeps a minute tick (or an unrelated
             shell update) from re-rendering untouched rows. */}
@@ -1099,9 +1067,7 @@ export function HomeScreen(props: HomeScreenProps) {
                 paddingBottom:
                   Platform.OS === "ios"
                     ? iosBottomClearance
-                    : (workspace?.bottomClearance ??
-                      Math.max(insets.bottom, 16) +
-                        (Platform.OS === "android" ? fabClearance : 88)),
+                    : (workspace?.bottomClearance ?? Math.max(insets.bottom, 16) + 16),
               }}
             />
           </GestureDetector>

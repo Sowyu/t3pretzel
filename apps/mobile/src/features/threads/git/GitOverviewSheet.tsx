@@ -500,7 +500,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       collapsable={false}
       className={
         Platform.OS === "android"
-          ? "flex-1 bg-header"
+          ? "flex-1 bg-sheet"
           : isInspector
             ? "flex-1 border-l border-border bg-sheet"
             : "flex-1 bg-sheet"
@@ -521,7 +521,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       ) : null}
 
       {isInspector ? (
-        <View className="gap-1 px-4 pb-4 pt-3 android:bg-header ios:border-b ios:border-border">
+        <View className="gap-1 px-4 pb-4 pt-3 ios:border-b ios:border-border">
           {Platform.OS === "android" ? (
             <View className="absolute right-3 top-4 z-[1]">{refreshMenu}</View>
           ) : (

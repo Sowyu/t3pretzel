@@ -584,7 +584,7 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
     </>
   );
 
-  return Platform.OS === "android" ? <View className="flex-1 bg-header">{content}</View> : content;
+  return Platform.OS === "android" ? <View className="flex-1 bg-screen">{content}</View> : content;
 }
 
 export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {

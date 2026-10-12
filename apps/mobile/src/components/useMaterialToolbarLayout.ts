@@ -4,7 +4,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
-/** Shared Android header geometry; class-based spacing uses the app's 14dp rem. */
+/**
+ * Shared Android header geometry, sized like the iOS navigation bar. Embedded
+ * (sheet) headers leave room above for the sheet grabber.
+ */
 export function useMaterialToolbarLayout(embedded = false) {
   const insets = useSafeAreaInsets();
   const title = useScaledTextRole("title");
@@ -13,9 +16,9 @@ export function useMaterialToolbarLayout(embedded = false) {
   const { fontScale } = useWindowDimensions();
   return {
     height: Math.ceil(
-      Math.max(48, 56 * scale, (title.lineHeight + subtitle.lineHeight) * fontScale + 1),
+      Math.max(48, 52 * scale, (title.lineHeight + subtitle.lineHeight) * fontScale + 1),
     ),
-    paddingTop: embedded ? 8 * scale : Math.max(insets.top, 12 * scale),
-    paddingBottom: 7 * scale,
+    paddingTop: embedded ? 14 * scale : Math.max(insets.top, 8 * scale),
+    paddingBottom: 4 * scale,
   };
 }

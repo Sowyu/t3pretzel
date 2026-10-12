@@ -369,7 +369,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
       params={params}
       value={pr?.provider === "github" ? pr.url : null}
     >
-      <View className={Platform.OS === "android" ? "flex-1 bg-header" : "flex-1 bg-screen"}>
+      <View className="flex-1 bg-screen">
         <NativeStackScreenOptions
           options={{
             title: `#${params.number}`,
@@ -905,7 +905,7 @@ export function PullRequestFileRouteScreen({
   const seekingFile = !targetFile && result.nextCursor !== null;
   const loadingDiff = (result.isPending && !data.rows.length) || (seekingFile && !result.error);
   return (
-    <View className={Platform.OS === "android" ? "flex-1 bg-header" : "flex-1 bg-screen"}>
+    <View className="flex-1 bg-screen">
       <NativeStackScreenOptions
         options={{
           title,

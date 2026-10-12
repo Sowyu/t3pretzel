@@ -4,8 +4,7 @@ import { Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/AppText";
-import { AndroidSheetHeader } from "../../components/AndroidScreenHeader";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
+import { AndroidHeaderIconButton, AndroidSheetHeader } from "../../components/AndroidScreenHeader";
 import { MaterialScreenContent } from "../../components/MaterialScreenContent";
 import { ControlPill } from "../../components/ControlPill";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
@@ -41,11 +40,10 @@ export function PullRequestSheetContent(props: {
           subtitle={props.subtitle}
           hideBottomBorder
           leading={
-            <MaterialIconButton
-              icon="arrow.left"
+            <AndroidHeaderIconButton
+              icon="xmark"
               accessibilityLabel="Close"
               disabled={props.busy}
-              tintColorClassName="accent-header-foreground"
               onPress={() => navigation.goBack()}
             />
           }

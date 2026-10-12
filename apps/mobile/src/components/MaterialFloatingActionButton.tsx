@@ -1,13 +1,19 @@
-import type { ComponentProps } from "react";
-import { Pressable } from "react-native";
-import type { MaterialFloatingActionButton as AndroidMaterialFloatingActionButton } from "./MaterialFloatingActionButton.android";
+import { Pressable, type StyleProp, type ViewStyle } from "react-native";
 import { AppText } from "./AppText";
-import { SymbolView } from "./AppSymbol";
+import { SymbolView, type AppSymbolName } from "./AppSymbol";
 import { cn } from "../lib/cn";
 
-export function MaterialFloatingActionButton(
-  props: ComponentProps<typeof AndroidMaterialFloatingActionButton>,
-) {
+/** The iPad empty-detail action. Android uses EmptyState's plain action button. */
+export function MaterialFloatingActionButton(props: {
+  readonly onPress: () => void;
+  readonly label: string;
+  readonly icon: AppSymbolName;
+  readonly variant?: "extended" | "large";
+  readonly expanded?: boolean;
+  readonly tone?: "primary" | "secondary";
+  readonly className?: string;
+  readonly style?: StyleProp<ViewStyle>;
+}) {
   return (
     <Pressable
       accessibilityRole="button"

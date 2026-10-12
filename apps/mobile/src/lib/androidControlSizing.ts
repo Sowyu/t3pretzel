@@ -14,10 +14,7 @@ export function resolveAndroidControlSizing(baseFontSize: number) {
     mediumIconSize: Math.round(18 * scale),
     buttonSize,
     fabSize,
-    largeFabSize: Math.round(96 * scale),
     menuWidth: Math.round(250 * scale),
     menuItemHeight: Math.max(48, Math.round(48 * scale)),
-    // Two floating actions, their gap, and the space below the lower action.
-    fabClearance: fabSize * 2 + 36,
   };
 }
