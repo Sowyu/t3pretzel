@@ -23,11 +23,8 @@ function ImagePreviewHeader() {
   const mediaActions = useMediaActions(props.source.actionsSource, props.onRequestClose);
   return (
     <View className="bg-black/70" style={{ paddingTop: insets.top }}>
+      {/* Close leads, like the iOS Quick Look viewer. */}
       <View className="flex-row items-center gap-2 px-3">
-        <AppText className="flex-1 text-base text-white" numberOfLines={2}>
-          {props.source.name ?? "Image"}
-        </AppText>
-        <MediaActionsMenu media={mediaActions} inModal />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close image"
@@ -36,13 +33,17 @@ function ImagePreviewHeader() {
         >
           <SymbolView name="xmark" size={20} tintColor="#ffffff" type="monochrome" />
         </Pressable>
+        <AppText className="flex-1 text-base text-white" numberOfLines={2}>
+          {props.source.name ?? "Image"}
+        </AppText>
+        <MediaActionsMenu media={mediaActions} inModal />
       </View>
       <MediaSourceCaption source={mediaActions.title} />
     </View>
   );
 }
 
-/** Android keeps media actions in its in-app image viewer. iOS uses Quick Look. */
+/** Android's in-app image viewer, with media actions when the source has them. iOS uses Quick Look. */
 export function MediaImagePreview(props: MediaImagePreviewProps) {
   const gallery = props.source.gallery ?? [props.source];
   const [index, setIndex] = useState(() =>
@@ -62,6 +63,8 @@ export function MediaImagePreview(props: MediaImagePreviewProps) {
         visible
         presentationStyle="fullScreen"
         onRequestClose={props.onRequestClose}
+        // The library's swipe-to-close wraps each image in a vertical ScrollView
+        // that steals the second finger of a pinch on Android.
         swipeToCloseEnabled={false}
         doubleTapToZoomEnabled
         HeaderComponent={ImagePreviewHeader}

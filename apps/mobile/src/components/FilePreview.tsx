@@ -1,6 +1,5 @@
 import { useEffect, useEffectEvent } from "react";
 import { Alert, Modal, Pressable, View } from "react-native";
-import ImageViewing from "react-native-image-viewing";
 
 import { openAttachmentInViewer } from "../lib/attachmentDownload";
 import type { ResolvedFilePreviewSource } from "./FilePreviewModal.types";
@@ -71,20 +70,5 @@ export function FilePreview(props: {
   readonly onOpenError?: (error: unknown) => void;
 }) {
   if (props.source.kind !== "image") return <DocumentPreview {...props} />;
-  if (props.source.actionsSource) return <MediaImagePreview {...props} />;
-  return (
-    <ImageViewing
-      images={
-        props.source.gallery?.map((item) => ({ uri: item.uri })) ?? [{ uri: props.source.uri }]
-      }
-      imageIndex={Math.max(
-        0,
-        props.source.gallery?.findIndex((item) => item.uri === props.source.uri) ?? 0,
-      )}
-      visible
-      onRequestClose={props.onRequestClose}
-      swipeToCloseEnabled={false}
-      doubleTapToZoomEnabled
-    />
-  );
+  return <MediaImagePreview {...props} />;
 }
