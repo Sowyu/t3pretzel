@@ -60,6 +60,8 @@ import {
 import { useThreadSelection } from "../../state/use-thread-selection";
 import { useSelectedThreadProjection } from "../../state/use-thread-detail";
 import { EnvironmentConnectionNotice } from "../connection/EnvironmentConnectionNotice";
+import { isAndroidKeyboardAnimationUsable } from "../keyboard/androidKeyboardRecovery";
+import { useAndroidKeyboardRecovery } from "../keyboard/useAndroidKeyboardRecovery";
 import { TerminalSurface } from "./NativeTerminalSurface";
 import { getMobileTerminalTheme } from "./terminalTheme";
 import { terminalDebugLog } from "./terminalDebugLog";
@@ -593,7 +595,16 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     height: state.height,
     isVisible: state.isVisible,
   }));
-  const isAccessoryVisible = canOperateTerminal && keyboardState.isVisible && !isAccessoryDismissed;
+  const { isQuarantined: isKeyboardStateQuarantined, markInputFocused } =
+    useAndroidKeyboardRecovery();
+  // On Android a keyboard state left over from before a resume is not trusted
+  // until the keyboard shows again or the terminal takes focus.
+  const isKeyboardAnimationUsable = isAndroidKeyboardAnimationUsable({
+    isKeyboardVisible: keyboardState.isVisible,
+    isQuarantined: isKeyboardStateQuarantined,
+  });
+  const isAccessoryVisible =
+    canOperateTerminal && isKeyboardAnimationUsable && !isAccessoryDismissed;
   // Android's terminal owns an EditText; turning off autoFocus also clears its native focus.
   const terminalAutoFocus =
     Platform.OS === "android"
@@ -601,7 +612,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
         (!SHOWCASE_ENABLED || keyboardFocusRequest > 0 || keyboardState.isVisible)
       : !SHOWCASE_ENABLED;
   const terminalBottomInset =
-    (keyboardState.isVisible ? keyboardState.height : 0) +
+    (isKeyboardAnimationUsable ? keyboardState.height : 0) +
     (isAccessoryVisible ? TERMINAL_ACCESSORY_HEIGHT : 0);
 
   useEffect(() => {
@@ -1211,7 +1222,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
             paddingTop:
               Platform.OS === "ios" ? (nativeColumnMetrics?.safeArea.top ?? insets.top) : 0,
             paddingBottom:
-              Platform.OS === "android" && !keyboardState.isVisible ? insets.bottom : 0,
+              Platform.OS === "android" && !isKeyboardAnimationUsable ? insets.bottom : 0,
           }}
         >
           {!isEnvironmentReady ? (
@@ -1291,13 +1302,14 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   }}
                   onInput={handleInput}
                   onResize={handleResize}
+                  onTerminalFocus={markInputFocused}
                   style={{ flex: 1 }}
                   terminalKey={terminalKey}
                   theme={terminalTheme}
                 />
               </View>
 
-              {Platform.OS === "android" && !keyboardState.isVisible ? (
+              {Platform.OS === "android" && !isKeyboardAnimationUsable ? (
                 <View className="min-h-14 flex-row items-center gap-2 bg-card-alt px-2">
                   {selectedThread && hasNativeTerminalSurface() ? (
                     <MaterialButton
@@ -1328,6 +1340,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
               ) : null}
               {isAccessoryVisible ? (
                 <KeyboardStickyView
+                  enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
                   style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
                   offset={{ closed: 0, opened: 0 }}
                 >

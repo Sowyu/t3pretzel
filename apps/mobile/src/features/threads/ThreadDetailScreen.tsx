@@ -60,7 +60,6 @@ import {
 } from "react";
 import {
   Alert,
-  AppState,
   Keyboard,
   Platform,
   useWindowDimensions,
@@ -70,7 +69,9 @@ import {
 } from "react-native";
 import {
   KeyboardController,
+  KeyboardEvents,
   KeyboardStickyView,
+  useKeyboardContext,
   useKeyboardState,
 } from "react-native-keyboard-controller";
 import Animated, {
@@ -117,6 +118,8 @@ import type {
   ThreadFeedEntry,
   ThreadFeedLatestRun,
 } from "../../lib/threadActivity";
+import { isAndroidKeyboardAnimationUsable } from "../keyboard/androidKeyboardRecovery";
+import { useAndroidKeyboardRecovery } from "../keyboard/useAndroidKeyboardRecovery";
 import { PendingApprovalCard } from "./PendingApprovalCard";
 import { ComposerErrorNotice } from "./ComposerErrorNotice";
 import { ComposerFeedback } from "./ComposerFeedback";
@@ -367,37 +370,55 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useKeyboardState((state) => state.isVisible);
   const liveKeyboardHeight = useKeyboardState((state) => state.height);
+  // KeyboardStickyView translates the composer by a shared value the keyboard
+  // library only writes while the IME animates its window insets. A keyboard
+  // that resizes without animating (a suggestion strip appearing, a numeric
+  // layout), or an animation whose end callback is lost while the app is
+  // backgrounded, leaves that value at the previous height: the composer then
+  // floats above the keyboard, or hangs mid-screen with no keyboard at all.
+  // Every settled keyboard event carries the real height, so write it back.
+  // That is a no-op when the shared value already agrees. RN's own hide event
+  // is a second source: it reads the root view's visible frame rather than the
+  // inset animation, so it still arrives when the library's callbacks are lost.
+  const keyboardAnimation = useKeyboardContext().reanimated;
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+    const settleAt = (height: number) => {
+      keyboardAnimation.height.value = -height;
+    };
+    const subscriptions = [
+      KeyboardEvents.addListener("keyboardDidShow", (event) => settleAt(event.height)),
+      KeyboardEvents.addListener("keyboardDidHide", () => settleAt(0)),
+      Keyboard.addListener("keyboardDidHide", () => settleAt(0)),
+    ];
+    return () => {
+      for (const subscription of subscriptions) subscription.remove();
+    };
+  }, [keyboardAnimation]);
   // Android can swallow the IME hide callbacks when the app is backgrounded
   // mid keyboard-hide (the reported repro: send — which blurs and starts the
   // hide — then Home within a second). The keyboard library's height AND
   // visibility then stay frozen open, so gating the sticky translation on
   // visibility alone still strands the composer after resume. Quarantine the
-  // translation on every Android resume instead; any sign of a live keyboard
-  // stream — an owned input gaining focus, or any visibility/height movement —
-  // lifts it. A healthy resume sees no visual difference (the translation is
-  // already zero while the keyboard is closed).
-  const [keyboardStateSuspect, setKeyboardStateSuspect] = useState(false);
-  useEffect(() => {
-    if (Platform.OS !== "android") {
-      return;
-    }
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        setKeyboardStateSuspect(true);
+  // translation on every Android resume instead; only a fresh keyboard show or
+  // an owned input gaining focus lifts it. A healthy resume sees no visual
+  // difference (the translation is already zero while the keyboard is closed).
+  const { isQuarantined: isKeyboardStateQuarantined, markInputFocused } =
+    useAndroidKeyboardRecovery();
+  const isKeyboardAnimationUsable = isAndroidKeyboardAnimationUsable({
+    isKeyboardVisible,
+    isQuarantined: isKeyboardStateQuarantined,
+  });
+  const handleOwnedInputFocusChange = useCallback(
+    (focused: boolean) => {
+      if (focused) {
+        markInputFocused();
       }
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-  useEffect(() => {
-    setKeyboardStateSuspect(false);
-  }, [isKeyboardVisible, liveKeyboardHeight]);
-  const handleOwnedInputFocusChange = useCallback((focused: boolean) => {
-    if (focused) {
-      setKeyboardStateSuspect(false);
-    }
-  }, []);
+    },
+    [markInputFocused],
+  );
   const windowHeight = useWindowDimensions().height;
   const navigationHeaderHeight = useContext(HeaderHeightContext) ?? insets.top + 44;
   const [screenMetrics, setScreenMetrics] = useState<NativeLayoutMetrics | null>(null);
@@ -459,7 +480,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   // focus-keyed inset is already in place while the composer rides down.
   // Dictation keeps that focus while the composer switches to its compact pill.
   const composerBottomInset = (
-    Platform.OS === "android" ? isKeyboardVisible : composerExpanded || composerFocused
+    Platform.OS === "android" ? isKeyboardAnimationUsable : composerExpanded || composerFocused
   )
     ? 0
     : Math.max(insets.bottom, 12);
@@ -806,6 +827,38 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     // checks follow state again so a user who scrolled up stays put.
     scheduleOverlayRepin(230);
   }, [scheduleOverlayRepin, selectedThreadKey, showFloatingStatus]);
+  // Android's keyboard integration lifts the feed for the keyboard alone. The
+  // composer card growing on focus left the last rows under the card, and the
+  // keyboard leaving left the feed mid-conversation, until the user scrolled.
+  // Re-pin once each keyboard transition has fully settled: a re-pin during
+  // the animation freezes the inset stream and swallows the close event,
+  // which leaves a keyboard-sized gap above the composer instead.
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+    const subscriptions = [
+      KeyboardEvents.addListener("keyboardDidShow", () => scheduleOverlayRepin(60)),
+      KeyboardEvents.addListener("keyboardDidHide", () => scheduleOverlayRepin(60)),
+    ];
+    return () => {
+      for (const subscription of subscriptions) subscription.remove();
+    };
+  }, [scheduleOverlayRepin]);
+  // The card also changes size on its own: the back gesture hides the keyboard
+  // first and the collapse follows, so the transition re-pin above lands with
+  // the card still expanded. Re-pin again once the card settles, but only with
+  // the keyboard at rest; while it animates, the transition handlers own it.
+  const previousComposerExpandedRef = useRef(composerExpanded);
+  useEffect(() => {
+    if (previousComposerExpandedRef.current === composerExpanded) {
+      return;
+    }
+    previousComposerExpandedRef.current = composerExpanded;
+    if (Platform.OS === "android" && !isKeyboardVisible) {
+      scheduleOverlayRepin(COMPOSER_TRANSITION_DURATION_MS + 60);
+    }
+  }, [composerExpanded, isKeyboardVisible, scheduleOverlayRepin]);
   const handleToggleUserInputCollapsed = useCallback(() => {
     if (activeUserInputRequestId === null) {
       return;
@@ -1216,7 +1269,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
           // iOS emits a native animated height target on both will-show and
           // will-hide, so stay subscribed for the full transition. Android
           // retains its background/resume stale-state quarantine.
-          enabled={Platform.OS === "ios" || (isKeyboardVisible && !keyboardStateSuspect)}
+          enabled={Platform.OS === "ios" || isKeyboardAnimationUsable}
           pointerEvents="box-none"
           style={{ position: "absolute", bottom: 0, left: 0, right: 0, top: 0 }}
           offset={{ closed: 0, opened: 0 }}

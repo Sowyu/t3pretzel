@@ -33,7 +33,8 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { Alert, Keyboard, Platform, Pressable, View, type ViewStyle } from "react-native";
+import { Alert, AppState, Keyboard, Platform, Pressable, View, type ViewStyle } from "react-native";
+import { KeyboardEvents } from "react-native-keyboard-controller";
 import { composerImageGallery } from "../../lib/composerImageGallery";
 import { filePreviewGallery } from "../../lib/filePreviewGallery";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
@@ -220,6 +221,9 @@ export interface ThreadComposerProps {
 // running alongside that translate reads as jitter. Snapping the layout and
 // letting the keyboard-synced slide be the only motion looks native there.
 export const COMPOSER_TRANSITION_DURATION_MS = 220;
+// Long enough to outlast an IME show/hide blip, short enough that a real
+// dismissal still collapses the card promptly.
+const KEYBOARD_HIDE_CONFIRM_MS = 300;
 // Side panes already animate the dock's width. Nested horizontal layout
 // transitions would leave the surface trailing its toolbar's new position.
 // Keep the vertical pill/card morph while horizontal layout follows the dock.
@@ -531,6 +535,48 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
     voiceInput.elapsedSeconds,
   );
   const isVoiceInputPresented = voicePresentation.statusLabel !== null;
+  // Android's back gesture hides the keyboard but leaves the editor focused,
+  // so the expanded card stayed on screen with nothing to type into. Collapse
+  // it like a tap on the feed does. Navigating away and app switches also hide
+  // the keyboard; those keep focus so typing resumes on return, and dictation
+  // owns the keyboard while it is presented. The hide is confirmed after a
+  // short wait: the IME can report a hide and show again within a frame while
+  // the composer relayouts, and blurring on that blip dismissed the keyboard.
+  const keyboardVisibleRef = useRef(false);
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const shown = KeyboardEvents.addListener("keyboardDidShow", () => {
+      keyboardVisibleRef.current = true;
+    });
+    const hidden = KeyboardEvents.addListener("keyboardDidHide", () => {
+      keyboardVisibleRef.current = false;
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+  useEffect(() => {
+    if (Platform.OS !== "android" || !isFocused || isVoiceInputPresented) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const subscription = KeyboardEvents.addListener("keyboardDidHide", () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        if (
+          !keyboardVisibleRef.current &&
+          navigation.isFocused() &&
+          AppState.currentState === "active"
+        ) {
+          inputRef.current?.blur();
+        }
+      }, KEYBOARD_HIDE_CONFIRM_MS);
+    });
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [inputRef, isFocused, isVoiceInputPresented, navigation]);
   // An open draft stays visible; only a collapsed composer becomes a voice strip.
   const isExpanded = isFocused || settingsSheetPresentation.keepsComposerExpanded;
   const showsCompactDictation = isVoiceInputPresented && !isExpanded;
@@ -809,7 +855,12 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
               triggerKind={composerMenu.trigger.kind}
               isLoading={composerMenu.isLoading}
               error={composerMenu.error}
-              onSelect={composerMenu.onSelect}
+              onSelect={(item) => {
+                composerMenu.onSelect(item);
+                // Android drops editor focus when a popover row is tapped, so the
+                // keyboard closed and the field needed another tap to keep typing.
+                if (Platform.OS === "android") inputRef.current?.focus();
+              }}
             />
           </ComposerPopoverAnchor>
         ) : null}
