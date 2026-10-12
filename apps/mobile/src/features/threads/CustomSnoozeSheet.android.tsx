@@ -1,24 +1,4 @@
-import { MaterialSegmentedButtons } from "../../components/MaterialSegmentedButtons.android";
-import {
-  BasicAlertDialog,
-  Column,
-  DateTimePicker,
-  Host,
-  FilledTonalIconButton,
-  Row,
-  Shape,
-  Surface,
-  Text,
-  TextButton,
-} from "@expo/ui/jetpack-compose";
-import {
-  padding,
-  size,
-  width,
-  fillMaxWidth,
-  testID,
-  verticalScroll,
-} from "@expo/ui/jetpack-compose/modifiers";
+import { DateTimePicker } from "@expo/ui/community/datetime-picker";
 import {
   localSnoozeDate,
   localSnoozeTime,
@@ -27,21 +7,23 @@ import {
 } from "@t3tools/client-runtime/state/thread-settled";
 import { requireNativeModule } from "expo";
 import { useEffect, useState } from "react";
-import { AppState, useWindowDimensions } from "react-native";
-
-import { OverlayPortal } from "../../components/OverlayPortal";
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
-import { useScaledTextRole } from "../settings/appearance/useScaledTextRole";
-import type { CustomSnoozeSheet as SharedCustomSnoozeSheet } from "./CustomSnoozeSheet.shared";
 import {
-  applySnoozePickerDate,
-  applySnoozePickerTime,
-  snoozeDateToPickerDate,
-} from "./customSnoozeDate";
+  AppState,
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from "react-native";
+
+import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
+import { AppText as Text } from "../../components/AppText";
+import { OverlayPortal } from "../../components/OverlayPortal";
+import { SegmentedControl } from "../../components/SegmentedControl";
+import type { CustomSnoozeSheet as SharedCustomSnoozeSheet } from "./CustomSnoozeSheet.shared";
 
 type Props = Parameters<typeof SharedCustomSnoozeSheet>[0];
-
-const roundedCorner = Shape.RoundedCorner;
 
 const modes = [
   { value: "date", label: "Date and time" },
@@ -57,8 +39,13 @@ function systemUses24HourClock() {
   return requireNativeModule<{ is24HourFormat(): boolean }>("T3NativeControls").is24HourFormat();
 }
 
+/**
+ * The iOS custom snooze popover in RN: an xmark, centered title and Snooze
+ * button bar over a mode picker. Dates and times use the system pickers.
+ * Rendered through OverlayPortal because recycled thread rows can unmount it.
+ */
 export function CustomSnoozeSheet(props: Props) {
-  const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
+  const { width: windowWidth } = useWindowDimensions();
   const [is24Hour, setIs24Hour] = useState(systemUses24HourClock);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -66,15 +53,21 @@ export function CustomSnoozeSheet(props: Props) {
     });
     return () => subscription.remove();
   }, []);
-  const titleTypography = useScaledTextRole("title");
-  const bodyTypography = useScaledTextRole("footnote");
-  const { width: windowWidth } = useWindowDimensions();
+  const { onClose } = props;
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [onClose]);
   const [mode, setMode] = useState<CustomSnoozeInput["mode"]>("date");
   const [date, setDate] = useState(() => new Date(Date.now() + 3_600_000));
-  const [picker, setPicker] = useState<"date" | "time">("date");
+  const [picker, setPicker] = useState<"date" | "time" | null>(null);
   const [amount, setAmount] = useState(2);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [error, setError] = useState<string | null>(null);
+
   const submit = () => {
     const input: CustomSnoozeInput =
       mode === "date"
@@ -90,194 +83,155 @@ export function CustomSnoozeSheet(props: Props) {
     props.onSnooze(snoozedUntil);
     props.onClose();
   };
-  const pickerColors = {
-    containerColor: colors["--color-card-alt"],
-    titleContentColor: colors["--color-foreground-secondary"],
-    headlineContentColor: colors["--color-foreground"],
-    weekdayContentColor: colors["--color-foreground-secondary"],
-    subheadContentColor: colors["--color-foreground"],
-    navigationContentColor: colors["--color-foreground"],
-    yearContentColor: colors["--color-foreground"],
-    dayContentColor: colors["--color-foreground"],
-    currentYearContentColor: colors["--color-primary"],
-    selectedYearContainerColor: colors["--color-primary"],
-    selectedYearContentColor: colors["--color-primary-foreground"],
-    selectedDayContainerColor: colors["--color-primary"],
-    selectedDayContentColor: colors["--color-primary-foreground"],
-    todayContentColor: colors["--color-primary"],
-    todayDateBorderColor: colors["--color-primary"],
-    dividerColor: colors["--color-border"],
-    clockDialColor: colors["--color-secondary"],
-    clockDialSelectedContentColor: colors["--color-primary-foreground"],
-    clockDialUnselectedContentColor: colors["--color-secondary-foreground"],
-    selectorColor: colors["--color-primary"],
-    periodSelectorSelectedContainerColor: colors["--color-secondary"],
-    periodSelectorSelectedContentColor: colors["--color-secondary-foreground"],
-    periodSelectorUnselectedContentColor: colors["--color-foreground"],
-    timeSelectorSelectedContainerColor: colors["--color-secondary"],
-    timeSelectorSelectedContentColor: colors["--color-secondary-foreground"],
-    timeSelectorUnselectedContainerColor: colors["--color-card"],
-    timeSelectorUnselectedContentColor: colors["--color-foreground"],
-  };
+
+  const timeLabel = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hourCycle: is24Hour ? "h23" : "h12",
+  });
+
   return (
-    // Recycled thread rows can detach a zero-sized native dialog host.
     <OverlayPortal>
-      <Host colorScheme={themeAppearance} style={{ height: 0, width: 0 }}>
-        <BasicAlertDialog
-          onDismissRequest={props.onClose}
-          properties={{ usePlatformDefaultWidth: false }}
-          modifiers={[width(Math.min(360, windowWidth - 32))]}
+      <View className="absolute inset-0 items-center justify-center bg-backdrop px-4">
+        <Pressable
+          accessibilityLabel="Cancel custom snooze"
+          className="absolute inset-0"
+          onPress={props.onClose}
+        />
+        <View
+          accessibilityViewIsModal
+          className="overflow-hidden rounded-[20px] border-separator bg-card-alt"
+          style={{
+            width: Math.min(360, windowWidth - 32),
+            maxHeight: "80%",
+            borderWidth: StyleSheet.hairlineWidth,
+            boxShadow: "0 12px 32px rgba(0, 0, 0, 0.24)",
+          }}
         >
-          <Surface
-            color={colors["--color-card-alt"]}
-            contentColor={colors["--color-foreground"]}
-            shape={roundedCorner({
-              cornerRadii: { topStart: 28, topEnd: 28, bottomStart: 28, bottomEnd: 28 },
-            })}
+          <View className="min-h-14 flex-row items-center px-3">
+            <AndroidHeaderIconButton
+              accessibilityLabel="Cancel custom snooze"
+              icon="xmark"
+              onPress={props.onClose}
+            />
+            <Text
+              accessibilityRole="header"
+              numberOfLines={1}
+              className="flex-1 text-center text-[17px] font-t3-bold"
+            >
+              Custom snooze
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              className="min-h-10 justify-center px-2 active:opacity-50"
+              onPress={submit}
+            >
+              <Text className="text-base font-t3-bold">Snooze</Text>
+            </Pressable>
+          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 16 }}
           >
-            <Column modifiers={[fillMaxWidth(), verticalScroll()]}>
-              <Column
-                verticalArrangement={{ spacedBy: 16 }}
-                modifiers={[fillMaxWidth(), padding(24, 24, 24, 16)]}
-              >
-                <Text style={titleTypography}>Custom snooze</Text>
-                <MaterialSegmentedButtons
-                  options={modes}
-                  selected={mode}
-                  onSelect={(value) => {
-                    setMode(value);
-                    setError(null);
-                  }}
-                />
-                {mode === "date" ? (
-                  <MaterialSegmentedButtons
-                    options={[
-                      {
-                        value: "date",
-                        label: date.toLocaleDateString([], { month: "short", day: "numeric" }),
-                      },
-                      {
-                        value: "time",
-                        label: date.toLocaleTimeString([], {
-                          hour: "numeric",
-                          minute: "2-digit",
-                          hourCycle: is24Hour ? "h23" : "h12",
-                        }),
-                      },
-                    ]}
-                    selected={picker}
-                    onSelect={setPicker}
-                  />
-                ) : null}
-              </Column>
-              {mode === "date" ? (
-                <Column horizontalAlignment="center" modifiers={[fillMaxWidth()]}>
-                  <SnoozeDateTimePicker
-                    key={picker}
-                    date={date}
-                    picker={picker}
-                    is24Hour={is24Hour}
-                    colors={pickerColors}
-                    onChange={(selected) => {
-                      setDate((current) =>
-                        picker === "date"
-                          ? applySnoozePickerDate(current, selected)
-                          : applySnoozePickerTime(current, selected),
-                      );
+            <SegmentedControl
+              options={modes}
+              selected={mode}
+              onSelect={(value) => {
+                setMode(value);
+                setPicker(null);
+                setError(null);
+              }}
+              role="tab"
+            />
+            {mode === "date" ? (
+              <View className="overflow-hidden rounded-xl bg-subtle">
+                {(["date", "time"] as const).map((value, index) => (
+                  <Pressable
+                    key={value}
+                    accessibilityRole="button"
+                    accessibilityLabel={value === "date" ? "Choose date" : "Choose time"}
+                    className="min-h-12 flex-row items-center justify-between border-separator px-4 active:opacity-50"
+                    style={{ borderTopWidth: index > 0 ? StyleSheet.hairlineWidth : 0 }}
+                    onPress={() => setPicker(value)}
+                  >
+                    <Text>{value === "date" ? "Date" : "Time"}</Text>
+                    <Text className="text-foreground-secondary">
+                      {value === "date"
+                        ? date.toLocaleDateString([], {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : timeLabel}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View className="gap-4">
+                <View className="flex-row items-center justify-center gap-6">
+                  <AndroidHeaderIconButton
+                    accessibilityLabel="Decrease duration"
+                    icon="minus"
+                    disabled={amount <= 1}
+                    onPress={() => {
+                      setAmount((current) => Math.max(1, current - 1));
                       setError(null);
                     }}
                   />
-                </Column>
-              ) : (
-                <Column
-                  verticalArrangement={{ spacedBy: 16 }}
-                  modifiers={[fillMaxWidth(), padding(24, 8, 24, 16)]}
-                >
-                  <Row
-                    horizontalArrangement="spaceEvenly"
-                    verticalAlignment="center"
-                    modifiers={[fillMaxWidth()]}
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    testID="snooze-duration"
+                    className="min-w-12 text-center text-2xl font-t3-bold"
                   >
-                    <FilledTonalIconButton
-                      enabled={amount > 1}
-                      onClick={() => setAmount((current) => Math.max(1, current - 1))}
-                      colors={{
-                        containerColor: colors["--color-secondary"],
-                        contentColor: colors["--color-secondary-foreground"],
-                      }}
-                      modifiers={[size(48, 48), testID("snooze-decrease-duration")]}
-                    >
-                      <Text style={titleTypography}>−</Text>
-                    </FilledTonalIconButton>
-                    <Text style={titleTypography} modifiers={[testID("snooze-duration")]}>
-                      {String(amount)}
-                    </Text>
-                    <FilledTonalIconButton
-                      enabled={amount < 99}
-                      onClick={() => setAmount((current) => Math.min(99, current + 1))}
-                      colors={{
-                        containerColor: colors["--color-secondary"],
-                        contentColor: colors["--color-secondary-foreground"],
-                      }}
-                      modifiers={[size(48, 48), testID("snooze-increase-duration")]}
-                    >
-                      <Text style={titleTypography}>+</Text>
-                    </FilledTonalIconButton>
-                  </Row>
-                  <MaterialSegmentedButtons options={units} selected={unit} onSelect={setUnit} />
-                </Column>
-              )}
-              <Column
-                verticalArrangement={{ spacedBy: 16 }}
-                modifiers={[fillMaxWidth(), padding(24, 8, 24, 24)]}
-              >
-                {error ? (
-                  <Text style={bodyTypography} color={colors["--color-danger-foreground"]}>
-                    {error}
+                    {String(amount)}
                   </Text>
-                ) : null}
-                <Row horizontalArrangement="end" modifiers={[fillMaxWidth()]}>
-                  <TextButton
-                    onClick={props.onClose}
-                    colors={{ contentColor: colors["--color-foreground"] }}
-                  >
-                    <Text style={bodyTypography}>Cancel</Text>
-                  </TextButton>
-                  <TextButton
-                    onClick={submit}
-                    colors={{ contentColor: colors["--color-foreground"] }}
-                  >
-                    <Text style={bodyTypography}>Snooze</Text>
-                  </TextButton>
-                </Row>
-              </Column>
-            </Column>
-          </Surface>
-        </BasicAlertDialog>
-      </Host>
+                  <AndroidHeaderIconButton
+                    accessibilityLabel="Increase duration"
+                    icon="plus"
+                    disabled={amount >= 99}
+                    onPress={() => {
+                      setAmount((current) => Math.min(99, current + 1));
+                      setError(null);
+                    }}
+                  />
+                </View>
+                <SegmentedControl
+                  options={units}
+                  selected={unit}
+                  onSelect={(value) => {
+                    setUnit(value);
+                    setError(null);
+                  }}
+                />
+              </View>
+            )}
+            {error ? (
+              <Text accessibilityRole="alert" className="text-sm text-danger-foreground">
+                {error}
+              </Text>
+            ) : null}
+          </ScrollView>
+        </View>
+        {picker ? (
+          <DateTimePicker
+            value={date}
+            mode={picker}
+            is24Hour={is24Hour}
+            onDismiss={() => setPicker(null)}
+            onValueChange={(_, selected) => {
+              const next = new Date(date);
+              if (picker === "date")
+                next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+              else next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+              setDate(next);
+              setPicker(null);
+              setError(null);
+            }}
+          />
+        ) : null}
+      </View>
     </OverlayPortal>
-  );
-}
-
-function SnoozeDateTimePicker(props: {
-  readonly date: Date;
-  readonly picker: "date" | "time";
-  readonly is24Hour: boolean;
-  readonly colors: React.ComponentProps<typeof DateTimePicker>["elementColors"];
-  readonly onChange: (date: Date) => void;
-}) {
-  // Changing initialDate resets Compose's picker state, including its active clock dial.
-  const [initialDate] = useState(() =>
-    props.picker === "date" ? snoozeDateToPickerDate(props.date) : props.date.toISOString(),
-  );
-  return (
-    <DateTimePicker
-      initialDate={initialDate}
-      displayedComponents={props.picker === "date" ? "date" : "hourAndMinute"}
-      is24Hour={props.is24Hour}
-      showVariantToggle={false}
-      elementColors={props.colors}
-      onDateSelected={props.onChange}
-    />
   );
 }
