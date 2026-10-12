@@ -63,7 +63,7 @@ export function MaterialPullRequestToolbar(props: { readonly onRequestVisibility
             onChangeText={(query) => dispatch({ type: "query", tab: "pullRequests", query })}
           />
         ) : (
-          <View className="min-w-0 flex-1 pl-3">
+          <View className="min-w-0 flex-1 pl-1">
             <WorkspaceConnectionTitle
               grow
               brand={
@@ -86,7 +86,7 @@ export function MaterialPullRequestToolbar(props: { readonly onRequestVisibility
         searching ? (
           <AndroidHeaderIconButton
             accessibilityLabel="Close search"
-            icon="arrow.left"
+            icon="chevron.left"
             onPress={closeSearch}
           />
         ) : undefined
@@ -102,7 +102,7 @@ export function MaterialPullRequestToolbar(props: { readonly onRequestVisibility
               },
               {
                 accessibilityLabel: "Open settings",
-                icon: "gearshape",
+                icon: "ellipsis",
                 onPress: () =>
                   navigation.navigate("SettingsSheet", {
                     screen: "SettingsContent",

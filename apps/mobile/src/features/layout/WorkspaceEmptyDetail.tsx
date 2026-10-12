@@ -2,7 +2,6 @@ import { SymbolView } from "../../components/AppSymbol";
 import { Platform, Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
-import { MaterialNewThreadButton } from "../../components/MaterialNewThreadButton";
 import { MaterialFloatingActionButton } from "../../components/MaterialFloatingActionButton";
 import { EmptyState } from "../../components/EmptyState";
 
@@ -24,14 +23,18 @@ export function WorkspaceEmptyDetail(props: {
             title="No environments connected"
             detail="Add an environment to load projects and start coding sessions."
             variant="plain"
+            actionLabel="Add environment"
+            onAction={props.onAddConnection}
             action={
-              <MaterialFloatingActionButton
-                label="Add environment"
-                icon="plus"
-                variant="extended"
-                tone="primary"
-                onPress={props.onAddConnection}
-              />
+              Platform.OS === "ios" ? (
+                <MaterialFloatingActionButton
+                  label="Add environment"
+                  icon="plus"
+                  variant="extended"
+                  tone="primary"
+                  onPress={props.onAddConnection}
+                />
+              ) : undefined
             }
           />
         </View>
@@ -45,22 +48,16 @@ export function WorkspaceEmptyDetail(props: {
           />
           <Text className="text-center text-xl font-t3-bold">Select a thread</Text>
           <Text className="text-center text-base text-foreground-muted">
-            {Platform.OS === "android"
-              ? "Choose a thread from the sidebar or start a new thread."
-              : "Choose a thread from the sidebar or start a new task."}
+            Choose a thread from the sidebar or start a new task.
           </Text>
           {props.onStartNewTask ? (
-            Platform.OS === "android" ? (
-              <MaterialNewThreadButton extended className="mt-2" onPress={props.onStartNewTask} />
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                className="mt-2 flex-row items-center gap-2 rounded-full bg-primary px-5 py-3 active:opacity-70"
-                onPress={props.onStartNewTask}
-              >
-                <Text className="text-base font-t3-bold text-primary-foreground">New Task</Text>
-              </Pressable>
-            )
+            <Pressable
+              accessibilityRole="button"
+              className="mt-2 flex-row items-center gap-2 rounded-full bg-primary px-5 py-3 active:opacity-70"
+              onPress={props.onStartNewTask}
+            >
+              <Text className="text-base font-t3-bold text-primary-foreground">New Task</Text>
+            </Pressable>
           ) : null}
         </View>
       )}

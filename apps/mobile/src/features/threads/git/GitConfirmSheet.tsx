@@ -124,7 +124,6 @@ export function GitConfirmSheet(props: GitConfirmSheetProps) {
       {Platform.OS === "android" ? (
         <NativeStackScreenOptions
           options={{
-            sheetCornerRadius: 28,
             sheetAllowedDetents: "fitToContents",
           }}
         />

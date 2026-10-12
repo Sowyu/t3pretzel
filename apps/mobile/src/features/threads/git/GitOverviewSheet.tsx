@@ -32,10 +32,7 @@ import { AndroidAnchoredMenu } from "../../../components/AndroidAnchoredMenu";
 import { MaterialScreenContent } from "../../../components/MaterialScreenContent";
 import { useAdaptiveWorkspaceLayout } from "../../layout/AdaptiveWorkspaceLayout";
 import { AppText as Text } from "../../../components/AppText";
-import {
-  NativeStackScreenOptions,
-  nativeHeaderScrollEdgeEffects,
-} from "../../../native/StackHeader";
+import { nativeHeaderScrollEdgeEffects } from "../../../native/StackHeader";
 import { useEnvironmentQuery } from "../../../state/query";
 import { useThreadSelection } from "../../../state/use-thread-selection";
 import { useSelectedThreadGitActions } from "../../../state/use-selected-thread-git-actions";
@@ -500,17 +497,12 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       collapsable={false}
       className={
         Platform.OS === "android"
-          ? "flex-1 bg-header"
+          ? "flex-1 bg-sheet"
           : isInspector
             ? "flex-1 border-l border-border bg-sheet"
             : "flex-1 bg-sheet"
       }
     >
-      {!isInspector ? (
-        <NativeStackScreenOptions
-          options={{ sheetCornerRadius: Platform.OS === "android" ? 28 : undefined }}
-        />
-      ) : null}
       {isInspector ? (
         <View
           style={{
@@ -521,7 +513,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       ) : null}
 
       {isInspector ? (
-        <View className="gap-1 px-4 pb-4 pt-3 android:bg-header ios:border-b ios:border-border">
+        <View className="gap-1 px-4 pb-4 pt-3 ios:border-b ios:border-border">
           {Platform.OS === "android" ? (
             <View className="absolute right-3 top-4 z-[1]">{refreshMenu}</View>
           ) : (

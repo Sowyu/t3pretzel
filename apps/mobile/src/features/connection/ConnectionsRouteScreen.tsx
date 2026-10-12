@@ -6,7 +6,7 @@ import { useCallback, useState } from "react";
 import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
+import { AndroidSheetHeader } from "../../components/AndroidScreenHeader";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
 import { LocalEnvironmentList } from "./LocalEnvironmentList";
 import { GitHubRoutingSettings } from "./GitHubRoutingSettings";
@@ -29,9 +29,8 @@ export function ConnectionsRouteScreen() {
   return (
     <View collapsable={false} className="flex-1 bg-sheet">
       {Platform.OS === "android" ? (
-        <AndroidScreenHeader
+        <AndroidSheetHeader
           title="Environments"
-          onBack={() => navigation.goBack()}
           actions={[
             {
               accessibilityLabel: "Add environment",

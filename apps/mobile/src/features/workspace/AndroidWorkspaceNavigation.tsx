@@ -7,3 +7,4 @@ export function AndroidWorkspaceNavigation(_props: {
 }
 
 export const ANDROID_WORKSPACE_RAIL_WIDTH = 80;
+export const ANDROID_WORKSPACE_TAB_BAR_HEIGHT = 49;

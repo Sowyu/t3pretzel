@@ -164,11 +164,11 @@ export function ThreadFileNavigatorPane(props: {
   return (
     <View
       className={
-        Platform.OS === "android" ? "flex-1 bg-header" : "flex-1 border-l border-border bg-sheet"
+        Platform.OS === "android" ? "flex-1 bg-sheet" : "flex-1 border-l border-border bg-sheet"
       }
     >
       <View
-        className="ios:border-b ios:border-border android:bg-header"
+        className="ios:border-b ios:border-border"
         style={{ paddingTop: Platform.OS === "android" ? 0 : props.headerInset }}
       >
         {Platform.OS === "android" ? (

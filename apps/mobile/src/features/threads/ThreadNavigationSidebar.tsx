@@ -1,6 +1,4 @@
-import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import { resolveScratchProjectScopeKey } from "@t3tools/client-runtime/state/project-grouping";
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import { computeThreadMoveAvailability } from "./threadOrder";
 import type {
   EnvironmentProject,
@@ -52,7 +50,6 @@ import {
 import { SidebarHeaderActions } from "./sidebar-header-actions";
 import { MaterialThreadListToolbar } from "../home/MaterialThreadListToolbar";
 import { useMaterialToolbarLayout } from "../../components/useMaterialToolbarLayout";
-import { useMaterialFabScroll } from "../home/MaterialFabScrollContext";
 import { SidebarFilterButton } from "./sidebar-filter-button";
 import { createSidebarHeaderItems } from "./sidebar-native-header-items";
 import { SidebarNavigationShell } from "./sidebar-navigation-shell";
@@ -96,6 +93,8 @@ interface ThreadNavigationSidebarProps {
   readonly onSearchQueryChange: (query: string) => void;
   readonly onSelectThread: (thread: EnvironmentThreadShell) => void;
   readonly onRequestVisibility: () => void;
+  /** Android draws New task in its sidebar header, like iPad's compose bar button. */
+  readonly onStartNewTask?: () => void;
   readonly searchQuery: string;
 }
 
@@ -132,11 +131,7 @@ function NativeSidebarContainer(props: ThreadNavigationSidebarProps) {
 function ThreadNavigationSidebarPane(
   props: ThreadNavigationSidebarProps & { readonly nativeChrome: boolean },
 ) {
-  const { themeVariables: materialTheme } = useAppearancePreferences();
-  const drawerColor = materialTheme["--color-drawer"];
-
   const insets = useSafeAreaInsets();
-  const { fabClearance } = useAndroidControlSizing();
   const projects = useProjects();
   const threads = useNavigationThreadShells();
   const { environments: workspaceEnvironments, state: catalogState } = useWorkspaceState();
@@ -591,9 +586,7 @@ function ThreadNavigationSidebarPane(
   const handleScrollBeginDrag = useCallback(() => {
     openSwipeableRef.current?.close();
   }, []);
-  const onMaterialFabScroll = useMaterialFabScroll();
   const { swipeEnabled, scrollGateHandlers } = useSwipeableScrollGate({
-    onScroll: onMaterialFabScroll,
     onScrollBeginDrag: handleScrollBeginDrag,
   });
   // The sticky header's project shells and search maps feed row props, so
@@ -976,7 +969,7 @@ function ThreadNavigationSidebarPane(
     <View
       testID="thread-navigation-sidebar"
       className={
-        Platform.OS === "android" ? "flex-1 bg-header" : "flex-1 border-r border-border bg-drawer"
+        Platform.OS === "android" ? "flex-1 bg-drawer" : "flex-1 border-r border-border bg-drawer"
       }
       style={{ width: props.width }}
     >
@@ -984,15 +977,7 @@ function ThreadNavigationSidebarPane(
         className="flex-1"
         style={
           Platform.OS === "android"
-            ? {
-                marginTop: stickyHeaderHeight,
-                marginHorizontal: 4,
-                paddingBottom: insets.bottom,
-                backgroundColor: drawerColor,
-                borderTopLeftRadius: 28,
-                borderTopRightRadius: 28,
-                overflow: "hidden",
-              }
+            ? { marginTop: stickyHeaderHeight, paddingBottom: insets.bottom }
             : { paddingBottom: insets.bottom }
         }
       >
@@ -1014,10 +999,7 @@ function ThreadNavigationSidebarPane(
                   styles.threadListContent,
                   Platform.OS === "android" ? { paddingHorizontal: 0 } : null,
                   {
-                    paddingBottom:
-                      Platform.OS === "android"
-                        ? Math.max(insets.bottom, 16) + fabClearance - insets.bottom
-                        : 16 + insets.bottom,
+                    paddingBottom: Platform.OS === "android" ? 16 : 16 + insets.bottom,
                     paddingTop: Platform.OS === "android" ? 6 : topListInset,
                   },
                 ]}
@@ -1047,6 +1029,7 @@ function ThreadNavigationSidebarPane(
           onOpenSettings={props.onOpenSettings}
           onOpenEnvironments={props.onOpenEnvironmentSettings}
           onRequestVisibility={props.onRequestVisibility}
+          onStartNewTask={props.onStartNewTask}
         />
       ) : (
         <View

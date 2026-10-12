@@ -89,7 +89,6 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
       {Platform.OS === "android" ? (
         <NativeStackScreenOptions
           options={{
-            sheetCornerRadius: 28,
             sheetAllowedDetents: "fitToContents",
           }}
         />

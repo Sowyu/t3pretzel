@@ -972,15 +972,11 @@ const RootStackConfig = createWorkspaceStackNavigator({
       linking: "connections",
       options: {
         title: "Environments",
-        // Android: full page; the screen renders its own AndroidScreenHeader,
-        // so the native bar stays hidden. iOS keeps the sheet.
-        ...(Platform.OS === "android"
-          ? { presentation: "card" as const, headerShown: false }
-          : {
-              ...FORM_SHEET_PRESENTATION_OPTIONS,
-              sheetAllowedDetents: [0.55, 0.7],
-              sheetGrabberVisible: true,
-            }),
+        // Android sheets render an embedded AndroidSheetHeader instead of the native bar.
+        ...(Platform.OS === "android" ? { headerShown: false } : undefined),
+        ...FORM_SHEET_PRESENTATION_OPTIONS,
+        sheetAllowedDetents: [0.55, 0.7],
+        sheetGrabberVisible: true,
       },
     }),
     ConnectionsNew: createNativeStackScreen({
@@ -1026,7 +1022,21 @@ const RootStackConfig = createWorkspaceStackNavigator({
 function GuardedScreenLayout(props: {
   readonly children: ReactNode;
   readonly route: { readonly name: string; readonly params?: object | undefined };
+  readonly options?: NativeStackNavigationOptions;
 }) {
+  // Android form sheets have no system grabber; draw the iOS 36x5 pill over the content.
+  const grabber =
+    Platform.OS === "android" &&
+    props.options?.presentation === "formSheet" &&
+    props.options.sheetGrabberVisible ? (
+      <View
+        pointerEvents="none"
+        importantForAccessibility="no-hide-descendants"
+        className="absolute inset-x-0 top-1.5 z-10 items-center"
+      >
+        <View className="h-[5px] w-9 rounded-full bg-foreground-tertiary" />
+      </View>
+    ) : null;
   return (
     <RenderErrorBoundary
       resetKeys={[props.route.params]}
@@ -1035,6 +1045,7 @@ function GuardedScreenLayout(props: {
       )}
     >
       {props.children}
+      {grabber}
     </RenderErrorBoundary>
   );
 }

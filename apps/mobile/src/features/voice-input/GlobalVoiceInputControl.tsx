@@ -22,6 +22,7 @@ import { FullWindowOverlay } from "react-native-screens";
 
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
+import { ANDROID_WORKSPACE_TAB_BAR_HEIGHT } from "../workspace/AndroidWorkspaceNavigation";
 import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import { cn } from "../../lib/cn";
 import { CompactVoiceWaveform, DictationElapsedTime } from "./ComposerDictationControl";
@@ -74,7 +75,7 @@ function EdgeDictationPill(props: { readonly collapseRef: RefObject<(() => void)
   const voice = useGlobalVoiceInput();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { fabSize } = useAndroidControlSizing();
+  const { scale } = useAndroidControlSizing();
   const [expanded, setExpanded] = useState(false);
   const progress = useSharedValue(0);
   useEffect(() => {
@@ -103,10 +104,10 @@ function EdgeDictationPill(props: { readonly collapseRef: RefObject<(() => void)
   }));
 
   // Sit just above the bottom chrome: the toolbar or composer on iOS, the
-  // new-thread FAB on Android.
+  // workspace tab bar on Android.
   const bottom =
     Platform.OS === "android"
-      ? Math.max(insets.bottom, 16) + 16 + fabSize + 12
+      ? insets.bottom + ANDROID_WORKSPACE_TAB_BAR_HEIGHT * Math.max(1, scale) + 12
       : Math.max(insets.bottom, 12) + IOS_BOTTOM_CHROME_CLEARANCE;
 
   const presentation = resolveVoiceComposerPresentation(voice.state, voice.elapsedSeconds);

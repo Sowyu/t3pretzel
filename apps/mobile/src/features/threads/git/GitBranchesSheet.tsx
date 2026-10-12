@@ -70,7 +70,6 @@ export function GitBranchesSheet(_props: GitBranchesSheetProps) {
       {Platform.OS === "android" ? (
         <NativeStackScreenOptions
           options={{
-            sheetCornerRadius: 28,
             sheetAllowedDetents: "fitToContents",
           }}
         />

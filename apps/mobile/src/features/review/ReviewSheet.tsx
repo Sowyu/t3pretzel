@@ -420,7 +420,7 @@ function ReviewFileNavigator({
   return (
     <View
       className={
-        Platform.OS === "android" ? "flex-1 bg-header" : "flex-1 border-l border-border bg-sheet"
+        Platform.OS === "android" ? "flex-1 bg-sheet" : "flex-1 border-l border-border bg-sheet"
       }
     >
       {Platform.OS === "android" ? (

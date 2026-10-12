@@ -56,7 +56,6 @@ import {
   parseActiveThreadPath,
   useHardwareKeyboardCommand,
 } from "../keyboard/hardwareKeyboardCommands";
-import { AndroidHomeFabLayout } from "../home/AndroidHomeFab";
 import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import {
   AndroidWorkspaceNavigation,
@@ -707,7 +706,7 @@ function AdaptiveWorkspaceLayoutContent(
       <AdaptiveWorkspaceContext.Provider value={contextValue}>
         <View
           testID="adaptive-workspace-layout"
-          className={Platform.OS === "android" ? "flex-1 flex-row bg-header" : "flex-1 flex-row"}
+          className={Platform.OS === "android" ? "flex-1 flex-row bg-screen" : "flex-1 flex-row"}
         >
           {shouldRenderNavigationRail ? (
             <Animated.View
@@ -745,34 +744,26 @@ function AdaptiveWorkspaceLayoutContent(
                     onRequestVisibility={revealPrimarySidebar}
                     selectedPullRequestKey={props.selectedPullRequestKey ?? null}
                   >
-                    <AndroidHomeFabLayout sidebar onStartNewTask={handleStartNewTask}>
-                      <ThreadNavigationSidebar
-                        width={layout.listPaneWidth}
-                        visible={panes.primarySidebarVisible}
-                        onRequestVisibility={revealPrimarySidebar}
-                        selectedThreadKey={selectedThreadKey}
-                        onOpenSettings={handleOpenSettings}
-                        onOpenEnvironmentSettings={handleOpenEnvironmentSettings}
-                        onNewThreadInProject={handleNewThreadInProject}
-                        onNewThreadOnBranch={handleNewThreadOnBranch}
-                        onSelectThread={handleSelectThread}
-                        onSearchQueryChange={setPrimarySidebarSearchQuery}
-                        searchQuery={primarySidebarSearchQuery}
-                      />
-                    </AndroidHomeFabLayout>
+                    <ThreadNavigationSidebar
+                      width={layout.listPaneWidth}
+                      visible={panes.primarySidebarVisible}
+                      onRequestVisibility={revealPrimarySidebar}
+                      selectedThreadKey={selectedThreadKey}
+                      onOpenSettings={handleOpenSettings}
+                      onOpenEnvironmentSettings={handleOpenEnvironmentSettings}
+                      onNewThreadInProject={handleNewThreadInProject}
+                      onNewThreadOnBranch={handleNewThreadOnBranch}
+                      onSelectThread={handleSelectThread}
+                      onSearchQueryChange={setPrimarySidebarSearchQuery}
+                      searchQuery={primarySidebarSearchQuery}
+                      onStartNewTask={handleStartNewTask}
+                    />
                   </AndroidWorkspaceSidebar>
                 </RenderErrorBoundary>
               </View>
             </Animated.View>
           ) : null}
-          <View
-            className={
-              Platform.OS === "android"
-                ? "flex-1 overflow-hidden bg-header"
-                : "flex-1 overflow-hidden bg-screen"
-            }
-            collapsable={false}
-          >
+          <View className="flex-1 overflow-hidden bg-screen" collapsable={false}>
             <View
               collapsable={false}
               style={

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Platform, Modal, Pressable, TextInput, View } from "react-native";
+import { Alert, Platform, Modal, Pressable, TextInput, View } from "react-native";
 
 import { cn } from "../lib/cn";
 import { AppText } from "./AppText";
-import { MaterialConfirmDialog } from "./MaterialConfirmDialog";
+import { AndroidAlert, type AndroidAlertRequest, alertRequestFromNative } from "./AndroidAlert";
 import type { ConfirmDialogRequest, TextInputDialogRequest } from "./ConfirmDialog.types";
 
 export type { ConfirmDialogRequest, TextInputDialogRequest } from "./ConfirmDialog.types";
@@ -29,10 +29,9 @@ export function showTextInputDialog(request: TextInputDialogRequest): void {
 }
 
 /**
- * Android-style alert dialog matching the native one themed by
- * withAndroidModernAlertDialog — left-aligned text, right-aligned text
- * buttons — with what the native theme can't do: a per-dialog destructive
- * button color and a dimmer message than the title.
+ * Hosts the app's imperative dialogs. iOS keeps its RN card; Android draws
+ * an iOS-style alert and also routes `Alert.alert` through it while mounted,
+ * so call sites need no platform branch.
  */
 export function ConfirmDialogHost() {
   const [presented, setPresented] = useState<DialogRequest | null>(null);
@@ -67,19 +66,7 @@ export function ConfirmDialogHost() {
   const confirmDisabled = presented?.kind === "text-input" && inputValue.trim().length === 0;
 
   if (Platform.OS === "android")
-    return presented ? (
-      <MaterialConfirmDialog
-        key={`${presented.kind}:${presented.request.title}:${presented.kind === "text-input" ? presented.request.initialValue : ""}`}
-        request={presented.request}
-        inputInitialValue={
-          presented.kind === "text-input" ? presented.request.initialValue : undefined
-        }
-        onInputChange={setInputValue}
-        confirmDisabled={confirmDisabled}
-        onCancel={handleCancel}
-        onConfirm={handleConfirm}
-      />
-    ) : null;
+    return <AndroidAlertQueue dialog={presented} onDone={setPresented} />;
 
   return (
     <Modal
@@ -149,4 +136,53 @@ export function ConfirmDialogHost() {
       )}
     </Modal>
   );
+}
+
+function dialogToAlert(dialog: DialogRequest, onDone: (dialog: null) => void): AndroidAlertRequest {
+  const { request } = dialog;
+  const finish = (action?: () => void) => () => {
+    onDone(null);
+    action?.();
+  };
+  return {
+    title: request.title,
+    message: dialog.kind === "confirm" ? dialog.request.message : undefined,
+    textInput:
+      dialog.kind === "text-input" ? { initialValue: dialog.request.initialValue } : undefined,
+    buttons: [
+      { text: request.cancelText ?? "Cancel", style: "cancel", onPress: finish(request.onCancel) },
+      {
+        text: request.confirmText,
+        style: dialog.kind === "confirm" && dialog.request.destructive ? "destructive" : "default",
+        requiresInput: dialog.kind === "text-input",
+        onPress: (value) => {
+          onDone(null);
+          if (dialog.kind === "confirm") dialog.request.onConfirm();
+          else dialog.request.onConfirm(value ?? "");
+        },
+      },
+    ],
+  };
+}
+
+/** One alert at a time; later Alert.alert calls wait their turn, like stacked native dialogs. */
+function AndroidAlertQueue(props: {
+  readonly dialog: DialogRequest | null;
+  readonly onDone: (dialog: null) => void;
+}) {
+  const [queue, setQueue] = useState<readonly AndroidAlertRequest[]>([]);
+  useEffect(() => {
+    const original = Alert.alert;
+    Alert.alert = (title, message, buttons, options) => {
+      const request = alertRequestFromNative(title, message, buttons, options, () =>
+        setQueue((current) => current.slice(1)),
+      );
+      setQueue((current) => [...current, request]);
+    };
+    return () => {
+      Alert.alert = original;
+    };
+  }, []);
+  const current = props.dialog ? dialogToAlert(props.dialog, props.onDone) : (queue[0] ?? null);
+  return current ? <AndroidAlert key={current.id ?? "dialog"} request={current} /> : null;
 }

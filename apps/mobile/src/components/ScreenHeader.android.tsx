@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  BackHandler,
-  Keyboard,
-  Pressable,
-  TextInput,
-  type TextInputInstance,
-  View,
-} from "react-native";
+import { BackHandler, Keyboard, TextInput, type TextInputInstance, View } from "react-native";
 import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
 import { NativeStackScreenOptions } from "../native/StackHeader";
 import { AndroidWorkspaceSidebarButton } from "../features/layout/workspace-sidebar-toolbar";
@@ -23,7 +16,7 @@ import { useAndroidControlSizing } from "./useAndroidControlSizing";
 export function ScreenHeader(props: ScreenHeaderProps) {
   const { search } = props;
   const { paddingTop, paddingBottom } = useMaterialToolbarLayout();
-  const { scale, buttonSize, iconSize, smallIconSize } = useAndroidControlSizing();
+  const { scale, buttonSize } = useAndroidControlSizing();
   const { themeVariables } = useAppearancePreferences();
   const inputRef = useRef<TextInputInstance>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -53,23 +46,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
         if (action && !action.disabled) action.onPress();
       }}
     >
-      {search?.mode === "inline" ? (
-        <Pressable
-          accessibilityLabel={menu.title}
-          accessibilityRole="button"
-          className="items-center justify-center rounded-full bg-subtle"
-          style={{ width: buttonSize, height: buttonSize }}
-        >
-          <SymbolView
-            name={menu.icon}
-            size={smallIconSize}
-            tintColorClassName="accent-header-foreground"
-            type="monochrome"
-          />
-        </Pressable>
-      ) : (
-        <ScreenHeaderButton accessibilityLabel={menu.title} icon={menu.icon} />
-      )}
+      <ScreenHeaderButton accessibilityLabel={menu.title} icon={menu.icon} />
     </ControlPillMenu>
   ));
   const options = (
@@ -89,38 +66,21 @@ export function ScreenHeader(props: ScreenHeaderProps) {
     return (
       <>
         {options}
-        <View
-          className="border-b border-header-border bg-header px-3"
-          style={{
-            paddingTop,
-            paddingBottom: 8.75 * scale,
-            borderBottomWidth: 0,
-          }}
-        >
+        <View className="px-3" style={{ paddingTop, paddingBottom: 8.75 * scale }}>
           <View className="flex-row items-center gap-2" style={{ minHeight: buttonSize }}>
             {props.onBack ? (
-              <Pressable
-                accessibilityLabel="Navigate up"
-                accessibilityRole="button"
-                hitSlop={8}
+              <ScreenHeaderButton
+                accessibilityLabel="Back"
+                icon="chevron.left"
                 onPress={props.onBack}
-                className="items-center justify-center"
-                style={{ width: buttonSize, height: buttonSize }}
-              >
-                <SymbolView
-                  name="chevron.left"
-                  size={iconSize}
-                  tintColorClassName="accent-header-foreground"
-                  type="monochrome"
-                />
-              </Pressable>
+              />
             ) : null}
             <View
-              className="flex-1 flex-row items-center bg-input"
+              className="flex-1 flex-row items-center bg-subtle"
               style={{
-                minHeight: Math.max(48, 38.5 * scale),
+                minHeight: Math.max(40, 38 * scale),
                 gap: 8.75 * scale,
-                borderRadius: 14 * scale,
+                borderRadius: 10 * scale,
                 paddingHorizontal: 12.25 * scale,
               }}
             >
@@ -201,11 +161,11 @@ export function ScreenHeader(props: ScreenHeaderProps) {
             {header}
           </View>
           {searching ? (
-            <View className="absolute inset-0 bg-header px-2" style={{ paddingTop, paddingBottom }}>
-              <View className="flex-1 flex-row items-center gap-1">
+            <View className="absolute inset-0 px-3" style={{ paddingTop, paddingBottom }}>
+              <View className="flex-1 flex-row items-center gap-2">
                 <ScreenHeaderButton
                   accessibilityLabel={search.closeAccessibilityLabel ?? "Close search"}
-                  icon="arrow.left"
+                  icon="chevron.left"
                   onPress={closeSearch}
                 />
                 <MaterialSearchField
