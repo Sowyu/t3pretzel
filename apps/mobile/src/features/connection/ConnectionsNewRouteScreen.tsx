@@ -23,7 +23,7 @@ import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../com
 import { FrostedCutout } from "../../components/FrostedCutout";
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
 import {
-  setPendingConnectionError,
+  clearPairingConnectionError,
   useRemoteConnections,
 } from "../../state/use-remote-environment-registry";
 import { SymbolView } from "../../components/AppSymbol";
@@ -97,16 +97,16 @@ export function ConnectionsNewRouteScreen({
 
   const handleHostChange = useCallback((value: string) => {
     setHostInput(value);
-    setPendingConnectionError(null);
+    clearPairingConnectionError();
   }, []);
 
   const handleCodeChange = useCallback((value: string) => {
     setCodeInput(value);
-    setPendingConnectionError(null);
+    clearPairingConnectionError();
   }, []);
 
-  // The error is shared app state; a stale failure must not greet the next visit.
-  useEffect(() => () => setPendingConnectionError(null), []);
+  // The pairing error outlives the screen; a stale failure must not greet the next visit.
+  useEffect(() => clearPairingConnectionError, []);
 
   // Opening the sheet never prompts; a tap on the scan card asks for the camera.
   const handleScanPress = useCallback(async () => {

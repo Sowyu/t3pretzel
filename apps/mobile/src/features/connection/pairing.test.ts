@@ -2,10 +2,12 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   buildPairingUrl,
+  describePairingFailure,
   extractPairingUrlFromQrPayload,
   normalizePairingCode,
   PairingQrPayloadEmptyError,
   parsePairingUrl,
+  withDefaultScheme,
 } from "./pairing";
 
 describe("normalizePairingCode", () => {
@@ -79,5 +81,47 @@ describe("parsePairingUrl", () => {
       host: "https://desktop.tailnet.ts.net",
       code: "pairing-token",
     });
+  });
+});
+
+describe("withDefaultScheme", () => {
+  it.each([
+    "localhost:3773",
+    "127.0.0.1:3773",
+    "[::1]:3773",
+    "10.0.2.2:3773",
+    "172.20.1.4:3773",
+    "192.168.1.100:3773",
+    "169.254.10.1:3773",
+    "100.101.102.103:3773",
+    "studio.local:3773",
+  ])("uses http for the local-network host %s", (host) => {
+    expect(withDefaultScheme(host)).toBe(`http://${host}`);
+  });
+
+  it("keeps https for a public hostname", () => {
+    expect(withDefaultScheme("box.tailnet.ts.net")).toBe("https://box.tailnet.ts.net");
+  });
+
+  it("keeps a scheme the user typed", () => {
+    expect(withDefaultScheme("https://192.168.1.100:3773")).toBe("https://192.168.1.100:3773");
+  });
+
+  it("schemes a LAN host even without a pairing code", () => {
+    expect(buildPairingUrl("192.168.1.100:3773", "")).toBe("http://192.168.1.100:3773");
+  });
+});
+
+describe("describePairingFailure", () => {
+  it("names the host when the request never reached it", () => {
+    const error = { _tag: "ConnectionTransientError", reason: "network", detail: "raw" };
+    expect(describePairingFailure(error, "http://192.168.1.100:3773/#token=abc")).toBe(
+      "Couldn't reach 192.168.1.100:3773. Check the address and that the server is running.",
+    );
+  });
+
+  it("leaves other failures to their own message", () => {
+    const error = { _tag: "ConnectionBlockedError", reason: "authentication" };
+    expect(describePairingFailure(error, "http://192.168.1.100:3773")).toBeNull();
   });
 });
