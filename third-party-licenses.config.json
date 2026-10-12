@@ -61,6 +61,7 @@
       "includeInBundles": ["mobile", "web"],
       "license": "MIT",
       "name": "agent-device",
+      "version": "0.21.25",
       "sourceUrl": "https://github.com/callstack/agent-device",
       "generatedNotices": [
         {
@@ -74,6 +75,7 @@
       "includeInBundles": ["mobile", "web"],
       "license": "MIT AND Apache-2.0 AND BSD-3-Clause",
       "name": "expo-device-hub",
+      "version": "0.15.3",
       "sourceUrl": "https://github.com/expo/expo-device-hub",
       "generatedNotices": [
         {
@@ -98,13 +100,6 @@
       "name": "libghostty-vt",
       "noticeFile": "native/libghostty-vt/LICENSE",
       "sourceUrl": "https://github.com/ghostty-org/ghostty"
-    },
-    {
-      "bundles": ["assets", "web"],
-      "license": "MIT",
-      "name": "Symbols Nerd Font Mono",
-      "noticeFile": "apps/web/src/terminal/ghostty/fonts/LICENSE",
-      "sourceUrl": "https://github.com/ryanoasis/nerd-fonts"
     },
     {
       "bundles": ["ios", "mobile"],
