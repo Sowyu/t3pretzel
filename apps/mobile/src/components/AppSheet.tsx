@@ -29,6 +29,8 @@ export function AppSheet(props: {
       isOpen={isOpen}
       detents={[0.5, 0.9]}
       prefersGrabberVisible
+      // Same rounded top as the navigator's form sheets (FORM_SHEET_PRESENTATION_OPTIONS).
+      preferredCornerRadius={Platform.OS === "android" ? 28 : "systemDefault"}
       nativeContainerStyle={containerStyle}
       onDismiss={props.onClose}
       onNativeDismiss={props.onClose}
