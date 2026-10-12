@@ -1,141 +1,38 @@
-# T3 Code
+# t3pretzel
 
-T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
+A fork of [T3 Code](https://github.com/pingdotgg/t3code) cut down to the mobile app. The goal is to fix up the Android app. The server, web app, desktop app, marketing site, relay, and native desktop helpers from the upstream monorepo are gone.
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, and Google Antigravity. If they're set up on your computer, T3 Code can control them.
+What is here:
 
-## "Wait, what are you selling me?"
+- `apps/mobile`, the Expo / React Native app for Android and iOS.
+- `packages/contracts`, `packages/shared`, `packages/client-runtime`, the workspace packages the app imports.
+- `scripts`, Android icon export, mobile native lint, and third-party license generation.
+- `native/libghostty-vt`, headers and version pin for the Android terminal's libghostty build.
 
-Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
+The app talks to any T3 Code server. Run one with `npx t3@latest` or the upstream desktop app.
 
-We wanted something performant, remote-ready, and truly open. If we ever go the wrong direction, we want you to have everything you need to fork and build the editor that you want.
+## Nightly builds
 
-## Installation
+Every push to `main` builds the Android app and publishes it to the rolling [nightly release](https://github.com/Sowyu/t3pretzel/releases/tag/nightly). It is the _nightly_ variant ("T3 Code Nightly", nightly artwork), so it installs next to the Play Store app. arm64-v8a, OTA updates off, T3 Connect on.
 
-> [!WARNING]
-> T3 Code currently supports Codex, Claude, Cursor, Grok Build, OpenCode, and Antigravity. Install and authenticate at least one provider before use:
->
-> - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
-> - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
-> - Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
-> - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
-> - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
-> - Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**. No CLI is required.
+Its package id is `com.t3tools.t3code.preview`, the id of T3's internal preview build, because T3's Clerk instance only completes OAuth sign-in for the package ids it lists and this fork cannot add one. Every nightly is signed with one key kept in the `NIGHTLY_KEYSTORE_BASE64` and `NIGHTLY_KEYSTORE_PASSWORD` repository secrets, so each one updates the previous. A fork needs its own: generate a keystore with `keytool`, store it base64-encoded in those two secrets, and set the matching `T3CODE_ANDROID_KEYSTORE_*` variables from `.env.example` for local release builds.
 
-### Command line
+Push notifications need Firebase, and the nightly ships without it by default. The app talks to FCM for its push token, FCM needs a `google-services.json`, and this repo has none, so a stock nightly registers with the relay carrying no push token and no agent push ever arrives. Local notifications are unaffected: while the app is running, a finished turn still posts a notification from the device itself. To turn push on for your own fork, create a Firebase project, add an Android app with the package id `com.t3tools.t3code.preview`, download its `google-services.json`, and store it base64-encoded (`base64 -w0 google-services.json`) in a repository secret named `GOOGLE_SERVICES_JSON`. The workflow decodes it and passes it to the build through `T3CODE_ANDROID_GOOGLE_SERVICES_FILE`; local builds set that variable to a path instead. Pushes are sent by T3's relay, so they also depend on that relay knowing your Firebase project.
 
-```bash
-curl -fsSL https://t3.codes/install.sh | sh
-```
+Once installed, the app updates itself: Settings → App shows the running commit with a Check button, the app checks the release every six hours, and an Update pill appears in the header when a newer nightly exists. Tapping it downloads the APK, checks its SHA-256 against the release digest plus the package name and signing key, installs it through Android's package installer, and reports the result on the next launch. After the first in-app update the app is its own installer of record, so later updates install without a confirmation dialog.
 
-On Windows, in PowerShell:
+Coming from the Play Store app: sign in to T3 Connect with the same account and your linked environments appear under Connections with a "Connect all" button. Directly paired environments (LAN, Tailscale) have to be paired again from the desktop app's Settings → Connections, since pairing tokens belong to one install.
 
-```powershell
-irm https://t3.codes/install.ps1 | iex
-```
+## Setup
 
-Then run `t3` to start the server and open the local web app. `t3 service install` keeps it running in the background, `t3 update` moves to a newer release, and `t3 --help` has the full reference.
-
-To try it once without installing, run `npx t3@latest` instead.
-
-### Desktop app
-
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
-
-#### Windows (`winget`)
-
-```bash
-winget install T3Tools.T3Code
-```
-
-#### Windows (`scoop`)
-
-```bash
-scoop install extras/t3code
-```
-
-#### macOS (Homebrew)
-
-```bash
-brew install --cask t3-code
-```
-
-#### Debian, Ubuntu (`.deb`)
-
-Download the `.deb` from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), then:
-
-```bash
-sudo apt install ./T3-Code-*.deb
-```
-
-#### Arch Linux (AUR)
-
-Stable:
-
-```bash
-yay -S t3code-bin
-```
-
-Nightly:
-
-```bash
-yay -S t3code-nightly-bin
-```
-
-The AUR packaging is maintained in this repository under [`packaging/aur`](./packaging/aur).
-
-## Some notes
-
-We are very very early in this project. Expect bugs.
-
-We are (mostly) not accepting contributions yet. Small fixes may be considered. Big features will not be.
-
-## Documentation
-
-Full docs live in [docs/](./docs). There's no docs site yet.
-
-- [Install and first run](./docs/user/install.md)
-- [Permission modes](./docs/user/permission-modes.md)
-- [Keyboard shortcuts](./docs/user/keybindings.md)
-- [Project settings](./docs/user/project-settings.md)
-- [Appearance preferences](./docs/user/appearance.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Connect Claude Code, Codex, ChatGPT and other agents over MCP](./docs/user/outside-agents.md)
-- [Keeping app and server in sync](./docs/user/updating.md)
-- [Source control integrations](./docs/user/source-control.md)
-- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
-- [Run T3 Code as a background service](./docs/user/background-service.md)
-
-Building from source? Start at [docs/internals/overview.md](./docs/internals/overview.md).
-
-## If you REALLY want to contribute still.... read this first
-
-### Install `vp`
-
-T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
-
-#### macOS / Linux
-
-```bash
-curl -fsSL https://vite.plus | bash
-```
-
-#### Windows
-
-```bash
-irm https://vite.plus/ps1 | iex
-```
-
-Checkout their getting started guide for more information: https://viteplus.dev/guide/
-
-### Install dependencies
+Install [Vite+](https://viteplus.dev/guide/), then:
 
 ```bash
 vp i
+cd apps/mobile
+vp run android:dev
 ```
 
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting a bug or opening a PR.
+[apps/mobile/README.md](./apps/mobile/README.md) covers variants, EAS builds, and native lint. Docs for the parts that remain are in [docs/](./docs).
 
-Have a feature request? Start an [Ideas discussion](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
-
-Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
+Licensed under the [MIT License](./LICENSE), same as upstream.
