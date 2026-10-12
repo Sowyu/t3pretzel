@@ -104,7 +104,6 @@ export function PullRequestSheetContent(props: {
       <NativeStackScreenOptions
         options={{
           gestureEnabled: !props.busy,
-          ...(android ? { sheetCornerRadius: 28 } : {}),
           ...(fitToContents ? { sheetAllowedDetents: "fitToContents" } : {}),
         }}
       />

@@ -32,10 +32,7 @@ import { AndroidAnchoredMenu } from "../../../components/AndroidAnchoredMenu";
 import { MaterialScreenContent } from "../../../components/MaterialScreenContent";
 import { useAdaptiveWorkspaceLayout } from "../../layout/AdaptiveWorkspaceLayout";
 import { AppText as Text } from "../../../components/AppText";
-import {
-  NativeStackScreenOptions,
-  nativeHeaderScrollEdgeEffects,
-} from "../../../native/StackHeader";
+import { nativeHeaderScrollEdgeEffects } from "../../../native/StackHeader";
 import { useEnvironmentQuery } from "../../../state/query";
 import { useThreadSelection } from "../../../state/use-thread-selection";
 import { useSelectedThreadGitActions } from "../../../state/use-selected-thread-git-actions";
@@ -506,11 +503,6 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
             : "flex-1 bg-sheet"
       }
     >
-      {!isInspector ? (
-        <NativeStackScreenOptions
-          options={{ sheetCornerRadius: Platform.OS === "android" ? 28 : undefined }}
-        />
-      ) : null}
       {isInspector ? (
         <View
           style={{
