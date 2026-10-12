@@ -3,11 +3,30 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildPairingUrl,
   extractPairingUrlFromQrPayload,
+  normalizePairingCode,
   PairingQrPayloadEmptyError,
   parsePairingUrl,
 } from "./pairing";
 
+describe("normalizePairingCode", () => {
+  it("strips separators and uppercases a server-issued code", () => {
+    expect(normalizePairingCode("7k3m-9pq2-rstv")).toBe("7K3M9PQ2RSTV");
+    expect(normalizePairingCode(" 7K3M 9PQ2 RSTV ")).toBe("7K3M9PQ2RSTV");
+  });
+
+  it("leaves codes outside the server format as typed", () => {
+    expect(normalizePairingCode("pairing-token")).toBe("pairing-token");
+    expect(normalizePairingCode("abcd-efgh-ijkl")).toBe("abcd-efgh-ijkl");
+  });
+});
+
 describe("buildPairingUrl", () => {
+  it("sends a hyphenated pairing code in the server's format", () => {
+    expect(buildPairingUrl("192.168.1.100:3773", "7k3m-9pq2-rstv")).toBe(
+      "http://192.168.1.100:3773/#token=7K3M9PQ2RSTV",
+    );
+  });
+
   it("uses HTTP for a schemeless IP address", () => {
     expect(buildPairingUrl("192.168.1.100:3773", "pairing-token")).toBe(
       "http://192.168.1.100:3773/#token=pairing-token",
