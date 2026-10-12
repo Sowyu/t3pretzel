@@ -344,4 +344,25 @@ describe("applyReviewDiffMetadata", () => {
     expect(result.notice).toContain("Counts include all changes");
     expect(applyReviewDiffMetadata(parsed, null)).toEqual(parsed);
   });
+
+  it("returns the same diff for a fresh section object with the same stats", () => {
+    const parsed = buildReviewParsedDiff(
+      ["diff --git a/a.txt b/a.txt", "--- a/a.txt", "+++ b/a.txt", "@@ -1 +1 @@", "-a", "+b"].join(
+        "\n",
+      ),
+      "same",
+    );
+    const stats = () => ({
+      truncated: false,
+      files: [{ path: "a.txt", previousPath: null, additions: 1, deletions: 1 }],
+    });
+    const first = applyReviewDiffMetadata(parsed, stats());
+    expect(applyReviewDiffMetadata(parsed, stats())).toBe(first);
+    const changed = applyReviewDiffMetadata(parsed, {
+      truncated: false,
+      files: [{ path: "a.txt", previousPath: null, additions: 2, deletions: 1 }],
+    });
+    expect(changed).not.toBe(first);
+    expect(changed.kind === "files" && changed.additions).toBe(2);
+  });
 });

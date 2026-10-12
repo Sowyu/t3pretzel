@@ -528,11 +528,37 @@ export function buildReviewParsedDiff(
   }
 }
 
+const reviewDiffMetadataCache = new WeakMap<
+  ReviewParsedDiff,
+  { readonly key: string; readonly diff: ReviewParsedDiff }
+>();
+
+/**
+ * Projection updates hand in a fresh section object with the same stats. Returning the
+ * same diff object for the same preview and stats keeps the native row cache, which is
+ * keyed by diff identity, from rebuilding every row while an agent runs.
+ */
 export function applyReviewDiffMetadata(
   previewDiff: ReviewParsedDiff,
   selectedSection: Pick<ReviewSectionItem, "files" | "truncated"> | null,
 ): ReviewParsedDiff {
   if (previewDiff.kind === "empty") return previewDiff;
+  const key = `${selectedSection?.truncated ? 1 : 0}|${
+    selectedSection?.files
+      ?.map((file) => `${file.path}\u0000${file.additions}\u0000${file.deletions}`)
+      .join("\n") ?? "-"
+  }`;
+  const cached = reviewDiffMetadataCache.get(previewDiff);
+  if (cached?.key === key) return cached.diff;
+  const diff = buildReviewDiffMetadata(previewDiff, selectedSection);
+  reviewDiffMetadataCache.set(previewDiff, { key, diff });
+  return diff;
+}
+
+function buildReviewDiffMetadata(
+  previewDiff: Exclude<ReviewParsedDiff, { readonly kind: "empty" }>,
+  selectedSection: Pick<ReviewSectionItem, "files" | "truncated"> | null,
+): ReviewParsedDiff {
   const notice = selectedSection?.truncated
     ? `This preview exceeds the size limit. Changes shown are incomplete.${selectedSection.files ? " Counts include all changes." : ""}`
     : previewDiff.notice;
