@@ -184,6 +184,8 @@ export function FontSizeSliderRow(props: {
               style={[
                 {
                   borderWidth: 1,
+                  // Android ignores the shadow* props; elevation draws the same lift there.
+                  elevation: 2,
                   height: THUMB_SIZE,
                   marginTop: -THUMB_SIZE / 2,
                   shadowColor: "#000000",
