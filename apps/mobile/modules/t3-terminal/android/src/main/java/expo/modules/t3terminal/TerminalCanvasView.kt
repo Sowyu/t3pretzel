@@ -74,6 +74,7 @@ internal class TerminalCanvasView(context: Context) : View(context) {
     private const val MENU_COPY = 1
     private const val MENU_SELECT_ALL = 2
     private const val HANDLE_COLOR = 0xFF7AA2F7.toInt()
+    private const val CURSOR_BLINK_MS = 500L
   }
 
   private val density = resources.displayMetrics.density
@@ -112,13 +113,20 @@ internal class TerminalCanvasView(context: Context) : View(context) {
   private var cursorOn = true
   private val cursorBlink = object : Runnable {
     override fun run() {
-      val currentFrame = frame ?: return
-      if (!currentFrame.cursorBlinking || !currentFrame.cursorVisible) return
+      if (!shouldBlink()) return
       cursorOn = !cursorOn
       invalidate()
-      postDelayed(this, 500)
+      postDelayed(this, CURSOR_BLINK_MS)
     }
   }
+
+  /** Set by the host from the input field's focus; an unfocused terminal shows a steady cursor. */
+  var cursorBlinkEnabled = true
+    set(value) {
+      if (field == value) return
+      field = value
+      restartCursorBlink()
+    }
 
   var onScrollRows: ((Int) -> Unit)? = null
   var onRequestKeyboard: (() -> Unit)? = null
@@ -174,11 +182,33 @@ internal class TerminalCanvasView(context: Context) : View(context) {
 
   fun setFrame(value: TerminalFrame) {
     frame = value
-    cursorOn = true
     updateSelectionEndpoints()
-    removeCallbacks(cursorBlink)
-    if (value.cursorBlinking && value.cursorVisible) postDelayed(cursorBlink, 500)
+    restartCursorBlink()
     invalidate()
+  }
+
+  // Each blink redraws the whole grid, so it only runs while someone can see it.
+  private fun shouldBlink(): Boolean {
+    val currentFrame = frame ?: return false
+    return cursorBlinkEnabled &&
+      isAttachedToWindow &&
+      windowVisibility == VISIBLE &&
+      currentFrame.cursorBlinking &&
+      currentFrame.cursorVisible
+  }
+
+  private fun restartCursorBlink() {
+    removeCallbacks(cursorBlink)
+    if (!cursorOn) {
+      cursorOn = true
+      invalidate()
+    }
+    if (shouldBlink()) postDelayed(cursorBlink, CURSOR_BLINK_MS)
+  }
+
+  override fun onWindowVisibilityChanged(visibility: Int) {
+    super.onWindowVisibilityChanged(visibility)
+    restartCursorBlink()
   }
 
   fun resetSelectionState() {
@@ -581,14 +611,16 @@ internal class TerminalCanvasView(context: Context) : View(context) {
     override fun onDown(event: MotionEvent): Boolean {
       scroller.forceFinished(true)
       removeCallbacks(flingRunnable)
-      onRequestKeyboard?.invoke()
       return true
     }
 
+    // Only a plain tap opens the keyboard. Scrolls, flings and long-press selection
+    // also start with onDown and must leave the keyboard alone.
     override fun onSingleTapUp(event: MotionEvent): Boolean {
       if (selectionActive) {
         clearSelection()
       } else {
+        onRequestKeyboard?.invoke()
         performClick()
       }
       return true

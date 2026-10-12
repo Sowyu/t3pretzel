@@ -65,7 +65,7 @@ import { getMobileTerminalTheme } from "./terminalTheme";
 import { terminalDebugLog } from "./terminalDebugLog";
 import {
   getTerminalBufferReplayKey,
-  getTerminalSurfaceReplayBuffer,
+  getTerminalSurfaceReplayWindow,
   TERMINAL_BUFFER_REPLAY_STABILITY_DELAY_MS,
 } from "./terminalBufferReplay";
 import {
@@ -483,8 +483,10 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
   if (lastBufferReplayKeyRef.current === null) {
     lastBufferReplayKeyRef.current = bufferReplayKey;
   }
-  const terminalSurfaceBuffer = getTerminalSurfaceReplayBuffer({
+  const terminalSurfaceWindow = getTerminalSurfaceReplayWindow({
     buffer: terminal.buffer,
+    startOffset: terminal.bufferStartOffset,
+    resetKey: terminal.bufferResetKey,
     replayKey: bufferReplayKey,
     readyReplayKey: readyBufferReplayKey,
   });
@@ -496,7 +498,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     terminalDebugLog("surface:props", {
       terminalKey,
       atomBufferLen: terminal.buffer.length,
-      surfaceBufferLen: terminalSurfaceBuffer.length,
+      surfaceBufferLen: terminalSurfaceWindow.buffer.length,
       replayKey: bufferReplayKey,
       readyReplayKey: readyBufferReplayKey,
       status: terminal.status,
@@ -509,7 +511,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     terminal.status,
     terminal.version,
     terminalKey,
-    terminalSurfaceBuffer.length,
+    terminalSurfaceWindow.buffer.length,
   ]);
 
   useEffect(() => {
@@ -1276,7 +1278,9 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                 <TerminalSurface
                   autoFocus={canOperateTerminal && terminalAutoFocus}
                   readOnly={!canOperateTerminal}
-                  buffer={terminal.version === 0 ? null : terminalSurfaceBuffer}
+                  buffer={terminal.version === 0 ? null : terminalSurfaceWindow.buffer}
+                  bufferStartOffset={terminalSurfaceWindow.startOffset}
+                  bufferResetKey={terminalSurfaceWindow.resetKey}
                   fontSize={fontSize}
                   isRunning={isRunning}
                   keyboardFocusRequest={keyboardFocusRequest}

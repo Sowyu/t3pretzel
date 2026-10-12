@@ -10,7 +10,7 @@ class T3TerminalModule : Module() {
     // Bumped when native hardware-keyboard handling changes; surfaced in the JS debug
     // logs so a stale native binary is distinguishable from a broken key pipeline.
     Constants(
-      "hardwareKeyRevision" to 2,
+      "hardwareKeyRevision" to 3,
     )
 
     View(T3TerminalView::class) {
@@ -20,6 +20,14 @@ class T3TerminalModule : Module() {
 
       Prop("initialBuffer") { view: T3TerminalView, initialBuffer: String ->
         view.initialBuffer = initialBuffer
+      }
+
+      Prop("bufferStartOffset") { view: T3TerminalView, offset: Double ->
+        view.bufferStartOffset = offset.toLong()
+      }
+
+      Prop("bufferResetKey") { view: T3TerminalView, key: String ->
+        view.bufferResetKey = key
       }
 
       Prop("fontSize") { view: T3TerminalView, fontSize: Double ->
@@ -61,7 +69,11 @@ class T3TerminalModule : Module() {
       Prop("captureRequest") { view: T3TerminalView, request: Double ->
         view.captureRequest = request
       }
-      Events("onInput", "onResize", "onCapture")
+      Events("onInput", "onResize", "onCapture", "onTerminalFocus")
+
+      OnViewDidUpdateProps { view: T3TerminalView ->
+        view.onPropsUpdated()
+      }
 
       OnViewDestroys { view: T3TerminalView ->
         view.cleanup()
