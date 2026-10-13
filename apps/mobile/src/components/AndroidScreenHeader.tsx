@@ -8,6 +8,7 @@ import { AppText as Text } from "./AppText";
 import { cn } from "../lib/cn";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
+import { useInAndroidPageSheet } from "./AndroidPageSheet";
 import { GlassSurface } from "./GlassSurface";
 import { useLiquidGlass } from "./useLiquidGlass";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
@@ -179,7 +180,10 @@ export function AndroidScreenHeader(props: {
 }) {
   const { scale, size } = useHeaderButtonSize();
   const liquid = useLiquidGlass().tier !== "none";
-  const { height: toolbarHeight, ...headerPadding } = useMaterialToolbarLayout(props.embedded);
+  // Inside a page sheet every screen gets the iOS sheet bar: centered title, grabber room.
+  const inPageSheet = useInAndroidPageSheet();
+  const embedded = props.embedded ?? inPageSheet;
+  const { height: toolbarHeight, ...headerPadding } = useMaterialToolbarLayout(embedded);
   const [headerWidth, setHeaderWidth] = useState(0);
   const [sideWidths, setSideWidths] = useState({ leading: 0, trailing: 0 });
   const actions = props.actions ?? [];
@@ -188,7 +192,7 @@ export function AndroidScreenHeader(props: {
   const directCount = actions.length > budget ? budget - 1 : actions.length;
   const visibleActions = actions.slice(0, directCount);
   const overflowActions = actions.slice(directCount);
-  const centered = props.embedded === true && props.titleContent === undefined;
+  const centered = embedded && props.titleContent === undefined;
   const titleInset = Math.max(sideWidths.leading, sideWidths.trailing) + 8;
   const hasTrailing = actions.length > 0 || hasContent(props.trailing);
 

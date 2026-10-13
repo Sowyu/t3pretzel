@@ -39,6 +39,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Alert, AppState, Platform, Pressable, TextInput as RNTextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import {
@@ -311,19 +312,15 @@ export function SettingsScheduledTasksRouteScreen() {
       <SettingsScreen
         title="Scheduled Tasks"
         trailing={
-          <View className="flex-row items-center">
+          <>
             <AndroidSettingsEnvironmentFilter />
-            <Pressable
-              accessibilityRole="button"
+            <AndroidHeaderIconButton
               accessibilityLabel="New task"
-              accessibilityState={{ disabled: visibleEnvironments.length === 0 }}
+              icon="plus"
               disabled={visibleEnvironments.length === 0}
               onPress={newTask}
-              className="size-11 items-center justify-center rounded-full disabled:opacity-50"
-            >
-              <SymbolView name="plus" size={22} tintColorClassName="accent-icon" />
-            </Pressable>
-          </View>
+            />
+          </>
         }
       >
         <ScrollView

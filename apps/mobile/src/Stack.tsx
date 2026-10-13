@@ -145,6 +145,7 @@ import { useNativeLayoutMetrics } from "./native/native-layout-metrics";
 import { nativeHeaderScrollEdgeEffects } from "./native/StackHeader";
 import { FORM_SHEET_PRESENTATION_OPTIONS } from "./native/sheet-surface";
 import { GlassFlatBackdrop } from "./components/GlassBackdropSource";
+import { AndroidPageSheet } from "./components/AndroidPageSheet";
 import { useThreadOutboxDrain } from "./state/use-thread-outbox-drain";
 import { useComposerAttachmentUploadWorker } from "./state/composer-attachment-uploads";
 
@@ -213,6 +214,18 @@ const LEGAL_DOCUMENT_HEADER_OPTIONS: AppScreenOptions = {
   presentation: "fullScreenModal",
 };
 
+// Android route drawn as an iOS page sheet by GuardedScreenLayout; the sheet
+// animates itself, and the screen below shows through.
+const ANDROID_PAGE_SHEET_OPTIONS: AppScreenOptions = {
+  presentation: "transparentModal",
+  animation: "none",
+  contentStyle: { backgroundColor: "transparent" },
+};
+
+// Pushes inside a settings sheet slide sideways like UINavigationController.
+const ANDROID_SHEET_PUSH_OPTIONS: AppScreenOptions | undefined =
+  Platform.OS === "android" ? { animation: "ios_from_right" } : undefined;
+
 // A navigator container leaves horizontal safe-area handling to its leaf screens.
 const NESTED_NAVIGATOR_OPTIONS = { nativeContentInsetHorizontally: false, headerShown: false };
 
@@ -222,6 +235,7 @@ const SettingsContentStack = createV5SheetStackNavigator({
     ...GLASS_HEADER_OPTIONS,
     // Sheets read better with the iOS-default centered title (no editor style).
     unstable_navigationItemStyle: undefined,
+    ...ANDROID_SHEET_PUSH_OPTIONS,
   },
   screens: {
     Settings: createNativeStackScreen({
@@ -437,6 +451,7 @@ const SettingsSheetStack = createV5SheetStackNavigator({
   initialRouteName: "SettingsContent",
   screenOptions: {
     headerShown: false,
+    ...ANDROID_SHEET_PUSH_OPTIONS,
   },
   screens: {
     SettingsContent: createNativeStackScreen({
@@ -1040,6 +1055,8 @@ function GuardedScreenLayout(props: {
         <View className="h-[5px] w-9 rounded-full bg-foreground-tertiary" />
       </View>
     ) : null;
+  // Android draws the iOS page sheet itself over a transparent modal.
+  const pageSheet = Platform.OS === "android" && props.options?.presentation === "transparentModal";
   return (
     <RenderErrorBoundary
       resetKeys={[props.route.params]}
@@ -1047,10 +1064,16 @@ function GuardedScreenLayout(props: {
         <ScreenRenderFallback {...fallback} routeName={props.route.name} />
       )}
     >
-      {/* Android glass on a screen's plain background (headers, pills, segmented controls) samples this. */}
-      <GlassFlatBackdrop />
-      {props.children}
-      {grabber}
+      {pageSheet ? (
+        <AndroidPageSheet>{props.children}</AndroidPageSheet>
+      ) : (
+        <>
+          {/* Android glass on a screen's plain background (headers, pills, segmented controls) samples this. */}
+          <GlassFlatBackdrop />
+          {props.children}
+          {grabber}
+        </>
+      )}
     </RenderErrorBoundary>
   );
 }
@@ -1069,8 +1092,8 @@ function ScreenRenderFallback(props: RenderFailureProps & { readonly routeName: 
 export const RootStack = RootStackConfig.with(function AdaptiveRootStack({ Navigator }) {
   const { width, height } = useWindowDimensions();
   const nativeMetrics = useNativeLayoutMetrics();
-  const usesWorkspaceFlowScreens =
-    Platform.OS === "android" || deriveLayout({ width, height, nativeMetrics }).usesSplitView;
+  const usesSplitView = deriveLayout({ width, height, nativeMetrics }).usesSplitView;
+  const usesWorkspaceFlowScreens = Platform.OS === "android" || usesSplitView;
 
   return (
     <Navigator
@@ -1078,6 +1101,11 @@ export const RootStack = RootStackConfig.with(function AdaptiveRootStack({ Navig
       screenOptions={({ route }) => {
         if (route.name !== "SettingsSheet" && route.name !== "NewTaskSheet") {
           return {};
+        }
+
+        // Compact Android presents Settings as the iOS page sheet (AndroidPageSheet).
+        if (Platform.OS === "android" && route.name === "SettingsSheet" && !usesSplitView) {
+          return ANDROID_PAGE_SHEET_OPTIONS;
         }
 
         // Follow the workspace viewport as it resizes; compact iOS keeps sheets.

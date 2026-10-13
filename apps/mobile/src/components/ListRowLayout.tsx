@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 
 import { cn } from "../lib/cn";
 import { AppText } from "./AppText";
@@ -12,15 +12,6 @@ export interface ListRowContentProps {
   readonly detail?: string;
   readonly disabled?: boolean;
 }
-
-// Android grouped rows draw an iOS-style top hairline, inset past the icon
-// (16 padding + 24 icon + 12 gap) or the padding alone. ListSection clips the
-// first row's line.
-const androidSeparatorStyles = StyleSheet.create({
-  base: { position: "absolute", top: 0, right: 0, height: StyleSheet.hairlineWidth },
-  withIcon: { left: 52 },
-  withoutIcon: { left: 16 },
-});
 
 /** Shared row geometry; controls own their behavior and accessibility. */
 export function ListRowLayout({
@@ -42,16 +33,6 @@ export function ListRowLayout({
         disabled && "opacity-45",
       )}
     >
-      {Platform.OS === "android" ? (
-        <View
-          pointerEvents="none"
-          className="bg-foreground/10"
-          style={[
-            androidSeparatorStyles.base,
-            icon ? androidSeparatorStyles.withIcon : androidSeparatorStyles.withoutIcon,
-          ]}
-        />
-      ) : null}
       {icon ? (
         <View className="size-6 items-center justify-center">
           <SymbolView

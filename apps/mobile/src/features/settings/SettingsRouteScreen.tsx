@@ -53,7 +53,7 @@ export function SettingsRouteScreen() {
       ) : null}
       <SettingsEnvironmentFilterHeader closeSettings />
       {Platform.OS === "android" ? (
-        <SettingsScreen title="Settings" trailing={<AndroidSettingsEnvironmentFilter />}>
+        <SettingsScreen title="Settings" closeSheet trailing={<AndroidSettingsEnvironmentFilter />}>
           {content}
         </SettingsScreen>
       ) : (
