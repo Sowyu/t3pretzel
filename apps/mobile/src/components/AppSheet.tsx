@@ -72,7 +72,13 @@ export function AppSheet(props: {
           </ScreenStack>
         ) : (
           <>
-            <AndroidSheetHeader title={props.title} onBack={close} />
+            {/* iOS closes with a Done item on the right, not a back chevron. */}
+            <AndroidSheetHeader
+              title={props.title}
+              actions={[
+                { accessibilityLabel: `Close ${props.title}`, icon: "checkmark", onPress: close },
+              ]}
+            />
             {props.children}
           </>
         )}

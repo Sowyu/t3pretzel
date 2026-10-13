@@ -16,7 +16,6 @@ import Animated, { Keyframe, ReduceMotion } from "react-native-reanimated";
 
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { cn } from "../lib/cn";
-import { themeColorWithAlpha } from "../lib/mobileTheme";
 import { AppText as Text } from "./AppText";
 import { isAppSymbolName, SymbolView } from "./AppSymbol";
 import { OverlayPortal } from "./OverlayPortal";
@@ -315,7 +314,9 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
                   width: menuWidth,
                   borderRadius: 14,
                   borderWidth: StyleSheet.hairlineWidth,
-                  backgroundColor: themeColorWithAlpha(colors["--color-card-alt"], 0.96),
+                  // Solid: iOS blurs what is behind a menu, and without a blur any
+                  // translucency lets the text underneath read through the items.
+                  backgroundColor: colors["--color-card-alt"],
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.18)",
                   transformOrigin: `${opensDown ? "top" : "bottom"} ${alignsLeft ? "left" : "right"}`,
                   ...(opensDown

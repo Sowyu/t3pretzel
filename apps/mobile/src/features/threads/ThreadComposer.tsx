@@ -360,10 +360,11 @@ export function ComposerSurface(props: {
         isAndroid
           ? {
               overflow: "hidden",
-              // Static lift in place of the iOS shadow. The fill stays near-opaque
-              // so the shadow cannot show through it.
+              // Static lift in place of the iOS shadow. The fill is opaque: Android
+              // draws elevation under the view, so any translucency shows the
+              // shadow through it as a darker rim around a lighter middle.
               elevation: 10,
-              backgroundColor: themeColorWithMinimumAlpha(colors["--color-composer-surface"], 0.94),
+              backgroundColor: themeColorWithMinimumAlpha(colors["--color-composer-surface"], 1),
             }
           : { overflow: "hidden" },
       ]}

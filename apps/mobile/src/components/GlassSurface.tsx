@@ -106,8 +106,7 @@ export function GlassSurface({
         style={[
           surfaceStyle,
           {
-            backgroundColor:
-              typeof fill === "string" ? themeColorWithMinimumAlpha(fill, 0.94) : fill,
+            backgroundColor: typeof fill === "string" ? themeColorWithMinimumAlpha(fill, 1) : fill,
           },
           style,
         ]}

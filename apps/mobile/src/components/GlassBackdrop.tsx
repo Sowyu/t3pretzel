@@ -11,7 +11,7 @@ export function GlassBackdrop(props: { readonly fallbackColor?: ColorValue }) {
   const color = props.fallbackColor ?? themeVariables["--color-glass-fallback"];
   const colorStyle = {
     backgroundColor:
-      supportsBlur || typeof color !== "string" ? color : themeColorWithMinimumAlpha(color, 0.94),
+      supportsBlur || typeof color !== "string" ? color : themeColorWithMinimumAlpha(color, 1),
   };
 
   return (
