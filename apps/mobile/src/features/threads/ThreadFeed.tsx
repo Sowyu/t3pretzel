@@ -2054,6 +2054,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       worktreeSetup: props.worktreeSetup,
       setupWorkingStartedAt: props.setupWorkingStartedAt,
       dispatchingMessageId: props.dispatchingMessageId,
+      // Skills resolve after the first render; rows must redraw their skill chips.
+      skills: props.skills,
       unsettledTurnId,
       copiedRowId,
       expandedWorkGroups,
@@ -2070,6 +2072,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       props.worktreeSetup,
       props.setupWorkingStartedAt,
       props.dispatchingMessageId,
+      props.skills,
       unsettledTurnId,
       copiedRowId,
       expandedWorkGroups,
