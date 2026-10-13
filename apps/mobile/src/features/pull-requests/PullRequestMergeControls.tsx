@@ -3,12 +3,10 @@ import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime"
 import type { PullRequestDetail, PullRequestMergeMethod } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { useRef, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import { ControlPillMenu } from "../../components/ControlPillMenu";
-import { MaterialButton } from "../../components/MaterialButton";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { composerPullRequests } from "../../state/pull-requests";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -166,52 +164,35 @@ export function PullRequestMergeControls(props: {
   return (
     <View className="gap-2 border-t border-border-subtle p-3">
       <View
-        className={
-          Platform.OS === "android"
-            ? "flex-row items-center gap-2"
-            : `flex-row overflow-hidden rounded-xl border-continuous ${canMerge ? "bg-prominent-action" : "bg-subtle-strong"}`
-        }
+        className={`flex-row overflow-hidden rounded-xl border-continuous ${canMerge ? "bg-prominent-action" : "bg-subtle-strong"}`}
       >
-        {Platform.OS === "android" ? (
-          <View className="min-w-0 flex-1">
-            <MaterialButton
-              label={busy ? "Working…" : !permissions.connected ? "Reconnect to merge" : label}
-              tone="primary"
-              fullWidth
-              disabled={!canMerge}
-              loading={busy || checkingStack}
-              onPress={() => confirm("merge")}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            scope ? `${label}, ${scope.layers.length} stack layers through #${pr.number}` : label
+          }
+          accessibilityState={{ disabled: !canMerge, busy: busy || checkingStack }}
+          disabled={!canMerge}
+          onPress={() => confirm("merge")}
+          className="min-h-11 min-w-0 flex-1 flex-row items-center justify-center gap-2 px-3 py-2 active:opacity-70"
+        >
+          {busy || checkingStack ? (
+            <ActivityIndicator size="small" colorClassName="accent-icon-muted" />
+          ) : (
+            <SymbolView
+              name="arrow.triangle.merge"
+              size={16}
+              tintColorClassName={
+                canMerge ? "accent-prominent-action-foreground" : "accent-icon-muted"
+              }
             />
-          </View>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              scope ? `${label}, ${scope.layers.length} stack layers through #${pr.number}` : label
-            }
-            accessibilityState={{ disabled: !canMerge, busy: busy || checkingStack }}
-            disabled={!canMerge}
-            onPress={() => confirm("merge")}
-            className="min-h-11 min-w-0 flex-1 flex-row items-center justify-center gap-2 px-3 py-2 active:opacity-70"
+          )}
+          <Text
+            className={`shrink text-center text-sm font-t3-semibold ${canMerge ? "text-prominent-action-foreground" : "text-foreground-muted"}`}
           >
-            {busy || checkingStack ? (
-              <ActivityIndicator size="small" colorClassName="accent-icon-muted" />
-            ) : (
-              <SymbolView
-                name="arrow.triangle.merge"
-                size={16}
-                tintColorClassName={
-                  canMerge ? "accent-prominent-action-foreground" : "accent-icon-muted"
-                }
-              />
-            )}
-            <Text
-              className={`shrink text-center text-sm font-t3-semibold ${canMerge ? "text-prominent-action-foreground" : "text-foreground-muted"}`}
-            >
-              {busy ? "Working…" : !permissions.connected ? "Reconnect to merge" : label}
-            </Text>
-          </Pressable>
-        )}
+            {busy ? "Working…" : !permissions.connected ? "Reconnect to merge" : label}
+          </Text>
+        </Pressable>
         {methods.length > 0 || canAutoMerge ? (
           <ControlPillMenu
             title="Merge options"
@@ -240,29 +221,19 @@ export function PullRequestMergeControls(props: {
               } else if (nativeEvent.event === autoAction && canAutoMerge) confirm(autoAction);
             }}
           >
-            {Platform.OS === "android" ? (
-              <View pointerEvents="none">
-                <MaterialIconButton
-                  accessibilityLabel="Merge options"
-                  icon="chevron.down"
-                  variant="tonal"
-                />
-              </View>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Merge options"
-                className="min-h-11 w-11 items-center justify-center border-l border-border-subtle"
-              >
-                <SymbolView
-                  name="chevron.down"
-                  size={13}
-                  tintColorClassName={
-                    canMerge ? "accent-prominent-action-foreground" : "accent-icon-muted"
-                  }
-                />
-              </Pressable>
-            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Merge options"
+              className="min-h-11 w-11 items-center justify-center border-l border-border-subtle"
+            >
+              <SymbolView
+                name="chevron.down"
+                size={13}
+                tintColorClassName={
+                  canMerge ? "accent-prominent-action-foreground" : "accent-icon-muted"
+                }
+              />
+            </Pressable>
           </ControlPillMenu>
         ) : null}
       </View>

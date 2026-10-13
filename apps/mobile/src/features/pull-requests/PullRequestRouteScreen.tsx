@@ -457,15 +457,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
           </NativeHeaderToolbar.Menu>
         </NativeHeaderToolbar>
         <View
-          style={{
-            flex: 1,
-            marginHorizontal: Platform.OS === "android" && layout.usesSplitView ? 4 : 0,
-          }}
-          className={
-            Platform.OS === "android"
-              ? "overflow-hidden rounded-t-[28px] bg-sheet-solid"
-              : undefined
-          }
+          style={{ flex: 1 }}
           onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
         >
           {(["overview", "guide", "activity"] as const)
@@ -644,7 +636,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                         >
                           <PullRequestIdentity pr={identity} params={params} />
                           <SegmentedControl
-                            className={Platform.OS === "android" ? undefined : "bg-grouped-card"}
+                            className="bg-grouped-card"
                             options={[
                               { value: "overview", label: "Overview" },
                               ...(guidesEnabled
@@ -713,7 +705,6 @@ export function PullRequestFileRouteScreen({
     readonly focus?: GuideDiffFocus;
   }
 >) {
-  const { layout } = useAdaptiveWorkspaceLayout();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [toolbarHeight, setToolbarHeight] = usePullRequestToolbarHeight(insets.bottom);
@@ -1052,15 +1043,7 @@ export function PullRequestFileRouteScreen({
           />
         </View>
       ) : null}
-      <View
-        className={
-          Platform.OS === "android"
-            ? "flex-1 overflow-hidden rounded-t-[28px] bg-sheet-solid"
-            : "flex-1"
-        }
-        collapsable={false}
-        style={{ marginHorizontal: Platform.OS === "android" && layout.usesSplitView ? 4 : 0 }}
-      >
+      <View className="flex-1" collapsable={false}>
         {loadingDiff || result.error ? (
           <View style={{ paddingTop: Platform.OS === "ios" && !staleDiff ? insets.top : 0 }}>
             <PullRequestReadStatus pending={loadingDiff} error={result.error} />
