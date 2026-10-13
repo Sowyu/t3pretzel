@@ -3,7 +3,9 @@ import { Pressable, View } from "react-native";
 import { cn } from "../lib/cn";
 import { SymbolView } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
+import { GlassFill } from "./GlassSurface";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
+import { useLiquidGlass } from "./useLiquidGlass";
 
 export { ControlPillMenu } from "./ControlPillMenu";
 
@@ -16,10 +18,17 @@ export function ControlPill(props: {
   readonly activateOnPressIn?: boolean;
   readonly variant?: "circle" | "pill" | "primary" | "danger";
   readonly disabled?: boolean;
+  /** Android: false keeps the flat fill, for a pill that already sits on glass. */
+  readonly glass?: boolean;
+  /** With Android glass on, a circle or pill uses only its layout classes (size, margins). */
   readonly className?: string;
 }) {
   const variant = props.variant ?? "circle";
   const { smallIconSize } = useAndroidControlSizing();
+  // Primary and danger stay solid: their color is the message.
+  const liquidTier = useLiquidGlass().tier;
+  const glass =
+    props.glass !== false && liquidTier !== "none" && (variant === "circle" || variant === "pill");
   const activatedOnPressInRef = useRef(false);
 
   const handlePressIn = () => {
@@ -57,15 +66,17 @@ export function ControlPill(props: {
       : variant === "primary"
         ? "h-11 flex-row items-center justify-center gap-2 rounded-full px-5"
         : "h-11 flex-row items-center justify-center gap-2 rounded-full px-3.5",
-    variant === "primary"
-      ? props.disabled
-        ? "bg-subtle-strong"
-        : "bg-primary"
-      : variant === "danger"
-        ? "bg-danger"
-        : "bg-subtle",
-    // iOS dims bar buttons on press; Android has no system feedback here otherwise.
-    "android:active:opacity-50",
+    glass
+      ? undefined
+      : variant === "primary"
+        ? props.disabled
+          ? "bg-subtle-strong"
+          : "bg-primary"
+        : variant === "danger"
+          ? "bg-danger"
+          : "bg-subtle",
+    // iOS dims bar buttons on press; glass swells instead.
+    !glass && "android:active:opacity-50",
     props.className,
   );
   const labelClassName = cn(
@@ -89,6 +100,9 @@ export function ControlPill(props: {
       disabled={props.disabled}
       className={containerClassName}
     >
+      {glass ? (
+        <GlassFill shape={isCircle ? "circle" : "capsule"} interactive={!props.disabled} />
+      ) : null}
       {props.iconNode ? (
         <View className="h-4 w-4 items-center justify-center">{props.iconNode}</View>
       ) : props.icon ? (

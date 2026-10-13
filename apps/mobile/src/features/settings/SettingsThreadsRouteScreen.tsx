@@ -11,6 +11,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import { supportsSharedSettingsSync } from "@t3tools/client-runtime/state/shared-settings";
 import { AppText as Text } from "../../components/AppText";
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
+import { cn } from "../../lib/cn";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -67,6 +70,7 @@ function AutoSettleSettingsRows() {
   const projectSelected = selectedProjectKey !== null;
   const [pendingWrites, setPendingWrites] = useState(0);
   const writeInFlight = useRef(false);
+  const liquid = useLiquidGlass().tier !== "none";
   const [pendingTargets, setPendingTargets] = useState<
     readonly ScopedMobileSettingsTarget[] | null
   >(null);
@@ -247,8 +251,12 @@ function AutoSettleSettingsRows() {
               accessibilityRole="button"
               disabled={disabled}
               onPress={() => writeToAll(autoSettlePatch)}
-              className="self-start rounded-full bg-subtle px-4 py-2 active:opacity-70"
+              className={cn(
+                "self-start rounded-full px-4 py-2",
+                !liquid && "bg-subtle active:opacity-70",
+              )}
             >
+              {liquid ? <GlassFill interactive={!disabled} /> : null}
               <Text className="text-sm font-t3-medium text-foreground">
                 Apply auto-settle defaults
               </Text>

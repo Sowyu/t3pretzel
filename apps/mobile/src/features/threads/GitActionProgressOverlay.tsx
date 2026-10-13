@@ -9,6 +9,8 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanim
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { APP_BAR_HEIGHT } from "../../lib/layoutMetrics";
 import { themeColorWithAlpha } from "../../lib/mobileTheme";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
@@ -79,6 +81,7 @@ function OverlayContent(props: { readonly progress: GitActionProgress }) {
   const foreground = colors["--color-foreground"];
   const shadowColor = colors["--color-primary-shadow"];
   const isDarkMode = useColorScheme() === "dark";
+  const liquid = useLiquidGlass().tier !== "none";
   const glassTint = themeColorWithAlpha(String(glassSurface), isDarkMode ? 0.48 : 0.38);
   const glassBorder = themeColorWithAlpha(String(foreground), isDarkMode ? 0.18 : 0.12);
   const content = (
@@ -146,6 +149,22 @@ function OverlayContent(props: { readonly progress: GitActionProgress }) {
             {content}
           </Animated.View>
         </AnimatedGlassView>
+      </Animated.View>
+    );
+  }
+
+  if (liquid) {
+    return (
+      <Animated.View
+        layout={OVERLAY_LAYOUT_TRANSITION}
+        className="flex-row items-center gap-2.5 px-3.5 py-3"
+      >
+        <GlassFill
+          shape="roundedRect"
+          borderRadius={26}
+          tintColor={progress.phase === "error" ? colors["--color-danger"] : undefined}
+        />
+        {content}
       </Animated.View>
     );
   }

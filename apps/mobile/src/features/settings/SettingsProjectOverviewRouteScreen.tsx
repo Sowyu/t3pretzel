@@ -1,6 +1,9 @@
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { AppText as Text, AppTextInput } from "../../components/AppText";
+import { GlassFill } from "../../components/GlassSurface";
 import { ProjectFavicon } from "../../components/ProjectFavicon";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
+import { cn } from "../../lib/cn";
 import { deriveProjectGroupLabel } from "@t3tools/client-runtime/state/project-grouping";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { useState } from "react";
@@ -70,6 +73,7 @@ function ProjectOverviewContent(props: {
   });
   const nextName = (draftName ?? displayName).trim();
   const canSave = !isSaving && nextName.length > 0 && nextName !== displayName;
+  const liquid = useLiquidGlass().tier !== "none";
 
   const saveName = () => {
     if (!canSave) return;
@@ -130,8 +134,12 @@ function ProjectOverviewContent(props: {
                 accessibilityRole="button"
                 accessibilityLabel="Save project name"
                 onPress={saveName}
-                className="rounded-full bg-subtle-strong px-4 py-2 active:opacity-70"
+                className={cn(
+                  "rounded-full px-4 py-2",
+                  !liquid && "bg-subtle-strong active:opacity-70",
+                )}
               >
+                {liquid ? <GlassFill /> : null}
                 <Text className="text-sm font-t3-medium text-foreground">Save</Text>
               </Pressable>
             ) : null}

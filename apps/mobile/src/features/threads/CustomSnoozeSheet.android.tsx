@@ -1,3 +1,5 @@
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import {
   localSnoozeDate,
   localSnoozeTime,
@@ -65,6 +67,7 @@ function systemUses24HourClock() {
  * recycled thread rows can unmount it.
  */
 export function CustomSnoozeSheet(props: Props) {
+  const liquid = useLiquidGlass().tier !== "none";
   const { width: windowWidth } = useWindowDimensions();
   const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
   const [is24Hour, setIs24Hour] = useState(systemUses24HourClock);
@@ -184,10 +187,15 @@ export function CustomSnoozeSheet(props: Props) {
             <Pressable
               accessibilityRole="button"
               hitSlop={4}
-              className="h-10 justify-center rounded-full border-separator bg-glass-fallback px-4 active:opacity-50"
+              className={
+                liquid
+                  ? "h-10 justify-center rounded-full px-4"
+                  : "h-10 justify-center rounded-full border-separator bg-glass-fallback px-4 active:opacity-50"
+              }
               style={{ borderWidth: StyleSheet.hairlineWidth }}
               onPress={submit}
             >
+              {liquid ? <GlassFill /> : null}
               <Text className="font-t3-semibold" style={{ fontSize: 17 }}>
                 Snooze
               </Text>

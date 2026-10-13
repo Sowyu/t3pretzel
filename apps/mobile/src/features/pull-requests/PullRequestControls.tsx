@@ -9,6 +9,8 @@ import { AppText as Text } from "../../components/AppText";
 import { SymbolView, type AppSymbolName } from "../../components/AppSymbol";
 import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { cn } from "../../lib/cn";
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { ControlPillMenu } from "../../components/ControlPillMenu";
 import { NativeHeaderToolbar } from "../../native/StackHeader";
 import { useNativeLayoutMetrics } from "../../native/native-layout-metrics";
@@ -112,6 +114,7 @@ export function PullRequestActionToolbar(props: {
   const navigation = useNavigation();
   const { draft } = usePullRequestReviewDraft(props.params);
   const { themeVariables: colors } = useAppearancePreferences();
+  const liquid = useLiquidGlass().tier !== "none";
   const insets = useSafeAreaInsets();
   const nativeMetrics = useNativeLayoutMetrics();
   const verticalControls = nativeMetrics !== null && nativeMetrics.verticalBarEdge !== "none";
@@ -145,11 +148,20 @@ export function PullRequestActionToolbar(props: {
         disabled={primaryDisabled}
         onPress={primaryPress}
         className={cn(
-          "h-11 min-w-0 flex-row items-center justify-center rounded-full px-5 active:opacity-70",
-          primaryDisabled ? "bg-subtle-strong" : "bg-prominent-action",
+          "h-11 min-w-0 flex-row items-center justify-center rounded-full px-5",
+          liquid
+            ? undefined
+            : cn("active:opacity-70", primaryDisabled ? "bg-subtle-strong" : "bg-prominent-action"),
         )}
-        style={{ elevation: 2 }}
+        style={liquid ? undefined : { elevation: 2 }}
       >
+        {liquid ? (
+          // iOS's prominent glass button: tinted with the action color.
+          <GlassFill
+            interactive={!primaryDisabled}
+            tintColor={primaryDisabled ? undefined : colors["--color-prominent-action"]}
+          />
+        ) : null}
         <Text
           numberOfLines={1}
           className={cn(

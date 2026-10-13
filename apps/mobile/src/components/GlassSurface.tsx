@@ -51,6 +51,7 @@ interface GlassSurfaceProps extends ViewProps {
   readonly ref?: Ref<ViewInstance>;
   readonly children: ReactNode;
   readonly glassEffectStyle?: "clear" | "regular" | "none";
+  /** iOS glass tint. Android tints regular glass with it too, unless "transparent". */
   readonly tintColor?: ColorValue;
   readonly tintColorClassName?: string;
   readonly chrome?: "default" | "none";
@@ -149,10 +150,13 @@ export function GlassSurface({
     const tint =
       variant === "edge"
         ? themeColorWithAlpha(String(tintColor ?? themeVariables["--color-screen"]), 0.86)
-        : themeColorWithAlpha(
-            themeVariables["--color-glass-surface"],
-            variant === "menu" ? (isDarkMode ? 0.74 : 0.8) : isDarkMode ? 0.4 : 0.46,
-          );
+        : tintColor !== undefined && tintColor !== "transparent"
+          ? // iOS tinted glass, like a selected filter: the color carries, the backdrop still shows.
+            themeColorWithAlpha(String(tintColor), 0.82)
+          : themeColorWithAlpha(
+              themeVariables["--color-glass-surface"],
+              variant === "menu" ? (isDarkMode ? 0.74 : 0.8) : isDarkMode ? 0.4 : 0.46,
+            );
     const borderRadius = typeof glassStyle.borderRadius === "number" ? glassStyle.borderRadius : 32;
     return (
       <ThemedLiquidGlass
@@ -224,5 +228,33 @@ export function GlassSurface({
       <GlassBackdrop fallbackColor={fallbackColor} />
       {children}
     </View>
+  );
+}
+
+/**
+ * Android Liquid Glass behind a pill or circle control's content. Render it
+ * as the control's first child, only while useLiquidGlass().tier is not
+ * "none", and drop the control's own background then; the control keeps its
+ * layout, so the glass-off look stays exactly as it was.
+ */
+export function GlassFill(props: {
+  readonly shape?: "circle" | "capsule" | "roundedRect";
+  /** For "roundedRect". */
+  readonly borderRadius?: number;
+  /** Tinted glass, like a selected filter. */
+  readonly tintColor?: ColorValue;
+  /** Swells under the finger; off for disabled controls. */
+  readonly interactive?: boolean;
+}) {
+  return (
+    <GlassSurface
+      chrome="none"
+      shape={props.shape ?? "capsule"}
+      interactive={props.interactive ?? true}
+      tintColor={props.tintColor}
+      style={[StyleSheet.absoluteFill, { borderRadius: props.borderRadius ?? 999 }]}
+    >
+      {null}
+    </GlassSurface>
   );
 }

@@ -15,6 +15,8 @@ import { AndroidHeaderButtonGroup, AndroidScreenHeader } from "./AndroidScreenHe
 import { ScreenHeaderButton } from "./ScreenHeaderButton.android";
 import { SymbolView } from "./AppSymbol";
 import { ControlPillMenu } from "./ControlPill";
+import { GlassFill } from "./GlassSurface";
+import { useLiquidGlass } from "./useLiquidGlass";
 import { MaterialSearchField } from "./MaterialSearchField";
 import { androidHeaderMenuActions, findHeaderMenuAction } from "./headerMenu.android";
 import type { ScreenHeaderProps } from "./ScreenHeader.types";
@@ -25,6 +27,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
   const { paddingTop, paddingBottom } = useMaterialToolbarLayout();
   const { scale, buttonSize } = useAndroidControlSizing();
   const { themeVariables } = useAppearancePreferences();
+  const liquid = useLiquidGlass().tier !== "none";
   const inputRef = useRef<TextInputInstance>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const searching = search !== undefined && (searchOpen || search.value.length > 0);
@@ -91,7 +94,9 @@ export function ScreenHeader(props: ScreenHeaderProps) {
               />
             ) : null}
             <View
-              className="flex-1 flex-row items-center bg-subtle"
+              className={
+                liquid ? "flex-1 flex-row items-center" : "flex-1 flex-row items-center bg-subtle"
+              }
               style={{
                 minHeight: Math.max(40, 38 * scale),
                 gap: 8.75 * scale,
@@ -99,6 +104,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
                 paddingHorizontal: 12.25 * scale,
               }}
             >
+              {liquid ? <GlassFill interactive={false} /> : null}
               <SymbolView
                 name="magnifyingglass"
                 size={Math.round(17 * scale)}

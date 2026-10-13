@@ -48,7 +48,12 @@ export function getLiquidGlassDeviceTier(): LiquidGlassTier {
 }
 
 let glassView: ComponentType<LiquidGlassViewProps> | null | undefined;
-let backdropView: ComponentType<ViewProps> | null | undefined;
+interface GlassBackdropViewProps extends ViewProps {
+  /** A screen's plain background: draws nothing, glass on it shows what is behind through its tint. */
+  readonly flat?: boolean;
+}
+
+let backdropView: ComponentType<GlassBackdropViewProps> | null | undefined;
 
 /** The glass surface, or null where the module is not compiled in (iOS, tests). */
 export function liquidGlassView() {
@@ -64,7 +69,7 @@ export function liquidGlassView() {
 export function glassBackdropView() {
   if (backdropView === undefined) {
     backdropView = nativeModule()
-      ? requireNativeView<ViewProps>(MODULE_NAME, "T3GlassBackdrop")
+      ? requireNativeView<GlassBackdropViewProps>(MODULE_NAME, "T3GlassBackdrop")
       : null;
   }
   return backdropView;

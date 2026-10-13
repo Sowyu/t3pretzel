@@ -1,5 +1,7 @@
 import { Pressable } from "react-native";
 import { AppText } from "./AppText";
+import { GlassFill } from "./GlassSurface";
+import { useLiquidGlass } from "./useLiquidGlass";
 import { cn } from "../lib/cn";
 
 export interface MaterialButtonProps {
@@ -22,6 +24,8 @@ const TONE_CLASS_NAMES = {
 export function MaterialButton(props: MaterialButtonProps) {
   const [containerClassName, labelClassName] = TONE_CLASS_NAMES[props.tone ?? "secondary"];
   const disabled = Boolean(props.disabled || props.loading);
+  // Android: the plain capsule becomes glass; filled tones keep their color.
+  const glass = useLiquidGlass().tier !== "none" && (props.tone ?? "secondary") === "secondary";
   return (
     <Pressable
       accessibilityRole="button"
@@ -29,11 +33,13 @@ export function MaterialButton(props: MaterialButtonProps) {
       disabled={disabled}
       onPress={props.onPress}
       className={cn(
-        "min-h-12 justify-center rounded-full px-6 active:opacity-70",
+        "min-h-12 justify-center rounded-full px-6",
+        !glass && "active:opacity-70",
         props.fullWidth ? "w-full" : "self-start",
-        disabled ? "bg-subtle-strong" : containerClassName,
+        glass ? undefined : disabled ? "bg-subtle-strong" : containerClassName,
       )}
     >
+      {glass ? <GlassFill interactive={!disabled} /> : null}
       <AppText
         className={cn(
           "text-center font-t3-medium",

@@ -1,3 +1,5 @@
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { SymbolView } from "../../components/AppSymbol";
 import { Pressable, View } from "react-native";
 
@@ -10,14 +12,20 @@ function FallbackHeaderButton(props: {
   readonly icon: "gearshape" | "square.and.pencil";
   readonly onPress: () => void;
 }) {
+  const liquid = useLiquidGlass().tier !== "none";
   return (
     <Pressable
-      className="size-11 items-center justify-center rounded-full bg-subtle active:opacity-70"
+      className={
+        liquid
+          ? "size-11 items-center justify-center rounded-full"
+          : "size-11 items-center justify-center rounded-full bg-subtle active:opacity-70"
+      }
       accessibilityLabel={props.accessibilityLabel}
       accessibilityRole="button"
       hitSlop={4}
       onPress={props.onPress}
     >
+      {liquid ? <GlassFill shape="circle" /> : null}
       <SymbolView
         name={props.icon}
         size={18}

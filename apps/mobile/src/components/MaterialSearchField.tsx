@@ -2,6 +2,8 @@ import type { RefObject } from "react";
 import { Pressable, TextInput, type TextInputInstance, View } from "react-native";
 
 import { SymbolView } from "./AppSymbol";
+import { GlassFill } from "./GlassSurface";
+import { useLiquidGlass } from "./useLiquidGlass";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
 export function MaterialSearchField({
@@ -23,17 +25,24 @@ export function MaterialSearchField({
   readonly autoFocus?: boolean;
 }) {
   const { scale, mediumIconSize } = useAndroidControlSizing();
+  const liquid = useLiquidGlass().tier !== "none";
   return (
     <View
-      className="min-w-0 flex-1 flex-row items-center bg-subtle"
+      className={
+        liquid
+          ? "min-w-0 flex-1 flex-row items-center"
+          : "min-w-0 flex-1 flex-row items-center bg-subtle"
+      }
       style={{
-        // The iOS search field: a filled, 10dp-radius capsule with no border.
+        // The iOS search field: a filled, 10dp-radius capsule with no border;
+        // iOS 26's bar search field is a glass capsule.
         minHeight: Math.max(40, 38 * scale),
         borderRadius: 10 * scale,
         gap: 7 * scale,
-        paddingHorizontal: 10.5 * scale,
+        paddingHorizontal: (liquid ? 14 : 10.5) * scale,
       }}
     >
+      {liquid ? <GlassFill interactive={false} /> : null}
       <SymbolView
         name="magnifyingglass"
         size={mediumIconSize}

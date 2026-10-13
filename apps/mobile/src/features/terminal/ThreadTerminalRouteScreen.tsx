@@ -32,7 +32,9 @@ import {
   ComposerToolbarScroller,
 } from "../../components/ComposerToolbar";
 import { EmptyState } from "../../components/EmptyState";
-import { GlassSurface } from "../../components/GlassSurface";
+import { GlassBackdropSource } from "../../components/GlassBackdropSource";
+import { GlassFill, GlassSurface } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { MaterialScreenContent } from "../../components/MaterialScreenContent";
 import { environmentCatalog } from "../../connection/catalog";
@@ -608,6 +610,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
       ? !isAccessoryDismissed &&
         (!SHOWCASE_ENABLED || keyboardFocusRequest > 0 || keyboardState.isVisible)
       : !SHOWCASE_ENABLED;
+  const liquid = useLiquidGlass().tier !== "none";
   const terminalBottomInset =
     (isKeyboardAnimationUsable ? keyboardState.height : 0) +
     (isAccessoryVisible ? TERMINAL_ACCESSORY_HEIGHT : 0);
@@ -1272,35 +1275,39 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   paddingBottom: terminalBottomInset,
                 }}
               >
-                <View
-                  pointerEvents="none"
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    backgroundColor: terminalTheme.background,
-                  }}
-                />
-                <TerminalSurface
-                  autoFocus={canOperateTerminal && terminalAutoFocus}
-                  readOnly={!canOperateTerminal}
-                  buffer={terminal.version === 0 ? null : terminalSurfaceWindow.buffer}
-                  bufferStartOffset={terminalSurfaceWindow.startOffset}
-                  bufferResetKey={terminalSurfaceWindow.resetKey}
-                  fontSize={fontSize}
-                  isRunning={isRunning}
-                  keyboardFocusRequest={keyboardFocusRequest}
-                  captureRequest={captureRequest}
-                  onCapture={(text) => {
-                    if (text.trim()) setCapturedOutput(text);
-                    else Alert.alert("No terminal output", "There is no visible output to attach.");
-                  }}
-                  onInput={handleInput}
-                  onResize={handleResize}
-                  onTerminalFocus={markInputFocused}
-                  style={{ flex: 1 }}
-                  terminalKey={terminalKey}
-                  theme={terminalTheme}
-                />
+                {/* The floating keyboard button refracts the terminal. */}
+                <GlassBackdropSource style={{ flex: 1 }}>
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      backgroundColor: terminalTheme.background,
+                    }}
+                  />
+                  <TerminalSurface
+                    autoFocus={canOperateTerminal && terminalAutoFocus}
+                    readOnly={!canOperateTerminal}
+                    buffer={terminal.version === 0 ? null : terminalSurfaceWindow.buffer}
+                    bufferStartOffset={terminalSurfaceWindow.startOffset}
+                    bufferResetKey={terminalSurfaceWindow.resetKey}
+                    fontSize={fontSize}
+                    isRunning={isRunning}
+                    keyboardFocusRequest={keyboardFocusRequest}
+                    captureRequest={captureRequest}
+                    onCapture={(text) => {
+                      if (text.trim()) setCapturedOutput(text);
+                      else
+                        Alert.alert("No terminal output", "There is no visible output to attach.");
+                    }}
+                    onInput={handleInput}
+                    onResize={handleResize}
+                    onTerminalFocus={markInputFocused}
+                    style={{ flex: 1 }}
+                    terminalKey={terminalKey}
+                    theme={terminalTheme}
+                  />
+                </GlassBackdropSource>
               </View>
 
               {selectedThread && hasNativeTerminalSurface() ? (
@@ -1310,8 +1317,9 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                     KeyboardController.dismiss();
                     setCaptureRequest((value) => value + 1);
                   }}
-                  className="px-4 py-2"
+                  className={liquid ? "mx-3 my-1.5 self-start rounded-full px-4 py-2" : "px-4 py-2"}
                 >
+                  {liquid ? <GlassFill /> : null}
                   <Text style={{ color: terminalTheme.foreground }}>Attach visible output</Text>
                 </Pressable>
               ) : null}

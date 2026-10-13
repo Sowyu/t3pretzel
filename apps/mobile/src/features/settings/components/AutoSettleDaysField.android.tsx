@@ -7,6 +7,8 @@ import { Pressable, View } from "react-native";
 
 import { AndroidAnchoredMenu } from "../../../components/AndroidAnchoredMenu";
 import { AppText } from "../../../components/AppText";
+import { GlassFill } from "../../../components/GlassSurface";
+import { useLiquidGlass } from "../../../components/useLiquidGlass";
 import { WheelPicker } from "../../../components/WheelPicker";
 import { cn } from "../../../lib/cn";
 import type { AutoSettleDaysFieldProps } from "./AutoSettleDaysField";
@@ -22,6 +24,7 @@ const days = Array.from(
  */
 export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
   const [draft, setDraft] = useState(props.value);
+  const liquid = useLiquidGlass().tier !== "none";
   return (
     <AndroidAnchoredMenu
       actions={[]}
@@ -65,10 +68,12 @@ export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
             open();
           }}
           className={cn(
-            "min-h-11 min-w-16 items-center justify-center rounded-full bg-subtle px-4 active:opacity-50",
+            "min-h-11 min-w-16 items-center justify-center rounded-full px-4",
+            !liquid && "bg-subtle active:opacity-50",
             props.disabled && "opacity-45",
           )}
         >
+          {liquid ? <GlassFill interactive={!props.disabled} /> : null}
           <AppText
             className="text-base text-primary-text"
             style={{ fontVariant: ["tabular-nums"] }}

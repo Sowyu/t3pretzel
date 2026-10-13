@@ -1,3 +1,5 @@
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { RowPressable } from "../../components/RowPressable";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -142,6 +144,7 @@ function NewTaskHeader(props: {
 }
 
 export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRouteParams | undefined>) {
+  const liquid = useLiquidGlass().tier !== "none";
   const projects = useProjects();
   const [searchText, setSearchText] = useState("");
   const { projectScopes, selectedEnvironmentId, setProject } = useNewTaskFlow();
@@ -382,9 +385,14 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   </Pressable>
                   {canStartScratch ? (
                     <Pressable
-                      className="rounded-full bg-subtle px-4 py-2.5 active:opacity-70"
+                      className={
+                        liquid
+                          ? "rounded-full px-4 py-2.5"
+                          : "rounded-full bg-subtle px-4 py-2.5 active:opacity-70"
+                      }
                       onPress={() => void startScratch()}
                     >
+                      {liquid ? <GlassFill /> : null}
                       <Text className="text-sm font-t3-bold text-foreground">
                         Start without a project
                       </Text>

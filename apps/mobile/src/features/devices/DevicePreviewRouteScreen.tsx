@@ -307,8 +307,10 @@ function DevicePreviewScreen({
             />
           ) : null}
           <View className="px-3" style={{ paddingTop: Math.max(insets.top, 12) }}>
-            <GlassSurface className="flex-row items-center gap-1 p-1">
+            {/* The stream is not a glass backdrop, so Android uses the thick menu material over it. */}
+            <GlassSurface variant="menu" className="flex-row items-center gap-1 p-1">
               <ControlPill
+                glass={false}
                 accessibilityLabel="Close device preview"
                 icon="xmark"
                 onPress={onClose}
@@ -317,6 +319,7 @@ function DevicePreviewScreen({
                 {preview?.name ?? "Devices"}
               </AppText>
               <ControlPill
+                glass={false}
                 accessibilityLabel="Home"
                 icon="house"
                 disabled={!inputConnected}

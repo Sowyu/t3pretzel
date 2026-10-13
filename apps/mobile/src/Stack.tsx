@@ -144,6 +144,7 @@ import { deriveLayout } from "./lib/layout";
 import { useNativeLayoutMetrics } from "./native/native-layout-metrics";
 import { nativeHeaderScrollEdgeEffects } from "./native/StackHeader";
 import { FORM_SHEET_PRESENTATION_OPTIONS } from "./native/sheet-surface";
+import { GlassFlatBackdrop } from "./components/GlassBackdropSource";
 import { useThreadOutboxDrain } from "./state/use-thread-outbox-drain";
 import { useComposerAttachmentUploadWorker } from "./state/composer-attachment-uploads";
 
@@ -1046,6 +1047,8 @@ function GuardedScreenLayout(props: {
         <ScreenRenderFallback {...fallback} routeName={props.route.name} />
       )}
     >
+      {/* Android glass on a screen's plain background (headers, pills, segmented controls) samples this. */}
+      <GlassFlatBackdrop />
       {props.children}
       {grabber}
     </RenderErrorBoundary>

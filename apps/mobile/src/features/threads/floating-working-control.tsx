@@ -25,6 +25,9 @@ import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import { ControlPill } from "../../components/ControlPill";
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
+import { cn } from "../../lib/cn";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import { BrowserPreviewButton } from "../browser/browser-preview-button";
 import { DevicePreviewButton } from "../devices/device-preview-button";
@@ -81,6 +84,7 @@ export function FloatingWorkingControl(props: {
   readonly lift?: SharedValue<number>;
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const liquid = useLiquidGlass().tier !== "none";
   const [overlayWidth, setOverlayWidth] = useState(windowWidth);
   const [queueWidth, setQueueWidth] = useState(0);
   const [agentsWidth, setAgentsWidth] = useState(0);
@@ -154,6 +158,10 @@ export function FloatingWorkingControl(props: {
   if (!hasCapsule && !props.showScrollToEnd) {
     return null;
   }
+  // Android glass replaces the fallback fill, border and shadow.
+  const scrollToEndClassName = liquid
+    ? "h-11 w-11"
+    : "h-11 w-11 border border-border bg-glass-fallback shadow-md shadow-black/10";
 
   // Both preview buttons fit beside each other only as icons.
   const previewCompact =
@@ -292,9 +300,13 @@ export function FloatingWorkingControl(props: {
         <View pointerEvents="box-none" className="flex-row items-center gap-4">
           <Animated.View
             pointerEvents={capsuleInteractive ? "box-none" : "none"}
-            className="h-11 items-center justify-center overflow-hidden rounded-full border border-border bg-glass-fallback shadow-md shadow-black/10"
+            className={cn(
+              "h-11 items-center justify-center overflow-hidden rounded-full",
+              !liquid && "border border-border bg-glass-fallback shadow-md shadow-black/10",
+            )}
             style={capsuleStyle}
           >
+            {liquid ? <GlassFill interactive={capsuleInteractive} /> : null}
             {capsuleContent}
           </Animated.View>
 
@@ -307,7 +319,7 @@ export function FloatingWorkingControl(props: {
             <ControlPill
               accessibilityLabel="Scroll to end"
               activateOnPressIn
-              className="h-11 w-11 border border-border bg-glass-fallback shadow-md shadow-black/10"
+              className={scrollToEndClassName}
               disabled={!props.showScrollToEnd}
               icon={{ ios: "chevron.down", android: "keyboard_arrow_down" }}
               onPress={props.onScrollToEnd}
@@ -327,7 +339,7 @@ export function FloatingWorkingControl(props: {
         <ControlPill
           accessibilityLabel="Scroll to end"
           activateOnPressIn
-          className="h-11 w-11 border border-border bg-glass-fallback shadow-md shadow-black/10"
+          className={scrollToEndClassName}
           icon={{ ios: "chevron.down", android: "keyboard_arrow_down" }}
           onPress={props.onScrollToEnd}
         />

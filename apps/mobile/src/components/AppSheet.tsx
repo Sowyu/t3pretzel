@@ -4,6 +4,7 @@ import { FormSheet, Screen, ScreenStack, ScreenStackHeaderConfig } from "react-n
 import { useResolveClassNames, withUniwind } from "uniwind";
 
 import { AndroidSheetHeader } from "./AndroidScreenHeader";
+import { GlassFlatBackdrop } from "./GlassBackdropSource";
 import { nativeHeaderScrollEdgeEffects } from "../native/StackHeader";
 
 const HEADER_SCROLL_EDGE_EFFECTS = nativeHeaderScrollEdgeEffects(Platform.OS, Platform.Version);
@@ -72,6 +73,7 @@ export function AppSheet(props: {
           </ScreenStack>
         ) : (
           <>
+            <GlassFlatBackdrop />
             {/* iOS closes with a Done item on the right, not a back chevron. */}
             <AndroidSheetHeader
               title={props.title}

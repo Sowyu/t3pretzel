@@ -57,6 +57,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
+import { GlassBackdropSource } from "../../components/GlassBackdropSource";
 import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import { AndroidWorkspaceSidebarButton } from "../layout/workspace-sidebar-toolbar";
@@ -464,203 +465,208 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
           style={{ flex: 1 }}
           onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
         >
-          {(["overview", "guide", "activity"] as const)
-            .filter((tab) => tab !== "guide" || guidesEnabled)
-            .map((tab) => (
-              <View
-                key={tab}
-                style={[StyleSheet.absoluteFill, { opacity: section === tab ? 1 : 0 }]}
-                pointerEvents={section === tab ? "auto" : "none"}
-                accessibilityElementsHidden={section !== tab}
-                importantForAccessibility={section === tab ? "auto" : "no-hide-descendants"}
-              >
-                <AnimatedLegendList
-                  ref={(list) => {
-                    scrollViews.current[tab] = list;
-                  }}
-                  initialScrollOffset={-insets.top}
-                  onScroll={(event) => {
-                    const offset = event.nativeEvent.contentOffset.y;
-                    scrollOffsets.current[tab] = offset;
-                    if (requestedSection.current === tab) currentScrollOffset.current = offset;
-                  }}
-                  className="flex-1"
-                  renderScrollComponent={
-                    Platform.OS === "ios" ? PullRequestTabScrollView : undefined
-                  }
-                  contentInsetAdjustmentBehavior="never"
-                  contentInset={
-                    Platform.OS === "ios" ? { top: insets.top, bottom: insets.bottom } : undefined
-                  }
-                  contentInsetStartAdjustment={Platform.OS === "ios" ? insets.top : 0}
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={section === tab && pullRefresh.refreshing}
-                      onRefresh={refresh}
-                    />
-                  }
-                  alwaysBounceVertical
-                  scrollsToTop={section === tab}
-                  onContentSizeChange={() => {
-                    if (
-                      tab !== "overview" ||
-                      section !== "overview" ||
-                      !pendingDescriptionJump.current
-                    )
-                      return;
-                    pendingDescriptionJump.current = false;
-                    // Collapse changes the scroll range; restore the heading after that layout commits.
-                    scrollViews.current.overview?.scrollToOffset({
-                      offset: bodyY.current + descriptionY.current - insets.top,
-                      animated: false,
-                    });
-                  }}
-                  contentContainerStyle={{
-                    paddingHorizontal: 16,
-                    paddingTop: 8,
-                    paddingBottom: 24 + (Platform.OS === "android" ? toolbarHeight : 0),
-                    // Short tabs must still be tall enough to preserve the collapsed header.
-                    minHeight: Math.max(
-                      0,
-                      viewportHeight + headerHeight - insets.top - insets.bottom,
-                    ),
-                  }}
-                  data={[
-                    {
-                      key: `${tab}:body`,
-                      content: (
-                        <View>
-                          {tab === "overview" && identity ? (
-                            <View>
-                              {pr ? (
-                                <PullRequestOverview
-                                  pr={pr}
-                                  params={params}
-                                  stack={stack}
-                                  descriptionExpanded={descriptionExpanded}
-                                  onDescriptionExpandedChange={setDescriptionExpanded}
-                                  onDescriptionLayout={(y) => {
-                                    descriptionY.current = y;
-                                  }}
-                                  onDescriptionCollapse={() => {
-                                    pendingDescriptionJump.current = true;
-                                  }}
-                                />
-                              ) : summary ? (
-                                <PullRequestOverviewLoading
-                                  summary={summary}
-                                  params={params}
-                                  stack={stack}
-                                />
-                              ) : null}
-                              <View
-                                className="mt-8 border-t border-border-subtle pt-3"
-                                onLayout={(event) => {
-                                  filesY.current = event.nativeEvent.layout.y;
-                                  if (pendingFilesJump.current) {
-                                    requestAnimationFrame(() => {
-                                      if (requestedSection.current === "overview") jumpToFiles();
-                                    });
-                                  }
-                                }}
-                              >
-                                {filesContent.header}
-                              </View>
-                            </View>
-                          ) : null}
-                          {tab === "guide" ? <PullRequestGuideContent params={params} /> : null}
-                          {tab === "activity" ? (
-                            <PullRequestActivityFilters
-                              value={activityFilter}
-                              onChange={setActivityFilter}
-                              hiddenCount={tabContent.hiddenCount}
-                            />
-                          ) : null}
-                          {tab === "activity" ? (
-                            <PullRequestReadStatus
-                              pending={tabContent.pending}
-                              error={tabContent.error}
-                            />
-                          ) : null}
-                        </View>
-                      ),
-                    },
-                    ...(tab === "overview"
-                      ? identity
-                        ? filesContent.rows
-                        : []
-                      : tab === "activity"
-                        ? tabContent.rows
-                        : []
-                    ).map((row) => ({
-                      ...row,
-                      key: `${tab}:${row.key}`,
-                      content: row.content,
-                    })),
-                  ]}
-                  keyExtractor={(row) => row.key}
-                  getItemType={(row) =>
-                    row.key.endsWith(":body") ? row.key : row.key.split(":")[0]
-                  }
-                  // The overview body contains the clipped description and owns collapse scroll
-                  // correction. Animating that cell fights both; file rows still fade individually.
-                  itemLayoutAnimation={tab === "overview" ? undefined : PR_ROW_LAYOUT}
-                  onLoad={() => setListAnimationsReady(true)}
-                  renderItem={({ item }) => (
-                    <Animated.View
-                      key={item.key}
-                      entering={
-                        listAnimationsReady && !item.key.endsWith(":body")
-                          ? PR_ROW_ENTER
-                          : undefined
-                      }
-                      exiting={
-                        listAnimationsReady && !item.key.endsWith(":body") ? PR_ROW_EXIT : undefined
-                      }
-                    >
-                      {item.content}
-                    </Animated.View>
-                  )}
-                  recycleItems={false}
-                  estimatedItemSize={tab === "overview" ? 64 : 220}
-                  maintainVisibleContentPosition={false}
-                  ListHeaderComponent={
-                    <>
-                      <PullRequestReadStatus
-                        pending={result.isPending && !identity}
-                        error={result.error}
+          {/* The floating action toolbar refracts the pull request. */}
+          <GlassBackdropSource style={{ flex: 1 }}>
+            {(["overview", "guide", "activity"] as const)
+              .filter((tab) => tab !== "guide" || guidesEnabled)
+              .map((tab) => (
+                <View
+                  key={tab}
+                  style={[StyleSheet.absoluteFill, { opacity: section === tab ? 1 : 0 }]}
+                  pointerEvents={section === tab ? "auto" : "none"}
+                  accessibilityElementsHidden={section !== tab}
+                  importantForAccessibility={section === tab ? "auto" : "no-hide-descendants"}
+                >
+                  <AnimatedLegendList
+                    ref={(list) => {
+                      scrollViews.current[tab] = list;
+                    }}
+                    initialScrollOffset={-insets.top}
+                    onScroll={(event) => {
+                      const offset = event.nativeEvent.contentOffset.y;
+                      scrollOffsets.current[tab] = offset;
+                      if (requestedSection.current === tab) currentScrollOffset.current = offset;
+                    }}
+                    className="flex-1"
+                    renderScrollComponent={
+                      Platform.OS === "ios" ? PullRequestTabScrollView : undefined
+                    }
+                    contentInsetAdjustmentBehavior="never"
+                    contentInset={
+                      Platform.OS === "ios" ? { top: insets.top, bottom: insets.bottom } : undefined
+                    }
+                    contentInsetStartAdjustment={Platform.OS === "ios" ? insets.top : 0}
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={section === tab && pullRefresh.refreshing}
+                        onRefresh={refresh}
                       />
-                      {identity ? (
-                        <View
-                          className="gap-5 pb-5"
-                          onLayout={(event) => {
-                            bodyY.current = event.nativeEvent.layout.height;
-                            setHeaderHeight(event.nativeEvent.layout.height);
-                          }}
-                        >
-                          <PullRequestIdentity pr={identity} params={params} />
-                          <SegmentedControl
-                            className="bg-grouped-card"
-                            options={[
-                              { value: "overview", label: "Overview" },
-                              ...(guidesEnabled
-                                ? [{ value: "guide" as const, label: "Guide" }]
-                                : []),
-                              { value: "activity", label: "Activity" },
-                            ]}
-                            selected={section}
-                            onSelect={selectSection}
-                            role="tab"
-                            size="compact"
-                          />
-                        </View>
-                      ) : null}
-                    </>
-                  }
-                  ListFooterComponent={tab === "overview" ? filesContent.footer : null}
-                />
-              </View>
-            ))}
+                    }
+                    alwaysBounceVertical
+                    scrollsToTop={section === tab}
+                    onContentSizeChange={() => {
+                      if (
+                        tab !== "overview" ||
+                        section !== "overview" ||
+                        !pendingDescriptionJump.current
+                      )
+                        return;
+                      pendingDescriptionJump.current = false;
+                      // Collapse changes the scroll range; restore the heading after that layout commits.
+                      scrollViews.current.overview?.scrollToOffset({
+                        offset: bodyY.current + descriptionY.current - insets.top,
+                        animated: false,
+                      });
+                    }}
+                    contentContainerStyle={{
+                      paddingHorizontal: 16,
+                      paddingTop: 8,
+                      paddingBottom: 24 + (Platform.OS === "android" ? toolbarHeight : 0),
+                      // Short tabs must still be tall enough to preserve the collapsed header.
+                      minHeight: Math.max(
+                        0,
+                        viewportHeight + headerHeight - insets.top - insets.bottom,
+                      ),
+                    }}
+                    data={[
+                      {
+                        key: `${tab}:body`,
+                        content: (
+                          <View>
+                            {tab === "overview" && identity ? (
+                              <View>
+                                {pr ? (
+                                  <PullRequestOverview
+                                    pr={pr}
+                                    params={params}
+                                    stack={stack}
+                                    descriptionExpanded={descriptionExpanded}
+                                    onDescriptionExpandedChange={setDescriptionExpanded}
+                                    onDescriptionLayout={(y) => {
+                                      descriptionY.current = y;
+                                    }}
+                                    onDescriptionCollapse={() => {
+                                      pendingDescriptionJump.current = true;
+                                    }}
+                                  />
+                                ) : summary ? (
+                                  <PullRequestOverviewLoading
+                                    summary={summary}
+                                    params={params}
+                                    stack={stack}
+                                  />
+                                ) : null}
+                                <View
+                                  className="mt-8 border-t border-border-subtle pt-3"
+                                  onLayout={(event) => {
+                                    filesY.current = event.nativeEvent.layout.y;
+                                    if (pendingFilesJump.current) {
+                                      requestAnimationFrame(() => {
+                                        if (requestedSection.current === "overview") jumpToFiles();
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {filesContent.header}
+                                </View>
+                              </View>
+                            ) : null}
+                            {tab === "guide" ? <PullRequestGuideContent params={params} /> : null}
+                            {tab === "activity" ? (
+                              <PullRequestActivityFilters
+                                value={activityFilter}
+                                onChange={setActivityFilter}
+                                hiddenCount={tabContent.hiddenCount}
+                              />
+                            ) : null}
+                            {tab === "activity" ? (
+                              <PullRequestReadStatus
+                                pending={tabContent.pending}
+                                error={tabContent.error}
+                              />
+                            ) : null}
+                          </View>
+                        ),
+                      },
+                      ...(tab === "overview"
+                        ? identity
+                          ? filesContent.rows
+                          : []
+                        : tab === "activity"
+                          ? tabContent.rows
+                          : []
+                      ).map((row) => ({
+                        ...row,
+                        key: `${tab}:${row.key}`,
+                        content: row.content,
+                      })),
+                    ]}
+                    keyExtractor={(row) => row.key}
+                    getItemType={(row) =>
+                      row.key.endsWith(":body") ? row.key : row.key.split(":")[0]
+                    }
+                    // The overview body contains the clipped description and owns collapse scroll
+                    // correction. Animating that cell fights both; file rows still fade individually.
+                    itemLayoutAnimation={tab === "overview" ? undefined : PR_ROW_LAYOUT}
+                    onLoad={() => setListAnimationsReady(true)}
+                    renderItem={({ item }) => (
+                      <Animated.View
+                        key={item.key}
+                        entering={
+                          listAnimationsReady && !item.key.endsWith(":body")
+                            ? PR_ROW_ENTER
+                            : undefined
+                        }
+                        exiting={
+                          listAnimationsReady && !item.key.endsWith(":body")
+                            ? PR_ROW_EXIT
+                            : undefined
+                        }
+                      >
+                        {item.content}
+                      </Animated.View>
+                    )}
+                    recycleItems={false}
+                    estimatedItemSize={tab === "overview" ? 64 : 220}
+                    maintainVisibleContentPosition={false}
+                    ListHeaderComponent={
+                      <>
+                        <PullRequestReadStatus
+                          pending={result.isPending && !identity}
+                          error={result.error}
+                        />
+                        {identity ? (
+                          <View
+                            className="gap-5 pb-5"
+                            onLayout={(event) => {
+                              bodyY.current = event.nativeEvent.layout.height;
+                              setHeaderHeight(event.nativeEvent.layout.height);
+                            }}
+                          >
+                            <PullRequestIdentity pr={identity} params={params} />
+                            <SegmentedControl
+                              className="bg-grouped-card"
+                              options={[
+                                { value: "overview", label: "Overview" },
+                                ...(guidesEnabled
+                                  ? [{ value: "guide" as const, label: "Guide" }]
+                                  : []),
+                                { value: "activity", label: "Activity" },
+                              ]}
+                              selected={section}
+                              onSelect={selectSection}
+                              role="tab"
+                              size="compact"
+                            />
+                          </View>
+                        ) : null}
+                      </>
+                    }
+                    ListFooterComponent={tab === "overview" ? filesContent.footer : null}
+                  />
+                </View>
+              ))}
+          </GlassBackdropSource>
         </View>
         <PullRequestActionToolbar
           pr={pr}

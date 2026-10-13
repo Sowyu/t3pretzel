@@ -9,7 +9,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { AppText as Text } from "./AppText";
 import { cn } from "../lib/cn";
+import { GlassSurface } from "./GlassSurface";
 import type { SegmentedControlProps } from "./SegmentedControl.types";
+import { useLiquidGlass } from "./useLiquidGlass";
 
 export type { SegmentedControlProps } from "./SegmentedControl.types";
 
@@ -17,6 +19,7 @@ export function SegmentedControl<Value extends number | string>(
   props: SegmentedControlProps<Value>,
 ) {
   const compact = props.size === "compact";
+  const liquid = useLiquidGlass().tier !== "none";
   const [width, setWidth] = useState(0);
   const index = Math.max(
     0,
@@ -40,6 +43,57 @@ export function SegmentedControl<Value extends number | string>(
       },
     ],
   }));
+  if (liquid) {
+    // iOS 26 segmented control: a glass track whose selection is the tab-bar
+    // lens, which slides on tap and follows a drag across segments.
+    return (
+      <GlassSurface
+        chrome="none"
+        shape="capsule"
+        accessible={false}
+        // Glass is the track, so a caller's track color only applies without it.
+        className={cn(
+          "flex-row",
+          props.className
+            ?.split(" ")
+            .filter((name) => !name.startsWith("bg-"))
+            .join(" "),
+        )}
+        tabs={{
+          count: props.options.length,
+          selected: index,
+          inset: 3,
+          onSelect: (next) => {
+            const option = props.options[next];
+            if (option) props.onSelect(option.value);
+          },
+        }}
+      >
+        {props.options.map((option) => {
+          const active = option.value === props.selected;
+          return (
+            <Pressable
+              key={String(option.value)}
+              accessibilityRole={props.role ?? "button"}
+              accessibilityLabel={option.accessibilityLabel ?? option.label}
+              accessibilityState={{ selected: active }}
+              onPress={() => props.onSelect(option.value)}
+              className={cn("flex-1 items-center justify-center", compact ? "h-9" : "h-11")}
+            >
+              <Text
+                className={cn(
+                  compact ? "text-xs" : "text-sm",
+                  active ? "font-t3-medium text-foreground" : "text-foreground-muted",
+                )}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </GlassSurface>
+    );
+  }
   return (
     <View
       accessible={false}

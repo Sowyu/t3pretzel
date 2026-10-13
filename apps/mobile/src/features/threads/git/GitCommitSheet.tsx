@@ -1,3 +1,5 @@
+import { GlassFill } from "../../../components/GlassSurface";
+import { useLiquidGlass } from "../../../components/useLiquidGlass";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import { Platform, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
@@ -23,6 +25,7 @@ type GitCommitSheetProps = StaticScreenProps<{
 }>;
 
 export function GitCommitSheet(_props: GitCommitSheetProps) {
+  const liquid = useLiquidGlass().tier !== "none";
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -139,16 +142,26 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
               <View className="flex-row items-center gap-2">
                 {!allSelected && isEditingFiles ? (
                   <Pressable
-                    className="rounded-full bg-subtle px-3 py-2 android:active:opacity-70"
+                    className={
+                      liquid
+                        ? "rounded-full px-3 py-2"
+                        : "rounded-full bg-subtle px-3 py-2 android:active:opacity-70"
+                    }
                     onPress={() => setExcludedFiles(new Set())}
                   >
+                    {liquid ? <GlassFill /> : null}
                     <Text className="text-foreground text-2xs font-t3-bold uppercase">Reset</Text>
                   </Pressable>
                 ) : null}
                 <Pressable
-                  className="rounded-full bg-subtle px-3 py-2 android:active:opacity-70"
+                  className={
+                    liquid
+                      ? "rounded-full px-3 py-2"
+                      : "rounded-full bg-subtle px-3 py-2 android:active:opacity-70"
+                  }
                   onPress={() => setIsEditingFiles((current) => !current)}
                 >
+                  {liquid ? <GlassFill /> : null}
                   <Text className="text-foreground text-2xs font-t3-bold uppercase">
                     {isEditingFiles ? "Done" : "Edit"}
                   </Text>

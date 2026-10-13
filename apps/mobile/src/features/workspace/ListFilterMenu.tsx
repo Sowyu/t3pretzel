@@ -5,6 +5,8 @@ import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import { ControlPillMenu } from "../../components/ControlPillMenu";
 import type { ControlPillMenuProps } from "../../components/ControlPillMenu.types";
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { cn } from "../../lib/cn";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -25,7 +27,8 @@ export function ListFilterMenu(props: {
   readonly actions: ControlPillMenuProps["actions"];
   readonly onSelect: (id: string) => void;
 }) {
-  const { themeAppearance } = useAppearancePreferences();
+  const { themeAppearance, themeVariables } = useAppearancePreferences();
+  const liquid = useLiquidGlass().tier !== "none";
   const content = (
     <>
       {props.icon ? (
@@ -73,6 +76,11 @@ export function ListFilterMenu(props: {
           >
             {content}
           </FilterGlass>
+        ) : liquid ? (
+          <View className={PILL}>
+            <GlassFill tintColor={props.active ? themeVariables["--color-primary"] : undefined} />
+            {content}
+          </View>
         ) : (
           <View className={cn(PILL, props.active ? "bg-primary" : "bg-subtle")}>{content}</View>
         )}

@@ -1,3 +1,5 @@
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { ConnectionTraceId } from "./ConnectionTraceId";
 import { useAuth } from "@clerk/expo";
@@ -81,6 +83,7 @@ function ConnectedOnlyCloudEnvironmentRows(props: CloudEnvironmentRowsProps) {
 function CloudEnvironmentRowsContent(
   props: CloudEnvironmentRowsProps & { readonly discoveryAvailable?: boolean },
 ) {
+  const liquid = useLiquidGlass().tier !== "none";
   const controller = useConnectionController();
   const discoveryAvailable = props.discoveryAvailable ?? true;
   const availableCloudEnvironments = discoveryAvailable
@@ -183,8 +186,13 @@ function CloudEnvironmentRowsContent(
             onPress={() => {
               void controller.refreshRelayEnvironments();
             }}
-            className="self-start rounded-full bg-subtle px-3.5 py-2 active:opacity-70"
+            className={
+              liquid
+                ? "self-start rounded-full px-3.5 py-2"
+                : "self-start rounded-full bg-subtle px-3.5 py-2 active:opacity-70"
+            }
           >
+            {liquid ? <GlassFill /> : null}
             <Text className="text-xs font-t3-bold text-foreground">Try again</Text>
           </Pressable>
         </View>
@@ -422,14 +430,20 @@ function CloudEnvironmentRowShell(props: {
 }
 
 function CopyTraceIdButton(props: { readonly traceId: string }) {
+  const liquid = useLiquidGlass().tier !== "none";
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => {
         copyTextWithHaptic(props.traceId, { target: "connection-trace-id" });
       }}
-      className="self-start flex-row items-center gap-1.5 rounded-full bg-subtle px-3 py-2 active:opacity-70"
+      className={
+        liquid
+          ? "self-start flex-row items-center gap-1.5 rounded-full px-3 py-2"
+          : "self-start flex-row items-center gap-1.5 rounded-full bg-subtle px-3 py-2 active:opacity-70"
+      }
     >
+      {liquid ? <GlassFill /> : null}
       <SymbolView
         name="doc.on.doc"
         size={12}

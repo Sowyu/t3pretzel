@@ -48,6 +48,21 @@ class GlassBackdropView(context: Context, appContext: AppContext) : ExpoView(con
   internal val content: BackdropRecording?
     get() = recording
 
+  /**
+   * A flat backdrop stands for a screen's plain background: glass that sits on
+   * flat color (in-flow headers, form controls) samples it and shows what is
+   * behind it through its tint, with nothing to refract. It has no children,
+   * draws nothing on screen, and records one near-transparent fill only while
+   * glass samples it, so it never re-records.
+   */
+  var flat = false
+    set(value) {
+      if (field != value) {
+        field = value
+        invalidate()
+      }
+    }
+
   init {
     // ViewGroups skip draw() by default; the background must be recorded too.
     setWillNotDraw(false)
@@ -82,12 +97,13 @@ class GlassBackdropView(context: Context, appContext: AppContext) : ExpoView(con
     node.setPosition(0, 0, width, height)
     val recording = node.beginRecording(width, height)
     try {
-      super.draw(recording)
+      // HWUI skips an empty display list, which would leave the glass blank.
+      if (flat) recording.drawColor(FLAT_FILL) else super.draw(recording)
     } finally {
       node.endRecording()
     }
     hasContent = true
-    canvas.drawRenderNode(node)
+    if (!flat) canvas.drawRenderNode(node)
     for (index in consumers.indices) consumers[index].onSourceRecorded()
   }
 
@@ -134,6 +150,11 @@ class GlassBackdropView(context: Context, appContext: AppContext) : ExpoView(con
     consumers.clear()
     releaseContent()
     GlassSources.bumpGeneration()
+  }
+
+  private companion object {
+    /** 1/255 black: invisible through the glass tint, but never an empty recording. */
+    const val FLAT_FILL = 0x01000000
   }
 }
 

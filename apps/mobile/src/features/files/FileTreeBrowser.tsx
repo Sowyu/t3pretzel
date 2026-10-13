@@ -1,3 +1,5 @@
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { LegendList } from "@legendapp/list/react-native";
 import type { ProjectEntry } from "@t3tools/contracts";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
@@ -118,6 +120,7 @@ export function FileTreeBrowser(props: {
   readonly onRefresh: () => void;
   readonly onSelectFile: (path: string) => void;
 }) {
+  const liquid = useLiquidGlass().tier !== "none";
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(() => new Set());
   const [pendingSelection, setPendingSelection] = useState<{
     readonly path: string;
@@ -292,8 +295,13 @@ export function FileTreeBrowser(props: {
                 accessibilityRole="button"
                 onPress={props.onRefresh}
                 disabled={props.isPending}
-                className="mt-3 min-h-11 self-start justify-center rounded-full bg-subtle px-4 active:opacity-70 disabled:opacity-50"
+                className={
+                  liquid
+                    ? "mt-3 min-h-11 self-start justify-center rounded-full px-4 disabled:opacity-50"
+                    : "mt-3 min-h-11 self-start justify-center rounded-full bg-subtle px-4 active:opacity-70 disabled:opacity-50"
+                }
               >
+                {liquid ? <GlassFill /> : null}
                 <Text className="text-sm font-t3-medium text-foreground">Try again</Text>
               </Pressable>
             </>

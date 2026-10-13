@@ -13,6 +13,9 @@ class T3LiquidGlassModule : Module() {
 
     View(GlassBackdropView::class) {
       Name("T3GlassBackdrop")
+      Prop("flat") { view: GlassBackdropView, value: Boolean ->
+        view.flat = value
+      }
     }
 
     View(LiquidGlassView::class) {

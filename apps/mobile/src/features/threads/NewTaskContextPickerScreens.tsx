@@ -1,3 +1,5 @@
+import { GlassFill } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { MaterialSearchField } from "../../components/MaterialSearchField";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
@@ -353,6 +355,7 @@ export function BranchPickerScreen(props: {
     readonly onChangeStartFromOrigin: (value: boolean) => void;
   };
 }) {
+  const liquid = useLiquidGlass().tier !== "none";
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const searchInput = useRef<TextInputInstance>(null);
@@ -437,9 +440,14 @@ export function BranchPickerScreen(props: {
           {!props.loading && props.error ? (
             <Pressable
               accessibilityRole="button"
-              className="rounded-full bg-card px-4 py-2 active:opacity-70"
+              className={
+                liquid
+                  ? "rounded-full px-4 py-2"
+                  : "rounded-full bg-card px-4 py-2 active:opacity-70"
+              }
               onPress={props.onRefresh}
             >
+              {liquid ? <GlassFill /> : null}
               <Text className="text-sm font-t3-medium text-foreground">Try again</Text>
             </Pressable>
           ) : null}

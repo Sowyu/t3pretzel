@@ -1,4 +1,4 @@
-import type { ViewProps } from "react-native";
+import { StyleSheet, type ViewProps } from "react-native";
 
 import { glassBackdropView } from "../../modules/t3-liquid-glass";
 
@@ -18,4 +18,16 @@ export function GlassBackdropSource(props: ViewProps) {
   // iOS (and anywhere the module is missing) keeps the tree exactly as it was.
   if (!Backdrop) return <>{props.children}</>;
   return <Backdrop collapsable={false} {...props} />;
+}
+
+/**
+ * A screen's plain background as a backdrop, for glass that sits on flat
+ * color: in-flow headers, segmented controls, pill buttons in forms. Render
+ * it first in a screen or sheet root; every glass on that screen without a
+ * closer content backdrop shares it and shows what is behind it through its
+ * tint. It draws nothing, has no children, and never re-records.
+ */
+export function GlassFlatBackdrop() {
+  if (!Backdrop) return null;
+  return <Backdrop flat pointerEvents="none" collapsable={false} style={StyleSheet.absoluteFill} />;
 }

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { MaterialButton } from "../../components/MaterialButton";
+import { GlassBackdropSource } from "../../components/GlassBackdropSource";
 import { GlassSurface } from "../../components/GlassSurface";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { relativeTime } from "../../lib/time";
@@ -153,66 +154,69 @@ function Discussion({ params }: { params: PullRequestParams & { readonly discuss
             />
           </NativeHeaderToolbar>
         ) : null}
-        <ScrollViewMarker style={{ flex: 1 }}>
-          <ScrollView
-            className="flex-1"
-            contentInsetAdjustmentBehavior="automatic"
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              padding: 20,
-              paddingBottom: canReply ? composerHeight + bottomInset + 24 : 24,
-            }}
-          >
-            {activity.isPending && !thread ? <ActivityIndicator /> : null}
-            {thread ? (
-              <View className="gap-2 pb-4">
-                <Text selectable className="font-mono text-xs text-foreground-muted">
-                  {thread.path}
-                  {thread.line ? `:${thread.line}` : ""}
-                </Text>
-                <Text className="text-xs text-foreground-muted">
-                  {thread.isResolved ? "Resolved" : "Unresolved"}
-                  {thread.isOutdated ? " · Outdated" : ""}
-                </Text>
-                <MaterialButton
-                  label="View file diff"
-                  onPress={() =>
-                    navigation.navigate("PullRequestFile", { ...params, path: thread.path })
-                  }
-                />
-              </View>
-            ) : !activity.isPending ? (
-              <Text>This discussion is no longer available.</Text>
-            ) : null}
-            {comments.map((comment) => (
-              <View key={comment.id} className="gap-3 border-b border-border-subtle py-4">
-                <View className="flex-row items-center gap-2">
-                  <PullRequestAvatar actor={comment.author} size={28} />
-                  <Text className="min-w-0 flex-1 text-sm font-t3-medium">
-                    {comment.author?.login ?? "Unknown author"}
+        {/* The floating reply composer refracts the comments. */}
+        <GlassBackdropSource style={{ flex: 1 }}>
+          <ScrollViewMarker style={{ flex: 1 }}>
+            <ScrollView
+              className="flex-1"
+              contentInsetAdjustmentBehavior="automatic"
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                padding: 20,
+                paddingBottom: canReply ? composerHeight + bottomInset + 24 : 24,
+              }}
+            >
+              {activity.isPending && !thread ? <ActivityIndicator /> : null}
+              {thread ? (
+                <View className="gap-2 pb-4">
+                  <Text selectable className="font-mono text-xs text-foreground-muted">
+                    {thread.path}
+                    {thread.line ? `:${thread.line}` : ""}
                   </Text>
-                  <Text className="text-2xs text-foreground-muted">
-                    {relativeTime(comment.createdAt)}
+                  <Text className="text-xs text-foreground-muted">
+                    {thread.isResolved ? "Resolved" : "Unresolved"}
+                    {thread.isOutdated ? " · Outdated" : ""}
                   </Text>
+                  <MaterialButton
+                    label="View file diff"
+                    onPress={() =>
+                      navigation.navigate("PullRequestFile", { ...params, path: thread.path })
+                    }
+                  />
                 </View>
-                <PullRequestMarkdown markdown={comment.body} />
-              </View>
-            ))}
-            {nextCursor ? (
-              <MaterialButton
-                label={busy ? "Loading…" : "Load more replies"}
-                disabled={busy}
-                onPress={() => void more()}
-              />
-            ) : null}
-            {error || activity.error ? (
-              <Text selectable className="py-4 text-sm text-danger-foreground">
-                {error ?? activity.error}
-              </Text>
-            ) : null}
-            {notice ? <Text className="py-4 text-sm text-foreground-muted">{notice}</Text> : null}
-          </ScrollView>
-        </ScrollViewMarker>
+              ) : !activity.isPending ? (
+                <Text>This discussion is no longer available.</Text>
+              ) : null}
+              {comments.map((comment) => (
+                <View key={comment.id} className="gap-3 border-b border-border-subtle py-4">
+                  <View className="flex-row items-center gap-2">
+                    <PullRequestAvatar actor={comment.author} size={28} />
+                    <Text className="min-w-0 flex-1 text-sm font-t3-medium">
+                      {comment.author?.login ?? "Unknown author"}
+                    </Text>
+                    <Text className="text-2xs text-foreground-muted">
+                      {relativeTime(comment.createdAt)}
+                    </Text>
+                  </View>
+                  <PullRequestMarkdown markdown={comment.body} />
+                </View>
+              ))}
+              {nextCursor ? (
+                <MaterialButton
+                  label={busy ? "Loading…" : "Load more replies"}
+                  disabled={busy}
+                  onPress={() => void more()}
+                />
+              ) : null}
+              {error || activity.error ? (
+                <Text selectable className="py-4 text-sm text-danger-foreground">
+                  {error ?? activity.error}
+                </Text>
+              ) : null}
+              {notice ? <Text className="py-4 text-sm text-foreground-muted">{notice}</Text> : null}
+            </ScrollView>
+          </ScrollViewMarker>
+        </GlassBackdropSource>
         {canReply ? (
           <View className="absolute inset-x-4 bottom-0" style={{ paddingBottom: bottomInset }}>
             <GlassSurface
