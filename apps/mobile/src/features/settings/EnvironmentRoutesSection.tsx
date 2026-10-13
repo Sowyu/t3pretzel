@@ -145,7 +145,7 @@ export function EnvironmentRoutesSection({
             onPress={() => setEditing((value) => !value)}
             className="px-2 py-1 active:opacity-70"
           >
-            <Text className="text-sm font-t3-medium text-foreground android:text-primary-text">
+            <Text className="text-sm font-t3-medium text-foreground">
               {editing ? "Done" : "Edit"}
             </Text>
           </Pressable>
@@ -294,11 +294,7 @@ function RouteRow(props: {
           .filter((part) => part !== null)
           .join(", ")}
         // Matches the padding of the settings rows around it.
-        className={cn(
-          "min-w-0 flex-1 flex-row items-center gap-4 py-4 android:py-3",
-          address !== null ? "android:min-h-18" : "android:min-h-14",
-          !props.editing && "pr-4",
-        )}
+        className={cn("min-w-0 flex-1 flex-row items-center gap-4 py-4", !props.editing && "pr-4")}
       >
         <SymbolView
           name={ROUTE_ICONS[connectionRouteKind(route)]}
@@ -307,9 +303,9 @@ function RouteRow(props: {
           type="monochrome"
           weight="regular"
         />
-        <View className="min-w-0 flex-1 gap-0.5 android:gap-1">
+        <View className="min-w-0 flex-1 gap-0.5">
           <View className="flex-row items-center gap-2">
-            <Text numberOfLines={1} className="shrink text-lg text-foreground android:text-base">
+            <Text numberOfLines={1} className="shrink text-lg text-foreground">
               {label}
             </Text>
             {props.inUse ? (
