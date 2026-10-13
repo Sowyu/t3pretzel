@@ -23,18 +23,14 @@ export function WorkspaceEmptyDetail(props: {
             title="No environments connected"
             detail="Add an environment to load projects and start coding sessions."
             variant="plain"
-            actionLabel="Add environment"
-            onAction={props.onAddConnection}
             action={
-              Platform.OS === "ios" ? (
-                <MaterialFloatingActionButton
-                  label="Add environment"
-                  icon="plus"
-                  variant="extended"
-                  tone="primary"
-                  onPress={props.onAddConnection}
-                />
-              ) : undefined
+              <MaterialFloatingActionButton
+                label="Add environment"
+                icon="plus"
+                variant="extended"
+                tone="primary"
+                onPress={props.onAddConnection}
+              />
             }
           />
         </View>
