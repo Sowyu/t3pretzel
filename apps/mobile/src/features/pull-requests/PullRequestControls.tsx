@@ -7,9 +7,8 @@ import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView, type AppSymbolName } from "../../components/AppSymbol";
-import { MaterialButton } from "../../components/MaterialButton";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
-import { MaterialFloatingToolbar } from "./MaterialFloatingToolbar";
+import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
+import { cn } from "../../lib/cn";
 import { ControlPillMenu } from "../../components/ControlPillMenu";
 import { NativeHeaderToolbar } from "../../native/StackHeader";
 import { useNativeLayoutMetrics } from "../../native/native-layout-metrics";
@@ -136,60 +135,78 @@ export function PullRequestActionToolbar(props: {
   const primaryDisabled = pendingReview ? false : agent.disabled;
   const showPrimary = pendingReview || canOpenThread;
   if (Platform.OS === "android") {
+    // iOS's bottom toolbar: AI helpers and Changed files as glass circles at the
+    // edges, the primary action as a prominent capsule centered between them.
     const primary = (
-      <MaterialButton
-        label={primaryLabel}
-        tone="primary"
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={primaryLabel}
+        accessibilityState={{ disabled: primaryDisabled }}
         disabled={primaryDisabled}
         onPress={primaryPress}
-      />
+        className={cn(
+          "h-11 min-w-0 flex-row items-center justify-center rounded-full px-5 active:opacity-70",
+          primaryDisabled ? "bg-subtle-strong" : "bg-prominent-action",
+        )}
+        style={{ elevation: 2 }}
+      >
+        <Text
+          numberOfLines={1}
+          className={cn(
+            "font-t3-semibold text-[17px]",
+            primaryDisabled ? "text-foreground-tertiary" : "text-prominent-action-foreground",
+          )}
+        >
+          {primaryLabel}
+        </Text>
+      </Pressable>
     );
     return (
       <View
         pointerEvents="box-none"
-        className="absolute inset-x-0 bottom-0 z-10 items-center px-4 pt-2"
-        style={{ paddingBottom: insets.bottom + 16 }}
+        className="absolute inset-x-0 bottom-0 z-10 flex-row items-center gap-3 px-4 pt-2"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) + 4 }}
         onLayout={(event) => props.onHeightChange?.(event.nativeEvent.layout.height)}
       >
-        <MaterialFloatingToolbar>
-          <View className="flex-row items-center gap-2">
-            {showAgentControls ? (
+        <View pointerEvents="box-none" className="flex-1 items-start">
+          {showAgentControls ? (
+            <ControlPillMenu
+              title="AI helpers"
+              actions={agentActions.map((action) => agent.menuAction(action.task))}
+              onPressAction={({ nativeEvent }) => agent.select(nativeEvent.event)}
+            >
+              <View pointerEvents="none">
+                <AndroidHeaderIconButton
+                  icon="sparkles"
+                  accessibilityLabel="PR agent actions"
+                  disabled={agent.disabled}
+                />
+              </View>
+            </ControlPillMenu>
+          ) : null}
+        </View>
+        {showPrimary ? (
+          <View className="min-w-0 shrink">
+            {!pendingReview && chooseThread ? (
               <ControlPillMenu
-                title="AI helpers"
-                actions={agentActions.map((action) => agent.menuAction(action.task))}
+                title="Open thread"
+                actions={threadMenuItems}
                 onPressAction={({ nativeEvent }) => agent.select(nativeEvent.event)}
               >
-                <View pointerEvents="none">
-                  <MaterialIconButton
-                    icon="sparkles"
-                    accessibilityLabel="PR agent actions"
-                    disabled={agent.disabled}
-                  />
-                </View>
+                <View pointerEvents="none">{primary}</View>
               </ControlPillMenu>
-            ) : null}
-            {showPrimary ? (
-              <View className="min-w-0 shrink">
-                {!pendingReview && chooseThread ? (
-                  <ControlPillMenu
-                    title="Open thread"
-                    actions={threadMenuItems}
-                    onPressAction={({ nativeEvent }) => agent.select(nativeEvent.event)}
-                  >
-                    <View pointerEvents="none">{primary}</View>
-                  </ControlPillMenu>
-                ) : (
-                  primary
-                )}
-              </View>
-            ) : null}
-            <MaterialIconButton
-              icon="file.diff"
-              accessibilityLabel="Changed files"
-              onPress={openFiles}
-            />
+            ) : (
+              primary
+            )}
           </View>
-        </MaterialFloatingToolbar>
+        ) : null}
+        <View pointerEvents="box-none" className="flex-1 items-end">
+          <AndroidHeaderIconButton
+            icon="file.diff"
+            accessibilityLabel="Changed files"
+            onPress={openFiles}
+          />
+        </View>
       </View>
     );
   }

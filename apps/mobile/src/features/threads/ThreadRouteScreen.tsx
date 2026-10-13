@@ -124,7 +124,7 @@ function ThreadRouteFallbackLayout(props: { readonly children: ReactNode }) {
     <>
       <ScreenHeader
         title="Thread"
-        options={{ contentStyle: { backgroundColor: themeVariables["--color-header"] } }}
+        options={{ contentStyle: { backgroundColor: themeVariables["--color-screen"] } }}
         onBack={layout.usesSplitView ? undefined : returnToList}
         hideBottomBorder
       />

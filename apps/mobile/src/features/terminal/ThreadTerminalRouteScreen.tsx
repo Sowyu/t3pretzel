@@ -35,8 +35,6 @@ import { EmptyState } from "../../components/EmptyState";
 import { GlassSurface } from "../../components/GlassSurface";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { MaterialScreenContent } from "../../components/MaterialScreenContent";
-import { MaterialButton } from "../../components/MaterialButton";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
 import { environmentCatalog } from "../../connection/catalog";
 import { useEnvironmentPresentation } from "../../state/presentation";
 import { terminalEnvironment } from "../../state/terminal";
@@ -303,7 +301,6 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     themeAppearance: appearanceScheme,
     themeId,
     setTerminalFontSize,
-    themeVariables,
   } = useAppearancePreferences();
   const fontSize = appearance.terminalFontSize;
   const cachedRouteGridSize =
@@ -1213,10 +1210,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
         <View
           className="flex-1"
           style={{
-            backgroundColor:
-              Platform.OS === "android"
-                ? themeVariables["--color-card-alt"]
-                : terminalTheme.background,
+            backgroundColor: terminalTheme.background,
             // The v5 column extends behind UIKit chrome. Its measured top
             // reservation is zero when UIKit has already inset the body or moved the bar.
             paddingTop:
@@ -1309,24 +1303,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                 />
               </View>
 
-              {Platform.OS === "android" && !isKeyboardAnimationUsable ? (
-                <View className="min-h-14 flex-row items-center gap-2 bg-card-alt px-2">
-                  {selectedThread && hasNativeTerminalSurface() ? (
-                    <MaterialButton
-                      label="Attach output"
-                      tone="text"
-                      onPress={() => setCaptureRequest((value) => value + 1)}
-                    />
-                  ) : null}
-                  <View className="flex-1" />
-                  <MaterialIconButton
-                    accessibilityLabel="Show keyboard"
-                    disabled={!canOperateTerminal}
-                    icon="keyboard"
-                    onPress={handleShowKeyboard}
-                  />
-                </View>
-              ) : Platform.OS !== "android" && selectedThread && hasNativeTerminalSurface() ? (
+              {selectedThread && hasNativeTerminalSurface() ? (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
@@ -1340,7 +1317,6 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
               ) : null}
               {isAccessoryVisible ? (
                 <KeyboardStickyView
-                  enabled={Platform.OS !== "android" || isKeyboardAnimationUsable}
                   style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
                   offset={{ closed: 0, opened: 0 }}
                 >
@@ -1389,7 +1365,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                     </ComposerToolbarRow>
                   </View>
                 </KeyboardStickyView>
-              ) : canOperateTerminal && !keyboardState.isVisible && Platform.OS !== "android" ? (
+              ) : canOperateTerminal && !isKeyboardAnimationUsable ? (
                 <Pressable
                   accessibilityLabel="Show keyboard"
                   accessibilityRole="button"
@@ -1405,6 +1381,10 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   <GlassSurface
                     chrome="none"
                     fallbackColor={terminalTheme.background}
+                    // Android's opaque fill matches the terminal, so a rim marks the button.
+                    fallbackClassName={
+                      Platform.OS === "android" ? "border border-foreground/10" : undefined
+                    }
                     glassEffectStyle="regular"
                     tintColor="transparent"
                     style={{

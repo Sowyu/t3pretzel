@@ -4,16 +4,16 @@ import type { ScreenHeaderMenuItem } from "./ScreenHeader.types";
 export function androidHeaderMenuActions(items: ReadonlyArray<ScreenHeaderMenuItem>): MenuAction[] {
   return items.flatMap((item): MenuAction[] =>
     "items" in item
-      ? item.inline && !item.title
-        ? androidHeaderMenuActions(item.items)
-        : [
-            {
-              id: item.id,
-              title: item.title ?? "",
-              image: item.icon,
-              subactions: androidHeaderMenuActions(item.items),
-            },
-          ]
+      ? [
+          {
+            id: item.id,
+            title: item.title ?? "",
+            image: item.icon,
+            // Inline groups are UIMenu sections, drawn in place by AndroidAnchoredMenu.
+            displayInline: item.inline,
+            subactions: androidHeaderMenuActions(item.items),
+          },
+        ]
       : [
           {
             id: item.id,

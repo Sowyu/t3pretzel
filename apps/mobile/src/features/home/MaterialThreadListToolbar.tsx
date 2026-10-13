@@ -10,7 +10,10 @@ import {
 } from "react-native";
 import type { MenuAction } from "@react-native-menu/menu";
 
-import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
+import {
+  AndroidHeaderButtonGroup,
+  AndroidHeaderIconButton,
+} from "../../components/AndroidScreenHeader";
 import { CompactBrandTitle } from "../../components/CompactBrandTitle";
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { ControlPillMenu } from "../../components/ControlPill";
@@ -119,38 +122,41 @@ export function MaterialThreadListToolbar(props: {
                 brand={<CompactBrandTitle allowFontScaling={false} />}
               />
             </View>
-            <AndroidHeaderIconButton
-              accessibilityLabel="Search threads"
-              icon="magnifyingglass"
-              onPress={openSearch}
-            />
-            {state.hasConnections ? (
-              <AndroidAnchoredMenu
-                actions={props.filterActions}
-                onPressAction={props.onFilterAction}
-              >
-                {(open) => (
-                  <AndroidHeaderIconButton
-                    accessibilityLabel="Filter threads"
-                    icon={filterIcon}
-                    selected={props.filterCustomized}
-                    onPress={open}
-                  />
-                )}
-              </AndroidAnchoredMenu>
-            ) : null}
+            {/* Search and filter share one capsule; settings keeps the iOS "..." circle. */}
+            <AndroidHeaderButtonGroup>
+              <AndroidHeaderIconButton
+                accessibilityLabel="Search threads"
+                icon="magnifyingglass"
+                onPress={openSearch}
+              />
+              {state.hasConnections ? (
+                <AndroidAnchoredMenu
+                  actions={props.filterActions}
+                  onPressAction={props.onFilterAction}
+                >
+                  {(open) => (
+                    <AndroidHeaderIconButton
+                      accessibilityLabel="Filter threads"
+                      icon={filterIcon}
+                      selected={props.filterCustomized}
+                      onPress={open}
+                    />
+                  )}
+                </AndroidAnchoredMenu>
+              ) : null}
+              {props.onStartNewTask && state.hasConnections ? (
+                <AndroidHeaderIconButton
+                  accessibilityLabel="New task"
+                  icon="square.and.pencil"
+                  onPress={props.onStartNewTask}
+                />
+              ) : null}
+            </AndroidHeaderButtonGroup>
             <AndroidHeaderIconButton
               accessibilityLabel="Open settings"
               icon="ellipsis"
               onPress={props.onOpenSettings}
             />
-            {props.onStartNewTask && state.hasConnections ? (
-              <AndroidHeaderIconButton
-                accessibilityLabel="New task"
-                icon="square.and.pencil"
-                onPress={props.onStartNewTask}
-              />
-            ) : null}
           </>
         )}
       </View>

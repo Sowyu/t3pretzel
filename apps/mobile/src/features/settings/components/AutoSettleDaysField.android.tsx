@@ -1,38 +1,58 @@
-import type { MenuAction } from "@react-native-menu/menu";
 import {
   MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
 } from "@t3tools/contracts";
-import { Pressable } from "react-native";
+import { useState } from "react";
+import { Pressable, View } from "react-native";
 
 import { AndroidAnchoredMenu } from "../../../components/AndroidAnchoredMenu";
 import { AppText } from "../../../components/AppText";
+import { WheelPicker } from "../../../components/WheelPicker";
 import { cn } from "../../../lib/cn";
 import type { AutoSettleDaysFieldProps } from "./AutoSettleDaysField";
 
 const days = Array.from(
   { length: MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS - MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS + 1 },
   (_, index) => MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS + index,
-);
+).map((value) => ({ value, label: `${value} ${value === 1 ? "day" : "days"}` }));
 
 /**
- * The iOS bordered button and day picker: a tinted capsule showing the count
- * that opens a scrolling menu of day options.
+ * The iOS bordered button and popover: a capsule showing the count that opens
+ * a 240dp card with a day wheel and Cancel/Done. The value commits on Done.
  */
 export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
-  const actions: MenuAction[] = days.map((value) => ({
-    id: String(value),
-    title: `${value} ${value === 1 ? "day" : "days"}`,
-    state: value === props.value ? "on" : undefined,
-  }));
+  const [draft, setDraft] = useState(props.value);
   return (
     <AndroidAnchoredMenu
-      actions={actions}
-      title="Days before auto-settle"
-      onPressAction={({ nativeEvent }) => {
-        const next = Number(nativeEvent.event);
-        if (!props.disabled && next !== props.value) props.onValueChange(next);
-      }}
+      actions={[]}
+      popoverWidth={240}
+      popover={(close) => (
+        <View style={{ padding: 12, gap: 4 }}>
+          <WheelPicker
+            accessibilityLabel="Days before auto-settle"
+            options={days}
+            value={draft}
+            onChange={setDraft}
+          />
+          <View className="flex-row justify-center" style={{ gap: 24 }}>
+            {(["Cancel", "Done"] as const).map((label) => (
+              <Pressable
+                key={label}
+                accessibilityRole="button"
+                hitSlop={8}
+                className="min-h-11 justify-center px-2 active:opacity-50"
+                onPress={() => {
+                  close();
+                  if (label === "Done" && !props.disabled && draft !== props.value)
+                    props.onValueChange(draft);
+                }}
+              >
+                <AppText className="text-[17px] text-primary-text">{label}</AppText>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
     >
       {(open) => (
         <Pressable
@@ -40,7 +60,10 @@ export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
           accessibilityLabel={`Days before auto-settle: ${props.value}`}
           accessibilityState={{ disabled: Boolean(props.disabled) }}
           disabled={props.disabled}
-          onPress={open}
+          onPress={() => {
+            setDraft(props.value);
+            open();
+          }}
           className={cn(
             "min-h-11 min-w-16 items-center justify-center rounded-full bg-subtle px-4 active:opacity-50",
             props.disabled && "opacity-45",

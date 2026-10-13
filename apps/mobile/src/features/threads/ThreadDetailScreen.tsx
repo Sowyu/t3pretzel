@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useAndroidScreenHeaderHeight } from "../../components/useMaterialToolbarLayout";
 import { useChildThreadInputs, useThreadReportedModelSelection } from "../../state/entities";
 import { UsageLimitRecoveryCard } from "./UsageLimitRecoveryCard";
 import { useNavigation } from "@react-navigation/native";
@@ -428,7 +429,11 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     [markInputFocused],
   );
   const windowHeight = useWindowDimensions().height;
-  const navigationHeaderHeight = useContext(HeaderHeightContext) ?? insets.top + 44;
+  const stackHeaderHeight = useContext(HeaderHeightContext) ?? insets.top + 44;
+  // Android's thread header overlays the feed (see useThreadHeaderOptions.android).
+  const androidHeaderHeight = useAndroidScreenHeaderHeight();
+  const navigationHeaderHeight =
+    Platform.OS === "android" ? androidHeaderHeight : stackHeaderHeight;
   const [screenMetrics, setScreenMetrics] = useState<NativeLayoutMetrics | null>(null);
   const columnMetrics = useNativeColumnLayoutMetrics();
   const nativeMetrics = usesNativeWorkspaceColumns ? columnMetrics : screenMetrics;
@@ -1258,7 +1263,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
               anchorMessageId={anchorMessageId}
               submittedMessageId={submittedMessageId}
               contentInsetEndAdjustment={combinedContentInsetEndAdjustment}
-              contentTopInset={0}
+              contentTopInset={Platform.OS === "android" ? navigationHeaderHeight : 0}
               contentBottomInset={
                 estimatedOverlayHeight +
                 (showFloatingStatus ? FLOATING_WORKING_CONTROL_COVERAGE : 0)

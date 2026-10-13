@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Modal, Pressable, TextInput, View } from "react-native";
+import Animated, { Keyframe, ReduceMotion } from "react-native-reanimated";
 
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { cn } from "../lib/cn";
-import { themeColorWithAlpha } from "../lib/mobileTheme";
 import { AppText } from "./AppText";
 import {
   orderAlertButtons,
@@ -13,10 +13,25 @@ import {
 
 export { alertRequestFromNative, type AndroidAlertRequest } from "../lib/android-alert";
 
-/** An iOS-style alert in a transparent Modal: centered text, hairlines and a 14dp card. */
+// UIAlertController grows in from slightly larger while the backdrop fades.
+const ALERT_ENTER = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 1.12 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }] },
+})
+  .duration(220)
+  .reduceMotion(ReduceMotion.System);
+
+/**
+ * The iOS 26 alert in a transparent Modal: a 270dp card with 34dp corners,
+ * centered title and message, and capsule buttons that sit side by side for
+ * two actions and stack otherwise.
+ */
 export function AndroidAlert(props: { readonly request: AndroidAlertRequest }) {
   const { request } = props;
-  const { themeVariables: colors } = useAppearancePreferences();
+  const { themeVariables: colors, themeAppearance } = useAppearancePreferences();
+  const isDark = themeAppearance === "dark";
+  // iOS system fill behind every alert button; the preferred action is filled with the accent.
+  const buttonFill = isDark ? "rgba(120, 120, 128, 0.32)" : "rgba(120, 120, 128, 0.16)";
   const [inputValue, setInputValue] = useState(request.textInput?.initialValue ?? "");
   const { ordered, horizontal } = orderAlertButtons(request.buttons);
   const cancelButton = request.buttons.find((button) => button.style === "cancel");
@@ -49,19 +64,33 @@ export function AndroidAlert(props: { readonly request: AndroidAlertRequest }) {
             onPress={() => request.onDismiss?.()}
           />
         ) : null}
-        <View
-          className="w-full max-w-[300px] overflow-hidden"
+        <Animated.View
+          entering={ALERT_ENTER}
+          accessibilityViewIsModal
           style={{
-            borderRadius: 14,
-            backgroundColor: themeColorWithAlpha(colors["--color-card-alt"], 0.97),
+            width: 270,
+            maxWidth: "100%",
+            borderRadius: 34,
+            padding: 16,
+            paddingTop: 22,
+            // Solid, a step above the screen in dark mode like the menus.
+            backgroundColor: isDark ? colors["--color-grouped-card"] : colors["--color-card-alt"],
+            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.25)",
           }}
         >
-          <View className="items-center gap-1 px-4 pb-5 pt-5">
-            <AppText accessibilityRole="header" className="text-center text-[17px] font-t3-bold">
+          <View className="items-center gap-1 px-2 pb-5">
+            <AppText
+              accessibilityRole="header"
+              className="text-center font-t3-bold"
+              style={{ fontSize: 17, lineHeight: 22 }}
+            >
               {request.title}
             </AppText>
             {request.message ? (
-              <AppText className="text-center text-[13px] leading-[18px]">
+              <AppText
+                className="text-center text-foreground-secondary"
+                style={{ fontSize: 15, lineHeight: 20 }}
+              >
                 {request.message}
               </AppText>
             ) : null}
@@ -77,14 +106,15 @@ export function AndroidAlert(props: { readonly request: AndroidAlertRequest }) {
                   const confirm = request.buttons.find((button) => button.requiresInput);
                   if (confirm && !inputBlank) press(confirm);
                 }}
-                className="mt-3 w-full rounded-[7px] border-separator bg-screen px-2 py-1.5 font-sans text-sm text-foreground"
-                style={{ borderWidth: StyleSheet.hairlineWidth }}
+                className="mt-3 w-full rounded-xl px-3 py-2 font-sans text-base text-foreground"
+                style={{ backgroundColor: buttonFill }}
               />
             ) : null}
           </View>
-          <View className={horizontal ? "flex-row" : undefined}>
-            {ordered.map((button, index) => {
+          <View className={horizontal ? "flex-row" : undefined} style={{ gap: 8 }}>
+            {ordered.map((button) => {
               const disabled = button.requiresInput === true && inputBlank;
+              const prominent = button === preferred && button.style !== "cancel" && !disabled;
               return (
                 <Pressable
                   key={`${button.style}:${button.text}`}
@@ -93,24 +123,30 @@ export function AndroidAlert(props: { readonly request: AndroidAlertRequest }) {
                   disabled={disabled}
                   onPress={() => press(button)}
                   className={cn(
-                    "min-h-11 items-center justify-center border-separator px-2 active:bg-subtle",
+                    "items-center justify-center px-3 active:opacity-60",
                     horizontal && "flex-1",
                   )}
                   style={{
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderLeftWidth: horizontal && index > 0 ? StyleSheet.hairlineWidth : 0,
+                    minHeight: 48,
+                    borderRadius: 24,
+                    backgroundColor:
+                      prominent && button.style !== "destructive"
+                        ? colors["--color-primary"]
+                        : buttonFill,
                   }}
                 >
                   <AppText
                     numberOfLines={1}
                     className={cn(
                       "text-[17px]",
-                      button === preferred && "font-t3-bold",
+                      button === preferred ? "font-t3-bold" : "font-t3-medium",
                       disabled
                         ? "text-foreground-tertiary"
                         : button.style === "destructive"
                           ? "text-danger-foreground"
-                          : "text-foreground",
+                          : prominent
+                            ? "text-primary-foreground"
+                            : "text-foreground",
                     )}
                   >
                     {button.text}
@@ -119,7 +155,7 @@ export function AndroidAlert(props: { readonly request: AndroidAlertRequest }) {
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

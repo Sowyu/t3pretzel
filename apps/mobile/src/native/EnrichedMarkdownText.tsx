@@ -116,7 +116,15 @@ function enrichedStyle(
       borderWidth: 2,
       gapWidth: 12,
     },
-    list: { ...body, bulletColor: style.mutedColor, markerColor: style.mutedColor, gapWidth: 6 },
+    list: {
+      ...body,
+      bulletColor: style.mutedColor,
+      markerColor: style.mutedColor,
+      // Android draws the bullet centered on the marker column's right edge,
+      // so a 6dp gap left "•text" touching. A 10dp column and 12dp gap put the
+      // bullet a few dp in and start item text 22dp in, as in the iOS thread.
+      ...(Platform.OS === "android" ? { markerMinWidth: 10, gapWidth: 12 } : { gapWidth: 6 }),
+    },
     thematicBreak: { color: style.dividerColor, height: 1, marginTop: 8, marginBottom: 8 },
     table: {
       ...body,

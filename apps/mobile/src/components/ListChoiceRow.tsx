@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 
 import { cn } from "../lib/cn";
 import { SymbolView } from "./AppSymbol";
@@ -24,7 +24,8 @@ export function ListChoiceRow(props: {
       pressHighlight
       className={cn(
         props.selected ? "bg-subtle" : "bg-grouped-card",
-        props.separated && "border-t border-border-subtle",
+        // Android rows draw their own inset hairline in ListRowLayout.
+        props.separated && Platform.OS !== "android" && "border-t border-border-subtle",
       )}
     >
       <ListRowLayout

@@ -20,7 +20,7 @@ const items: ReadonlyArray<ScreenHeaderMenuItem> = [
 ];
 
 describe("header menus", () => {
-  it("keeps named sections as Android submenus", () => {
+  it("keeps inline groups as in-place sections, titled or not", () => {
     const actions = androidHeaderMenuActions([
       {
         id: "text-size",
@@ -28,16 +28,15 @@ describe("header menus", () => {
         inline: true,
         items: [{ id: "font-increase", title: "A+", onPress: () => {} }],
       },
-    ]);
-    expect(actions[0]?.title).toBe("Text size");
-    expect(actions[0]?.subactions?.[0]?.id).toBe("font-increase");
-  });
-
-  it("flattens inline groups while keeping their action IDs", () => {
-    const actions = androidHeaderMenuActions([
       { id: "modes", inline: true, items: [{ id: "code", title: "Code", onPress: () => {} }] },
+      { id: "more", title: "More", items: [{ id: "x", title: "X", onPress: () => {} }] },
     ]);
-    expect(actions.map(({ id }) => id)).toEqual(["code"]);
+    expect(actions.map(({ title, displayInline }) => [title, displayInline])).toEqual([
+      ["Text size", true],
+      ["", true],
+      ["More", undefined],
+    ]);
+    expect(actions[1]?.subactions?.[0]?.id).toBe("code");
   });
 
   it("keeps stable action IDs, selection, and disabled state inside submenus", () => {

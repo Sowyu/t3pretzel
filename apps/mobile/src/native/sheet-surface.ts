@@ -8,5 +8,5 @@ import { Platform } from "react-native";
  */
 export const FORM_SHEET_PRESENTATION_OPTIONS = {
   presentation: "formSheet" as const,
-  ...(Platform.OS === "android" ? { sheetCornerRadius: 28 } : {}),
+  ...(Platform.OS === "android" ? { sheetCornerRadius: 38 } : {}),
 };

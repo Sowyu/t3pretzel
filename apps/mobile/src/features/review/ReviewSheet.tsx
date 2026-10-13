@@ -4,6 +4,7 @@ import { useNavigation, type StaticScreenProps } from "@react-navigation/native"
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { nativeHeaderScrollEdgeEffects } from "../../native/StackHeader";
 import { ScreenHeader } from "../../components/ScreenHeader";
+import { useAndroidScreenHeaderHeight } from "../../components/useMaterialToolbarLayout";
 import type { ScreenHeaderMenuItem } from "../../components/ScreenHeader.types";
 import type { ReviewSectionItem } from "./reviewModel";
 import { useReviewHeaderPresentation } from "./useReviewHeaderPresentation";
@@ -77,6 +78,8 @@ function ReviewHeader(
     readonly showChangedFilesToggle: boolean;
     readonly onSelectSection: (sectionId: string) => void;
     readonly onReturnToThread: () => void;
+    /** Android floats the bar over the diff with a scrim in this color. */
+    readonly surfaceColor: string;
   },
 ) {
   const { panes, toggleAuxiliaryPane } = useAdaptiveWorkspaceLayout();
@@ -99,7 +102,13 @@ function ReviewHeader(
       subtitle={presentation.subtitle}
       onBack={props.onReturnToThread}
       hideBottomBorder
-      options={{ headerTintColor: props.iconColor, headerTitle: props.title }}
+      options={{
+        headerTintColor: props.iconColor,
+        headerTitle: props.title,
+        ...(Platform.OS === "android"
+          ? { headerTransparent: true, headerStyle: { backgroundColor: props.surfaceColor } }
+          : undefined),
+      }}
       backInSplitView={{ accessibilityLabel: "Back to chat", icon: "chevron.left" }}
       actions={
         props.showChangedFilesToggle
@@ -441,7 +450,9 @@ export function ReviewSheet(props: ReviewSheetProps) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { themeAppearance: selectedTheme } = useAppearancePreferences();
-  const headerIcon = String(useUniwindTheme()["--color-icon"]);
+  const uniwindTheme = useUniwindTheme();
+  const headerIcon = String(uniwindTheme["--color-icon"]);
+  const androidHeaderHeight = useAndroidScreenHeaderHeight();
   const { environmentId, threadId } = props.route.params;
   const environment = useEnvironmentPresentation(environmentId);
   const retryEnvironment = useAtomCommand(environmentCatalog.retryNow, "environment retry");
@@ -451,7 +462,8 @@ export function ReviewSheet(props: ReviewSheetProps) {
   const { selectedThreadCwd } = useSelectedThreadWorktree();
   const columnMetrics = useNativeColumnLayoutMetrics();
   const safeArea = columnMetrics?.safeArea ?? insets;
-  const topContentInset = Platform.OS === "ios" ? safeArea.top : 0;
+  // Android's header overlays the review (see ReviewHeader), so content pads below it.
+  const topContentInset = Platform.OS === "ios" ? safeArea.top : androidHeaderHeight;
   const bottomContentInset =
     Platform.OS === "ios" ? safeArea.bottom + 8 : Math.max(insets.bottom, 18) + 18;
 
@@ -707,6 +719,14 @@ export function ReviewSheet(props: ReviewSheetProps) {
         onRefresh={handlePullToRefresh}
         onSelectSection={selectSection}
         onReturnToThread={handleReturnToThread}
+        surfaceColor={
+          !showConnectionNotice &&
+          selectedSection &&
+          parsedDiff.kind === "files" &&
+          NativeReviewDiffView
+            ? String(nativeBridge.theme.background)
+            : String(uniwindTheme["--color-sheet-solid"])
+        }
       />
 
       <MaterialScreenContent>
@@ -735,7 +755,12 @@ export function ReviewSheet(props: ReviewSheetProps) {
             >
               <View
                 className="min-w-0 flex-1"
-                style={listHeader ? { paddingTop: topContentInset } : undefined}
+                // The Android diff canvas has no top inset, so the pane pads instead.
+                style={
+                  listHeader || Platform.OS === "android"
+                    ? { paddingTop: topContentInset }
+                    : undefined
+                }
               >
                 {listHeader}
                 <View className="min-w-0 flex-1" collapsable={false}>
@@ -752,7 +777,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
                     collapsedCommentIdsJson={nativeBridge.collapsedCommentIdsJson}
                     contentResetKey={`${reviewCache.threadKey}:${selectedSection.id}`}
                     contentWidth={NATIVE_REVIEW_DIFF_CONTENT_WIDTH}
-                    contentInsetTop={listHeader ? 0 : topContentInset}
+                    contentInsetTop={listHeader || Platform.OS === "android" ? 0 : topContentInset}
                     contentInsetBottom={bottomContentInset}
                     nativeViewRef={nativeReviewDiffViewRef}
                     rowHeight={nativeReviewDiffStyle.rowHeight}
@@ -777,7 +802,11 @@ export function ReviewSheet(props: ReviewSheetProps) {
             <ScrollView
               contentInsetAdjustmentBehavior="never"
               contentInset={{ top: topContentInset, bottom: bottomContentInset }}
-              contentOffset={{ x: 0, y: -topContentInset }}
+              contentOffset={{ x: 0, y: Platform.OS === "ios" ? -topContentInset : 0 }}
+              // contentInset is iOS-only; Android scrolls the padding under its header.
+              contentContainerStyle={
+                Platform.OS === "android" ? { paddingTop: topContentInset } : undefined
+              }
               automaticallyAdjustsScrollIndicatorInsets={false}
               scrollIndicatorInsets={{ top: topContentInset, bottom: bottomContentInset }}
               showsVerticalScrollIndicator={false}
@@ -788,6 +817,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
                 // iOS has no other refresh affordance here (the explicit
                 // "Refresh current diff" menu is Android-only).
                 <RefreshControl
+                  progressViewOffset={Platform.OS === "android" ? topContentInset : undefined}
                   refreshing={isPullRefreshing || isSelectedSectionPending || areFilePatchesPending}
                   onRefresh={() => void handlePullToRefresh()}
                 />

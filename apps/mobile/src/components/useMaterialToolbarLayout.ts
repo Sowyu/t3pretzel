@@ -22,3 +22,9 @@ export function useMaterialToolbarLayout(embedded = false) {
     paddingBottom: 4 * scale,
   };
 }
+
+/** Total height of a non-embedded Android screen header, for content under an overlay header. */
+export function useAndroidScreenHeaderHeight() {
+  const { height, paddingTop, paddingBottom } = useMaterialToolbarLayout();
+  return paddingTop + height + paddingBottom;
+}

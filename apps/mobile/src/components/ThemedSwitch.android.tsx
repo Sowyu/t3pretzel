@@ -12,16 +12,19 @@ import Animated, {
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import type { ThemedSwitchProps } from "./ThemedSwitch";
 
-// UISwitch geometry.
-const TRACK_WIDTH = 51;
-const TRACK_HEIGHT = 31;
-const THUMB_SIZE = 27;
-const INSET = (TRACK_HEIGHT - THUMB_SIZE) / 2;
-// UISwitch outlines its off track so it reads on a grouped card of nearly the same colour.
-const OUTLINE = 1;
-const TRAVEL = TRACK_WIDTH - THUMB_SIZE - INSET * 2;
-// Pads the 31px track out to Android's 48dp minimum touch target.
-const HIT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 };
+// iOS 26 UISwitch geometry: a 63x28 track with a 37x24 pill thumb.
+const TRACK_WIDTH = 63;
+const TRACK_HEIGHT = 28;
+const THUMB_WIDTH = 37;
+const THUMB_HEIGHT = 24;
+const INSET = (TRACK_HEIGHT - THUMB_HEIGHT) / 2;
+const TRAVEL = TRACK_WIDTH - THUMB_WIDTH - INSET * 2;
+// UISwitch's off track is the system fill, a translucent grey that reads on
+// any grouped card colour.
+const OFF_TRACK_LIGHT = "rgba(120, 120, 128, 0.16)";
+const OFF_TRACK_DARK = "rgba(120, 120, 128, 0.32)";
+// Pads the 28dp track out to Android's 48dp minimum touch target.
+const HIT_SLOP = { top: 10, bottom: 10, left: 4, right: 4 };
 
 /**
  * An iOS-style switch drawn in JS. Taps are the only input: one Pressable
@@ -29,7 +32,7 @@ const HIT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 };
  * pan gesture and fired twice per tap, so there is deliberately no drag.
  */
 export function ThemedSwitch(props: ThemedSwitchProps) {
-  const { themeVariables: colors } = useAppearancePreferences();
+  const { themeVariables: colors, themeAppearance } = useAppearancePreferences();
   const value = Boolean(props.value);
   const progress = useSharedValue(value ? 1 : 0);
 
@@ -43,12 +46,10 @@ export function ThemedSwitch(props: ThemedSwitchProps) {
     );
   }, [progress, value]);
 
-  const offTrack = colors["--color-switch-inactive-track"];
+  const offTrack = themeAppearance === "dark" ? OFF_TRACK_DARK : OFF_TRACK_LIGHT;
   const onTrack = colors["--color-switch-active-track"];
-  const outline = colors["--color-border"];
   const trackStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(progress.value, [0, 1], [offTrack, onTrack]),
-    borderColor: interpolateColor(progress.value, [0, 1], [outline, onTrack]),
   }));
   const thumbStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: progress.value * TRAVEL }],
@@ -72,8 +73,7 @@ export function ThemedSwitch(props: ThemedSwitchProps) {
             width: TRACK_WIDTH,
             height: TRACK_HEIGHT,
             borderRadius: TRACK_HEIGHT / 2,
-            borderWidth: OUTLINE,
-            padding: INSET - OUTLINE,
+            padding: INSET,
           },
           trackStyle,
         ]}
@@ -81,11 +81,12 @@ export function ThemedSwitch(props: ThemedSwitchProps) {
         <Animated.View
           style={[
             {
-              width: THUMB_SIZE,
-              height: THUMB_SIZE,
-              borderRadius: THUMB_SIZE / 2,
-              backgroundColor: colors["--color-switch-active-thumb"],
-              elevation: 3,
+              width: THUMB_WIDTH,
+              height: THUMB_HEIGHT,
+              borderRadius: THUMB_HEIGHT / 2,
+              // UISwitch's thumb is white in both appearances.
+              backgroundColor: "#FFFFFF",
+              boxShadow: "0 2px 6px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0, 0, 0, 0.12)",
             },
             thumbStyle,
           ]}

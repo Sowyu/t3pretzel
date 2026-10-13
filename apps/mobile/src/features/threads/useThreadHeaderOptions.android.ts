@@ -1,10 +1,11 @@
 import type { useThreadHeaderOptions as useIosThreadHeaderOptions } from "./useThreadHeaderOptions";
 
 export function useThreadHeaderOptions(
-  props: Parameters<typeof useIosThreadHeaderOptions>[0],
+  _props: Parameters<typeof useIosThreadHeaderOptions>[0],
 ): ReturnType<typeof useIosThreadHeaderOptions> {
   return {
-    options: { contentStyle: { backgroundColor: props.headerColor } },
+    // The feed scrolls under the bar and its scrim, as under iOS's glass header.
+    options: { headerTransparent: true },
     // Android renders header actions as children, not native item factories.
     optionsVersion: [],
     sidebar: true,

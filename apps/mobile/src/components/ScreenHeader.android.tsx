@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BackHandler, Keyboard, TextInput, type TextInputInstance, View } from "react-native";
+import {
+  BackHandler,
+  Keyboard,
+  StyleSheet,
+  TextInput,
+  type TextInputInstance,
+  View,
+} from "react-native";
 import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
 import { NativeStackScreenOptions } from "../native/StackHeader";
 import { AndroidWorkspaceSidebarButton } from "../features/layout/workspace-sidebar-toolbar";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
-import { AndroidScreenHeader } from "./AndroidScreenHeader";
+import { AndroidHeaderButtonGroup, AndroidScreenHeader } from "./AndroidScreenHeader";
 import { ScreenHeaderButton } from "./ScreenHeaderButton.android";
 import { SymbolView } from "./AppSymbol";
 import { ControlPillMenu } from "./ControlPill";
@@ -49,10 +56,18 @@ export function ScreenHeader(props: ScreenHeaderProps) {
       <ScreenHeaderButton accessibilityLabel={menu.title} icon={menu.icon} />
     </ControlPillMenu>
   ));
+  // headerTransparent means the same as on iOS: content scrolls under the bar.
+  // Android draws the bar itself, so these never reach the native stack.
+  const { headerTransparent, headerStyle, ...navigationOptions } = props.options ?? {};
+  const overlay = headerTransparent
+    ? {
+        color: StyleSheet.flatten(headerStyle)?.backgroundColor ?? themeVariables["--color-screen"],
+      }
+    : undefined;
   const options = (
     <NativeStackScreenOptions
       options={{
-        ...props.options,
+        ...navigationOptions,
         ...(props.matchSearchSurface
           ? { contentStyle: { backgroundColor: themeVariables["--color-header"] } }
           : undefined),
@@ -105,7 +120,9 @@ export function ScreenHeader(props: ScreenHeaderProps) {
                 style={{ paddingVertical: 7 * scale }}
               />
             </View>
-            {menuView}
+            {menuView?.length ? (
+              <AndroidHeaderButtonGroup>{menuView}</AndroidHeaderButtonGroup>
+            ) : null}
           </View>
         </View>
       </>
@@ -118,6 +135,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
       onBack={props.onBack}
       leading={props.sidebar !== false ? <AndroidWorkspaceSidebarButton /> : undefined}
       hideBottomBorder={props.hideBottomBorder}
+      overlay={overlay}
       actions={
         search
           ? [
@@ -140,10 +158,12 @@ export function ScreenHeader(props: ScreenHeaderProps) {
           : props.actions
       }
       trailing={
-        <>
-          {menuView}
-          {props.trailing}
-        </>
+        menuView?.length || props.trailing ? (
+          <>
+            {menuView}
+            {props.trailing}
+          </>
+        ) : undefined
       }
     />
   );

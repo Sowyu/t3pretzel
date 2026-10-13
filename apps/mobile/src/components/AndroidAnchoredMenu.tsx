@@ -12,10 +12,16 @@ import {
   View,
 } from "react-native";
 import { useKeyboardState } from "react-native-keyboard-controller";
-import Animated, { Keyframe, ReduceMotion } from "react-native-reanimated";
+import Animated, {
+  type EntryExitAnimationFunction,
+  ReduceMotion,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { cn } from "../lib/cn";
+import { menuSections } from "./menuSections";
 import { AppText as Text } from "./AppText";
 import { isAppSymbolName, SymbolView } from "./AppSymbol";
 import { OverlayPortal } from "./OverlayPortal";
@@ -24,13 +30,39 @@ import { useAndroidControlSizing } from "./useAndroidControlSizing";
 const SCREEN_MARGIN = 12;
 const ANCHOR_GAP = 6;
 
-// One short scale-and-fade, skipped entirely when the system asks for reduced motion.
-const MENU_ENTER = new Keyframe({
-  0: { opacity: 0, transform: [{ scale: 0.92 }] },
-  100: { opacity: 1, transform: [{ scale: 1 }] },
-})
-  .duration(160)
-  .reduceMotion(ReduceMotion.System);
+// UIMenu's presentation: a spring from 0.85 at the anchor corner with a fade
+// in, and a quicker fade out. Both run on the UI thread.
+const MENU_ENTER: EntryExitAnimationFunction = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.85 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 140, reduceMotion: ReduceMotion.System }),
+      transform: [
+        {
+          scale: withSpring(1, {
+            duration: 220,
+            dampingRatio: 0.82,
+            reduceMotion: ReduceMotion.System,
+          }),
+        },
+      ],
+    },
+  };
+};
+
+const MENU_EXIT: EntryExitAnimationFunction = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 1, transform: [{ scale: 1 }] },
+    animations: {
+      opacity: withTiming(0, { duration: 120, reduceMotion: ReduceMotion.System }),
+      transform: [
+        { scale: withTiming(0.92, { duration: 120, reduceMotion: ReduceMotion.System }) },
+      ],
+    },
+  };
+};
 
 // Anchor position is snapshotted in window coordinates when the menu opens;
 // the overlay root measures itself the same way, and the menu is placed from
@@ -65,6 +97,13 @@ export type AndroidAnchoredMenuProps = {
    * this menu on long-press.
    */
   readonly children: ReactNode | ((open: () => void) => ReactNode);
+  /**
+   * Replaces the action rows with custom content in the same anchored card,
+   * like a SwiftUI popover. Receives `close` for its own Cancel/Done buttons.
+   */
+  readonly popover?: (close: () => void) => ReactNode;
+  /** Card width for `popover` content; menus use the UIMenu width. */
+  readonly popoverWidth?: number;
 };
 
 function focusAccessibility(target: ViewInstance | null) {
@@ -85,19 +124,21 @@ function MenuRow({
   readonly disabled?: boolean;
   readonly submenu?: boolean;
   readonly back?: boolean;
-  readonly separator: boolean;
   readonly ref?: Ref<ViewInstance>;
   readonly onPress: () => void;
 }) {
   const { scale } = useAndroidControlSizing();
   const { themeAppearance } = useAppearancePreferences();
-  const iconSize = Math.round(18 * scale);
+  const iconSize = Math.round(19 * scale);
+  const checkSize = Math.round(15 * scale);
   const tint = props.disabled
     ? "accent-icon-subtle"
     : props.destructive
       ? "accent-danger-foreground"
       : "accent-foreground";
   const trailingIcon = props.submenu ? "chevron.right" : props.icon;
+  const pressedFill =
+    themeAppearance === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.06)";
   return (
     <Pressable
       ref={ref}
@@ -110,29 +151,31 @@ function MenuRow({
       }}
       disabled={props.disabled}
       onPress={props.onPress}
-      className="flex-row items-center border-separator px-4 active:bg-subtle"
-      style={{
+      className="flex-row items-center"
+      // iOS 26 highlights a pressed row with a rounded fill inset from the card
+      // edge; the 10dp inner padding keeps labels 16dp from the edge.
+      style={({ pressed }) => ({
         minHeight: Math.max(44, 44 * scale),
-        gap: 10 * scale,
+        marginHorizontal: 6,
+        paddingHorizontal: 10,
         paddingVertical: 10 * scale,
-        borderTopWidth: props.separator ? StyleSheet.hairlineWidth : 0,
-        // The theme separator vanishes on the lifted dark menu fill.
-        ...(themeAppearance === "dark" ? { borderColor: "rgba(255, 255, 255, 0.08)" } : null),
-      }}
+        gap: 10 * scale,
+        borderRadius: 14,
+        backgroundColor: pressed ? pressedFill : undefined,
+      })}
     >
       {props.back ? (
-        <SymbolView name="chevron.left" size={iconSize} tintColorClassName={tint} />
+        <SymbolView name="chevron.left" size={checkSize} tintColorClassName={tint} />
       ) : props.checkColumn ? (
-        <View style={{ width: iconSize }}>
+        <View style={{ width: checkSize }}>
           {props.checked ? (
-            <SymbolView name="checkmark" size={iconSize} tintColorClassName={tint} />
+            <SymbolView name="checkmark" size={checkSize} tintColorClassName={tint} />
           ) : null}
         </View>
       ) : null}
       <View className="min-w-0 flex-1">
         <Text
           className={cn(
-            "text-base",
             props.back && "font-t3-bold",
             props.disabled
               ? "text-foreground-tertiary"
@@ -140,17 +183,37 @@ function MenuRow({
                 ? "text-danger-foreground"
                 : "text-foreground",
           )}
+          style={{ fontSize: 17 * scale, lineHeight: 22 * scale }}
         >
           {props.title}
         </Text>
         {props.subtitle ? (
-          <Text className="text-xs text-foreground-muted">{props.subtitle}</Text>
+          <Text
+            className={props.disabled ? "text-foreground-tertiary" : "text-foreground-muted"}
+            style={{ fontSize: 15 * scale, lineHeight: 20 * scale }}
+          >
+            {props.subtitle}
+          </Text>
         ) : null}
       </View>
       {!props.back && trailingIcon && isAppSymbolName(trailingIcon) ? (
         <SymbolView name={trailingIcon} size={iconSize} tintColorClassName={tint} />
       ) : null}
     </Pressable>
+  );
+}
+
+/** The thin line iOS 26 draws between menu sections; items within a section have none. */
+function SectionSeparator(props: { readonly dark: boolean }) {
+  return (
+    <View
+      style={{
+        height: StyleSheet.hairlineWidth,
+        marginHorizontal: 16,
+        marginVertical: 4,
+        backgroundColor: props.dark ? "rgba(255, 255, 255, 0.14)" : "rgba(0, 0, 0, 0.1)",
+      }}
+    />
   );
 }
 
@@ -161,7 +224,8 @@ function MenuRow({
  * TalkBack focus moves into the menu and back to the anchor.
  */
 export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
-  const { scale, menuWidth: desiredMenuWidth } = useAndroidControlSizing();
+  const { scale, menuWidth } = useAndroidControlSizing();
+  const desiredMenuWidth = props.popover ? (props.popoverWidth ?? menuWidth) : menuWidth;
   const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
   const isDark = themeAppearance === "dark";
   const [anchor, setAnchor] = useState<AnchorSnapshot | null>(null);
@@ -170,7 +234,7 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   // by their BOTTOM edge (bottom = rootHeight - anchorTop), so drill-in height
   // changes grow upward without re-measurement or a two-frame jitter.
   const [overlay, setOverlay] = useState<OverlayFrame | null>(null);
-  const menuWidth =
+  const cardWidth =
     overlay === null
       ? desiredMenuWidth
       : Math.min(desiredMenuWidth, Math.max(0, overlay.width - 2 * SCREEN_MARGIN));
@@ -214,9 +278,7 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   }, [isOpen, close, submenuDepth]);
 
   const parent = path[path.length - 1] ?? null;
-  const levelActions = (parent?.subactions ?? props.actions).filter(
-    (action) => !(action.attributes?.hidden ?? false),
-  );
+  const sections = menuSections(parent?.subactions ?? props.actions);
 
   // Anchor in overlay-local coordinates (both measured in window space).
   const local =
@@ -231,11 +293,11 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const alignsLeft =
     local === null || overlay === null ? true : local.x + local.width / 2 <= overlay.width / 2;
   const preferredLeft =
-    local === null ? 0 : alignsLeft ? local.x : local.x + local.width - menuWidth;
+    local === null ? 0 : alignsLeft ? local.x : local.x + local.width - cardWidth;
   const left =
     overlay === null
       ? 0
-      : Math.min(Math.max(preferredLeft, SCREEN_MARGIN), overlay.width - menuWidth - SCREEN_MARGIN);
+      : Math.min(Math.max(preferredLeft, SCREEN_MARGIN), overlay.width - cardWidth - SCREEN_MARGIN);
   // The keyboard can stay up while the menu is open (in-window overlay, no
   // focus change), so the space it covers is not usable.
   const usableBottom =
@@ -271,8 +333,11 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
     [close, onPressAction],
   );
 
-  const checkColumn = levelActions.some((action) => action.state === "on");
-  const showTitle = parent === null && Boolean(props.title);
+  // One leading checkmark column for the whole level, as UIMenu aligns it.
+  const checkColumn = sections.some((section) =>
+    section.actions.some((action) => action.state === "on"),
+  );
+  const showTitle = parent === null && Boolean(props.title) && !props.popover;
 
   return (
     <>
@@ -308,15 +373,15 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
             />
             {local === null ? null : (
               <Animated.View
-                key={submenuDepth === 0 ? "root" : "submenu"}
-                entering={submenuDepth === 0 ? MENU_ENTER : undefined}
+                entering={MENU_ENTER}
+                exiting={MENU_EXIT}
                 accessibilityRole="menu"
-                className="absolute overflow-hidden border-separator"
+                className="absolute overflow-hidden"
                 style={{
                   left,
                   maxHeight,
-                  width: menuWidth,
-                  borderRadius: 14,
+                  width: cardWidth,
+                  borderRadius: 24,
                   borderWidth: StyleSheet.hairlineWidth,
                   // Solid: iOS blurs what is behind a menu, and without a blur any
                   // translucency lets the text underneath read through the items.
@@ -324,62 +389,97 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
                   backgroundColor: isDark
                     ? colors["--color-grouped-card"]
                     : colors["--color-card-alt"],
-                  ...(isDark ? { borderColor: "rgba(255, 255, 255, 0.1)" } : null),
-                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.18)",
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
+                  boxShadow: isDark
+                    ? "0 16px 48px rgba(0, 0, 0, 0.55)"
+                    : "0 16px 48px rgba(0, 0, 0, 0.18)",
                   transformOrigin: `${opensDown ? "top" : "bottom"} ${alignsLeft ? "left" : "right"}`,
                   ...(opensDown
                     ? { top: local.y + local.height + ANCHOR_GAP }
                     : { bottom: (overlay?.height ?? 0) - local.y + ANCHOR_GAP }),
                 }}
               >
-                {/* keyboardShouldPersistTaps: the menu often opens over an
-                    active editor; the first item tap must act, not just
-                    dismiss the keyboard. */}
-                <ScrollView
-                  bounces={false}
-                  keyboardShouldPersistTaps="always"
-                  showsVerticalScrollIndicator={false}
-                >
-                  {showTitle ? (
-                    <View
-                      ref={firstRowRef}
-                      accessible
-                      accessibilityRole="header"
-                      className="px-4"
-                      style={{ paddingVertical: 8 * scale }}
-                    >
-                      <Text className="text-center text-xs text-foreground-muted">
-                        {props.title}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {parent ? (
-                    <MenuRow
-                      back
-                      ref={firstRowRef}
-                      title={parent.title}
-                      checkColumn={false}
-                      separator={false}
-                      onPress={() => setPath((current) => current.slice(0, -1))}
-                    />
-                  ) : null}
-                  {levelActions.map((action, index) => (
-                    <MenuRow
-                      key={action.id ?? `${index}-${action.title}`}
-                      ref={index === 0 && !parent && !showTitle ? firstRowRef : undefined}
-                      title={action.title}
-                      subtitle={action.subtitle}
-                      icon={action.image}
-                      checked={action.state === "on"}
-                      checkColumn={checkColumn}
-                      destructive={action.attributes?.destructive}
-                      disabled={action.attributes?.disabled}
-                      submenu={(action.subactions?.length ?? 0) > 0}
-                      separator={index > 0 || parent !== null || showTitle}
-                      onPress={() => onPressItem(action)}
-                    />
-                  ))}
-                </ScrollView>
+                {props.popover ? (
+                  props.popover(close)
+                ) : (
+                  // keyboardShouldPersistTaps: the menu often opens over an
+                  // active editor; the first item tap must act, not just
+                  // dismiss the keyboard. The key resets scroll on drill-in.
+                  <ScrollView
+                    key={submenuDepth}
+                    bounces={false}
+                    keyboardShouldPersistTaps="always"
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingVertical: 6 }}
+                  >
+                    {showTitle ? (
+                      <View
+                        ref={firstRowRef}
+                        accessible
+                        accessibilityRole="header"
+                        style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 }}
+                      >
+                        <Text
+                          className="text-center text-foreground-muted"
+                          style={{ fontSize: 13 * scale, lineHeight: 18 * scale }}
+                        >
+                          {props.title}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {parent ? (
+                      <>
+                        <MenuRow
+                          back
+                          ref={firstRowRef}
+                          title={parent.title}
+                          checkColumn={false}
+                          onPress={() => setPath((current) => current.slice(0, -1))}
+                        />
+                        <SectionSeparator dark={isDark} />
+                      </>
+                    ) : null}
+                    {sections.map((section, sectionIndex) => (
+                      <View key={section.key}>
+                        {sectionIndex > 0 ? <SectionSeparator dark={isDark} /> : null}
+                        {section.title ? (
+                          <Text
+                            accessibilityRole="header"
+                            className="text-foreground-muted"
+                            style={{
+                              fontSize: 13 * scale,
+                              lineHeight: 18 * scale,
+                              paddingHorizontal: 16,
+                              paddingTop: 6,
+                              paddingBottom: 2,
+                            }}
+                          >
+                            {section.title}
+                          </Text>
+                        ) : null}
+                        {section.actions.map((action, index) => (
+                          <MenuRow
+                            key={action.id ?? `${index}-${action.title}`}
+                            ref={
+                              sectionIndex === 0 && index === 0 && !parent && !showTitle
+                                ? firstRowRef
+                                : undefined
+                            }
+                            title={action.title}
+                            subtitle={action.subtitle}
+                            icon={action.image}
+                            checked={action.state === "on"}
+                            checkColumn={checkColumn}
+                            destructive={action.attributes?.destructive}
+                            disabled={action.attributes?.disabled}
+                            submenu={(action.subactions?.length ?? 0) > 0}
+                            onPress={() => onPressItem(action)}
+                          />
+                        ))}
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
               </Animated.View>
             )}
           </View>

@@ -90,6 +90,7 @@ import IconListNumbers from "@tabler/icons-react-native/IconListNumbers";
 import IconMenu2 from "@tabler/icons-react-native/IconMenu2";
 import IconMessageCircleQuestion from "@tabler/icons-react-native/IconMessageCircleQuestion";
 import IconMessage from "@tabler/icons-react-native/IconMessage";
+import IconMessageFilled from "@tabler/icons-react-native/IconMessageFilled";
 import IconMessageCircle from "@tabler/icons-react-native/IconMessageCircle";
 import IconMessageCirclePlus from "@tabler/icons-react-native/IconMessageCirclePlus";
 import IconMessages from "@tabler/icons-react-native/IconMessages";
@@ -264,6 +265,7 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   terminal: IconTerminal2,
   "text.alignleft": IconAlignLeft,
   "text.bubble": IconMessage,
+  "text.bubble.fill": IconMessageFilled,
   "questionmark.bubble": IconMessageCircleQuestion,
   "exclamationmark.shield": IconShieldExclamation,
   "bubble.left.and.bubble.right": IconMessages,

@@ -137,6 +137,9 @@ const LEGACY_MENU_ACTIONS: MenuAction[] = [
 
 // Android has no Menlo; its generic monospace family is the closest match.
 const MONO_FONT = Platform.OS === "android" ? "monospace" : "Menlo";
+// Hoisted so list rows do not allocate style objects on every render.
+const MONO_TEXT_STYLE = { fontFamily: MONO_FONT };
+const RECEDED_ROW_STYLE = { opacity: 0.55 };
 /** Rounded-row radius shared with the v1 sidebar rows. */
 const SIDEBAR_V2_ROW_RADIUS = 12;
 
@@ -412,7 +415,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
                   "text-xs text-foreground-muted",
                   sidebarPane && "text-drawer-foreground-muted",
                 )}
-                style={{ fontFamily: MONO_FONT }}
+                style={MONO_TEXT_STYLE}
               >
                 {branch}
               </Text>
@@ -1096,7 +1099,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
                       ? selectedThreadRowColors.mutedForegroundClassName
                       : rowAppearance.mutedForegroundClassName,
                   )}
-                  style={{ fontFamily: MONO_FONT }}
+                  style={MONO_TEXT_STYLE}
                 >
                   {thread.branch}
                 </Text>
@@ -1148,7 +1151,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             <Text
               accessibilityLabel={pr.accessibilityLabel}
               className={cn("text-xs", pr.textClassName)}
-              style={{ fontFamily: MONO_FONT }}
+              style={MONO_TEXT_STYLE}
             >
               {pr.label}
             </Text>
@@ -1182,7 +1185,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   // Background work fades as a whole, status label included, so it takes
   // less attention than rows that need a human (input, approval, done).
   const fadedCardContent = recede ? (
-    <View style={{ opacity: 0.55 }}>{cardContent}</View>
+    <View style={RECEDED_ROW_STYLE}>{cardContent}</View>
   ) : (
     cardContent
   );
@@ -1289,7 +1292,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
                   ? rowAppearance.mutedForegroundClassName
                   : rowAppearance.tertiaryForegroundClassName,
             )}
-            style={{ fontFamily: MONO_FONT }}
+            style={MONO_TEXT_STYLE}
           >
             {snoozedRow && props.snoozeWakeLabelText !== undefined
               ? props.snoozeWakeLabelText

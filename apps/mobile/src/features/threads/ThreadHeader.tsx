@@ -40,6 +40,14 @@ export function ThreadHeader(
         onPress: props.onReturnToThread,
       });
     }
+    // Same order as the iOS capsule: terminal, files, git.
+    if (props.hasWorkspaceRoot && props.gitControls.canOpenTerminal) {
+      actions.push({
+        accessibilityLabel: "Open terminal",
+        icon: "terminal",
+        onPress: () => onOpenTerminal(null),
+      });
+    }
     if (props.hasThreadCwd) {
       const filesVisible = props.inspectorMode === "files" && panes.auxiliaryPaneVisible;
       actions.push({
@@ -47,13 +55,6 @@ export function ThreadHeader(
         selected: filesVisible,
         icon: "folder",
         onPress: filesVisible ? toggleAuxiliaryPane : props.onOpenFilesInspector,
-      });
-    }
-    if (props.hasWorkspaceRoot && props.gitControls.canOpenTerminal) {
-      actions.push({
-        accessibilityLabel: "Open terminal",
-        icon: "terminal",
-        onPress: () => onOpenTerminal(null),
       });
     }
     if (!androidGitMenus) {
