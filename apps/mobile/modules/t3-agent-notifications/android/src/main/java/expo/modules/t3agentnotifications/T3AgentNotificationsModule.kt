@@ -30,6 +30,10 @@ class T3AgentNotificationsModule : Module() {
       appContext.reactContext?.let { AgentNotifications.showcase(it, scheme, data) }
     }
 
+    Function("postLocalAlert") { scheme: String, data: Map<String, String> ->
+      appContext.reactContext?.let { AgentNotifications.postLocal(it, scheme, data) }
+    }
+
     Function("setThreadOnScreen") { path: String? ->
       AgentNotifications.setThreadOnScreen(path)
     }

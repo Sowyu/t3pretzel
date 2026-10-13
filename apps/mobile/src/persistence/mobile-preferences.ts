@@ -95,6 +95,10 @@ export interface Preferences {
   /** Home list filters, restored on the next launch. */
   readonly threadListFilters?: ThreadListFilters;
   readonly pullRequestListFilters?: PullRequestListPreferences;
+  /** Android only. Unset means on: saved environments stay fresh without being asked. */
+  readonly backgroundRefreshEnabled?: boolean;
+  /** Android only. Local alerts for finished turns that no relay push covers. Unset means on. */
+  readonly turnNotificationsEnabled?: boolean;
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -163,6 +167,8 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     threadListWorkingShelfExpanded?: boolean;
     threadListFilters?: ThreadListFilters;
     pullRequestListFilters?: PullRequestListPreferences;
+    backgroundRefreshEnabled?: boolean;
+    turnNotificationsEnabled?: boolean;
   } = {};
 
   if (typeof parsed.pullRequestHideTestFiles === "boolean") {
@@ -282,6 +288,12 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (isPullRequestListPreferences(parsed.pullRequestListFilters)) {
     preferences.pullRequestListFilters = parsed.pullRequestListFilters;
+  }
+  if (typeof parsed.backgroundRefreshEnabled === "boolean") {
+    preferences.backgroundRefreshEnabled = parsed.backgroundRefreshEnabled;
+  }
+  if (typeof parsed.turnNotificationsEnabled === "boolean") {
+    preferences.turnNotificationsEnabled = parsed.turnNotificationsEnabled;
   }
   return preferences;
 }

@@ -102,14 +102,26 @@ export type AgentAwarenessRegistrationStatus = "unknown" | "pending" | "register
 let registrationStatus: AgentAwarenessRegistrationStatus = "unknown";
 const registrationStatusListeners = new Set<() => void>();
 
-function setRegistrationStatus(next: AgentAwarenessRegistrationStatus): void {
-  if (registrationStatus === next) {
+// Whether the accepted registration carried an FCM/APNs token, so the relay
+// can actually push to this device. Builds without Firebase register without
+// one and rely on the app's local turn notifications instead.
+let registeredWithPushToken = false;
+
+function setRegistrationStatus(next: AgentAwarenessRegistrationStatus, pushToken = false): void {
+  const withPushToken = next === "registered" && pushToken;
+  if (registrationStatus === next && registeredWithPushToken === withPushToken) {
     return;
   }
   registrationStatus = next;
+  registeredWithPushToken = withPushToken;
   for (const listener of registrationStatusListeners) {
     listener();
   }
+}
+
+/** True once the relay accepted this device with a push token it can deliver to. */
+export function agentAwarenessPushRegistered(): boolean {
+  return registrationStatus === "registered" && registeredWithPushToken;
 }
 
 export function getAgentAwarenessRegistrationStatus(): AgentAwarenessRegistrationStatus {
@@ -413,7 +425,7 @@ function registerDeviceWithRelay(
       persisted.signature === signature &&
       !needsAndroidReplay
     ) {
-      setRegistrationStatus("registered");
+      setRegistrationStatus("registered", body.pushToken !== undefined);
       logRegistrationDebug("relay device registration skipped; already registered for account", {
         expectedGeneration,
       });
@@ -439,7 +451,7 @@ function registerDeviceWithRelay(
       return;
     }
     if (body.platform === "android") androidDeviceReplayedAt = Date.now();
-    setRegistrationStatus("registered");
+    setRegistrationStatus("registered", body.pushToken !== undefined);
     yield* Effect.promise(() =>
       saveAgentAwarenessRegistrationRecord({
         identity,
@@ -937,6 +949,7 @@ export function __resetAgentAwarenessRemoteRegistrationForTest(): void {
   activeDeviceRegistration = null;
   pendingDeviceRegistration = null;
   registrationStatus = "unknown";
+  registeredWithPushToken = false;
   androidDeviceReplayedAt = null;
   registrationStatusListeners.clear();
   registeredActivityPushTokens.clear();

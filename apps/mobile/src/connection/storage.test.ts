@@ -94,4 +94,29 @@ describe("mobile connection catalog storage", () => {
       expect(memory.values.has(LEGACY_CONNECTIONS_KEY)).toBe(false);
     }),
   );
+
+  it.effect(
+    "shares one document between stores, so a stale copy cannot restore a removed environment",
+    () =>
+      Effect.gen(function* () {
+        const memory = makeStorage({});
+        const provide = Effect.provideService(
+          MobileSecureStorage.MobileSecureStorage,
+          memory.storage,
+        );
+        const live = yield* make().pipe(provide);
+        const background = yield* make().pipe(provide);
+        yield* background.read;
+        yield* live.update((document) => ({
+          ...document,
+          githubRoutingPermissions: [],
+        }));
+        // The background store writes after the live one; it must start from the live write.
+        yield* background.update((document) => document);
+        expect(JSON.parse(memory.values.get(CONNECTION_CATALOG_KEY)!)).toHaveProperty(
+          "githubRoutingPermissions",
+          [],
+        );
+      }),
+  );
 });

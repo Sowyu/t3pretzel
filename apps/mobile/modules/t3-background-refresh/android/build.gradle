@@ -1,0 +1,22 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.t3tools.backgroundrefresh'
+version = '0.0.0'
+
+android {
+  namespace 'expo.modules.t3backgroundrefresh'
+  defaultConfig {
+    versionCode 1
+    versionName '0.0.0'
+  }
+}
+
+dependencies {
+  // ReactHost and HeadlessJsTaskContext start the JS refresh; the React Native
+  // Gradle plugin pins the version.
+  implementation 'com.facebook.react:react-android'
+  implementation 'androidx.work:work-runtime:2.9.1'
+}

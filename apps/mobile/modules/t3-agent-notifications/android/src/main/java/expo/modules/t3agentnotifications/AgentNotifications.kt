@@ -133,6 +133,18 @@ object AgentNotifications {
     }
   }
 
+  /**
+   * Posts an alert the app built itself, for builds or environments that get
+   * no relay push. It goes through the same seen-alert history as pushes, so
+   * one turn posts once however many times the app detects it.
+   */
+  @Synchronized
+  fun postLocal(context: Context, scheme: String, data: Map<String, String>) {
+    if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+    channels(context)
+    showAlert(context, context.getSharedPreferences(STORE, Context.MODE_PRIVATE), scheme, data)
+  }
+
   private fun showAlert(
     context: Context,
     prefs: SharedPreferences,
