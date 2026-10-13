@@ -2,13 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
 import { MOBILE_THEME_IDS } from "@t3tools/shared/themePalettes";
 
 import { getMobileThemeVariables } from "../../lib/mobileTheme";
-import { getThreadListV2RowAppearance as iosAppearance } from "./thread-list-v2-row-appearance";
-import { getThreadListV2RowAppearance as androidAppearance } from "./thread-list-v2-row-appearance.android";
+import { getThreadListV2RowAppearance as appearanceFor } from "./thread-list-v2-row-appearance";
 
-describe.each([
-  ["ios", iosAppearance],
-  ["android", androidAppearance],
-] as const)("%s thread row colors", (_platform, appearanceFor) => {
+describe("thread row colors", () => {
   it.each(MOBILE_THEME_IDS)(
     "preserves active selection and uses neutral hover for %s",
     (themeId) => {
