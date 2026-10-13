@@ -10,6 +10,8 @@ vi.mock("expo-clipboard", () => ({
   setStringAsync: mocks.setStringAsync,
 }));
 
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+
 vi.mock("expo-haptics", () => ({
   ImpactFeedbackStyle: {
     Light: "light",
@@ -69,20 +71,19 @@ describe("copyTextWithHaptic", () => {
     const hapticCause = new Error(`Native failure for ${content}`);
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.setStringAsync.mockRejectedValueOnce(clipboardCause);
+    // A failing haptic is swallowed by the shared helper, so it must not add a
+    // second diagnostic carrying the copied text.
     mocks.impactAsync.mockRejectedValueOnce(hapticCause);
 
     await tryCopyTextWithHaptic(content, { target: "provider-sign-in-link" });
 
+    expect(consoleError).toHaveBeenCalledOnce();
     expect(consoleError).toHaveBeenCalledWith(
       "Failed to copy provider-sign-in-link to the clipboard.",
       expect.objectContaining({
         _tag: "CopyTextClipboardWriteError",
         target: "provider-sign-in-link",
       }),
-    );
-    expect(consoleError).toHaveBeenCalledWith(
-      "Failed to trigger light-impact haptic feedback after copying provider-sign-in-link.",
-      expect.objectContaining({ _tag: "CopyTextHapticFeedbackError", feedback: "light-impact" }),
     );
     const diagnostics = JSON.stringify(consoleError.mock.calls);
     expect(diagnostics).not.toContain("private-state");

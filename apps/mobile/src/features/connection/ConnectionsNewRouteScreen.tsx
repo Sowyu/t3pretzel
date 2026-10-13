@@ -1,7 +1,7 @@
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { useAuth } from "@clerk/expo";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as Haptics from "expo-haptics";
+import { successHaptic, errorHaptic } from "../../lib/haptics";
 import {
   StackActions,
   useIsFocused,
@@ -23,7 +23,7 @@ import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../com
 import { FrostedCutout } from "../../components/FrostedCutout";
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
 import {
-  setPendingConnectionError,
+  clearPairingConnectionError,
   useRemoteConnections,
 } from "../../state/use-remote-environment-registry";
 import { SymbolView } from "../../components/AppSymbol";
@@ -97,16 +97,16 @@ export function ConnectionsNewRouteScreen({
 
   const handleHostChange = useCallback((value: string) => {
     setHostInput(value);
-    setPendingConnectionError(null);
+    clearPairingConnectionError();
   }, []);
 
   const handleCodeChange = useCallback((value: string) => {
     setCodeInput(value);
-    setPendingConnectionError(null);
+    clearPairingConnectionError();
   }, []);
 
-  // The error is shared app state; a stale failure must not greet the next visit.
-  useEffect(() => () => setPendingConnectionError(null), []);
+  // The pairing error outlives the screen; a stale failure must not greet the next visit.
+  useEffect(() => clearPairingConnectionError, []);
 
   // Opening the sheet never prompts; a tap on the scan card asks for the camera.
   const handleScanPress = useCallback(async () => {
@@ -143,7 +143,7 @@ export function ConnectionsNewRouteScreen({
         setScanComplete(true);
         setScannerLocked(false);
       } catch (error) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        void errorHaptic();
         Alert.alert(
           "Invalid QR code",
           error instanceof Error ? error.message : "Scanned QR code was not recognized.",
@@ -162,11 +162,7 @@ export function ConnectionsNewRouteScreen({
       onChangeConnectionPairingUrl(pairingUrl);
       try {
         const result = await onConnectPress(pairingUrl, params.routeFor);
-        void Haptics.notificationAsync(
-          AsyncResult.isSuccess(result)
-            ? Haptics.NotificationFeedbackType.Success
-            : Haptics.NotificationFeedbackType.Error,
-        );
+        void (AsyncResult.isSuccess(result) ? successHaptic() : errorHaptic());
         if (AsyncResult.isSuccess(result)) {
           if (replaceWithHome || !navigation.canGoBack()) {
             navigation.dispatch(StackActions.replace("Home"));

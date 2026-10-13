@@ -9,8 +9,6 @@ describe("native review diff bridge", () => {
       sectionId: "turn:2",
       scheme: "dark" as const,
       diff: "diff --git a/a.ts b/a.ts",
-      fileCount: 1,
-      rowCount: 4,
     };
 
     const resetKey = buildNativeReviewTokensResetKey(input);
@@ -18,7 +16,7 @@ describe("native review diff bridge", () => {
     expect(
       buildNativeReviewTokensResetKey({ ...input, diff: "diff --git a/b.ts b/b.ts" }),
     ).not.toBe(resetKey);
-    expect(buildNativeReviewTokensResetKey({ ...input, rowCount: 5 })).not.toBe(resetKey);
+    expect(buildNativeReviewTokensResetKey({ ...input, scheme: "light" })).not.toBe(resetKey);
     expect(buildNativeReviewTokensResetKey({ ...input, diff: null })).not.toBe(resetKey);
   });
 });

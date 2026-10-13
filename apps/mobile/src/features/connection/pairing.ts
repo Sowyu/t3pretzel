@@ -3,19 +3,35 @@ import * as Schema from "effect/Schema";
 
 const MOBILE_PAIRING_URL_PARAM = "pairingUrl";
 
-function isIpLiteral(host: string): boolean {
+/**
+ * True for hosts that live on the user's own network: loopback, any IP
+ * literal (private, link-local, Tailscale's 100.64/10, and the rare public IP
+ * that also has no certificate), `localhost`, and mDNS `*.local` names.
+ */
+export function isLocalNetworkHost(host: string): boolean {
+  let hostname: string;
   try {
-    const hostname = new URL(`http://${host}`).hostname.replace(/^\[|\]$/g, "");
-    if (hostname.includes(":")) return true;
-
-    const octets = hostname.split(".");
-    return (
-      octets.length === 4 &&
-      octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)
-    );
+    hostname = new URL(`http://${host}`).hostname.replace(/^\[|\]$/g, "").toLowerCase();
   } catch {
     return false;
   }
+  if (hostname.includes(":")) return true;
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+  if (hostname.endsWith(".local")) return true;
+  const octets = hostname.split(".");
+  return (
+    octets.length === 4 && octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)
+  );
+}
+
+/**
+ * Shared parsing turns a bare host into https://, and a server on the local
+ * network almost never has a certificate, so those hosts get http:// here.
+ */
+export function withDefaultScheme(host: string): string {
+  const trimmed = host.trim().replace(/^\/+/, "");
+  if (trimmed === "" || /^[a-zA-Z][a-zA-Z\d+-]*:\/\//.test(trimmed)) return trimmed;
+  return `${isLocalNetworkHost(trimmed) ? "http" : "https"}://${trimmed}`;
 }
 
 export class PairingQrPayloadEmptyError extends Schema.TaggedError<PairingQrPayloadEmptyError>()(
@@ -27,14 +43,26 @@ export class PairingQrPayloadEmptyError extends Schema.TaggedError<PairingQrPayl
   }
 }
 
+// Server-issued pairing codes are 12 characters from this alphabet (no 0/1/I/O),
+// printed without separators. People type them with the hyphens or spaces the
+// placeholder suggests, or in lowercase, and the server compares verbatim and
+// answers 401. Codes that do not fit the format (dev tokens) pass through as typed.
+const PAIRING_CODE_PATTERN = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{12}$/;
+
+export function normalizePairingCode(code: string): string {
+  const trimmed = code.trim();
+  const compact = trimmed.replace(/[\s-]+/g, "").toUpperCase();
+  return PAIRING_CODE_PATTERN.test(compact) ? compact : trimmed;
+}
+
 export function buildPairingUrl(host: string, code: string): string {
-  const h = host.trim();
-  const c = code.trim();
+  const h = withDefaultScheme(host);
+  const c = normalizePairingCode(code);
   if (!h) return "";
   if (!c) return h;
 
   try {
-    const url = new URL(h.includes("://") ? h : `${isIpLiteral(h) ? "http" : "https"}://${h}`);
+    const url = new URL(h);
     url.hash = new URLSearchParams([["token", c]]).toString();
     return url.toString();
   } catch {
@@ -89,4 +117,29 @@ export function extractPairingUrlFromQrPayload(payload: string): string {
   }
 
   return trimmed;
+}
+
+/**
+ * A pairing that never reached the server says so in one sentence. The raw
+ * transport error ("HttpClientError: Transport error (GET ...)") goes to the
+ * log instead of the banner.
+ */
+export function describePairingFailure(error: unknown, pairingUrl: string): string | null {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("_tag" in error) ||
+    error._tag !== "ConnectionTransientError" ||
+    !("reason" in error) ||
+    (error.reason !== "network" && error.reason !== "timeout")
+  ) {
+    return null;
+  }
+  let host = pairingUrl.trim();
+  try {
+    host = new URL(pairingUrl).host || host;
+  } catch {
+    // Keep what the user typed.
+  }
+  return `Couldn't reach ${host}. Check the address and that the server is running.`;
 }

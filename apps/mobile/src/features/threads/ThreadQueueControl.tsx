@@ -2,7 +2,7 @@ import { type StaticScreenProps, useNavigation } from "@react-navigation/native"
 import { useAtomValue } from "@effect/atom-react";
 import type { ChatAttachment, EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
 import { Image } from "expo-image";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Animated, Platform, Pressable, ScrollView, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -107,7 +107,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
     if (busyRef.current || !workflow?.canReorder) return;
     busyRef.current = true;
     setBusyRunId(runId);
-    void Haptics.selectionAsync();
+    void selectionHaptic();
     try {
       await reorder({ ...target, input: { threadId: target.threadId, runId, beforeRunId } });
     } finally {
@@ -130,7 +130,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
     }
     if (action === "edit") {
       const entry = queuedRuns[index]!;
-      void Haptics.selectionAsync();
+      void selectionHaptic();
       beginQueuedRunEdit(threadKey, {
         runId,
         messageId: entry.messageId,
@@ -144,7 +144,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
     if (action !== "steer" && action !== "remove") return;
     busyRef.current = true;
     setBusyRunId(runId);
-    void Haptics.selectionAsync();
+    void selectionHaptic();
     try {
       if (action === "remove") {
         await cancel(buildCancelQueuedRunCommand({ ...target, runId }));
@@ -266,7 +266,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                     setDragRows(rows);
                     setPreviewBeforeRunId(beforeRunId);
                     setDraggedRunId(run.id);
-                    void Haptics.selectionAsync();
+                    void selectionHaptic();
                   }}
                   onMove={(y) => {
                     const current = drag.current;

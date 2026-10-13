@@ -129,6 +129,7 @@ class T3ComposerEditorModule : Module() {
         "onComposerFocus",
         "onComposerBlur",
         "onComposerPasteImages",
+        "onComposerSubmit",
         "onComposerContextPress",
         "onComposerPasteContext",
         "onComposerPasteText",

@@ -46,7 +46,8 @@ export function buildArchivedThreadGroups(input: {
     const environmentLabel = input.environmentLabels[entry.environmentId] ?? null;
     const threadsByProjectId = new Map<string, EnvironmentThreadShell[]>();
     for (const thread of entry.snapshot.threads) {
-      if (thread.archivedAt === null) {
+      // Subagent threads belong to their parent's run, as in the thread list.
+      if (thread.archivedAt === null || thread.lineage.relationshipToParent === "subagent") {
         continue;
       }
       const threads = threadsByProjectId.get(thread.projectId) ?? [];

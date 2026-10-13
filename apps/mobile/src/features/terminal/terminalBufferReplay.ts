@@ -9,21 +9,29 @@ export function getTerminalBufferReplayKey(input: {
   return `${input.terminalKey}:${input.fontSize}`;
 }
 
-export function getTerminalSurfaceReplayBuffer(input: {
+export interface TerminalSurfaceReplayWindow {
   readonly buffer: string;
-  readonly replayKey: string;
-  readonly readyReplayKey: string | null;
-}): string {
-  // Pass live buffer whenever ready key is unset or matches. Only return "" when ready key is
-  // stale vs current replay key (e.g. mid font-size transition).
+  readonly startOffset: number;
+  readonly resetKey: string;
+}
+
+export function getTerminalSurfaceReplayWindow(
+  input: TerminalSurfaceReplayWindow & {
+    readonly replayKey: string;
+    readonly readyReplayKey: string | null;
+  },
+): TerminalSurfaceReplayWindow {
+  // Pass live buffer whenever ready key is unset or matches. Hide it only when ready key is
+  // stale vs current replay key (e.g. mid font-size transition). The stale reset key makes
+  // the native view rebuild and replay once the buffer comes back, instead of appending.
   if (input.readyReplayKey !== null && input.readyReplayKey !== input.replayKey) {
     terminalDebugLog("replay:stale-key-hiding-buffer", {
       replayKey: input.replayKey,
       readyReplayKey: input.readyReplayKey,
       bufferLen: input.buffer.length,
     });
-    return "";
+    return { buffer: "", startOffset: 0, resetKey: `stale:${input.replayKey}` };
   }
 
-  return input.buffer;
+  return { buffer: input.buffer, startOffset: input.startOffset, resetKey: input.resetKey };
 }

@@ -58,7 +58,9 @@ export function useNativeReviewDiffHighlighting(input: {
     setVisibleRange({ firstRowIndex: 0, lastRowIndex: 80 });
     setTokensPatchJson(createEmptyTokenPatch(resetKey));
     return () => scheduler.cancel();
-  }, [enabled, resetKey, rows.length, scheduler]);
+    // Added rows (a loaded file patch, a new comment) carry new IDs and get highlighted by the
+    // effect below without starting over.
+  }, [enabled, resetKey, scheduler]);
 
   useEffect(() => {
     if (!enabled || rows.length === 0) {

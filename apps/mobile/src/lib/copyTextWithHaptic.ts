@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
+
+import { lightImpactHaptic, selectionHaptic } from "./haptics";
 
 export class CopyTextClipboardWriteError extends Schema.TaggedError<CopyTextClipboardWriteError>()(
   "CopyTextClipboardWriteError",
@@ -11,19 +12,6 @@ export class CopyTextClipboardWriteError extends Schema.TaggedError<CopyTextClip
 ) {
   override get message(): string {
     return `Failed to copy ${this.target} to the clipboard.`;
-  }
-}
-
-export class CopyTextHapticFeedbackError extends Schema.TaggedError<CopyTextHapticFeedbackError>()(
-  "CopyTextHapticFeedbackError",
-  {
-    target: Schema.String,
-    feedback: Schema.Literals(["light-impact", "selection"]),
-    cause: Schema.Defect(),
-  },
-) {
-  override get message(): string {
-    return `Failed to trigger ${this.feedback} haptic feedback after copying ${this.target}.`;
   }
 }
 
@@ -50,18 +38,8 @@ export async function tryCopyTextWithHaptic(
     }
   })();
 
-  void (async () => {
-    try {
-      if (feedback === "selection") {
-        await Haptics.selectionAsync();
-      } else {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (cause) {
-      const error = new CopyTextHapticFeedbackError({ target, feedback, cause });
-      console.error(error.message, { _tag: error._tag, target, feedback, stack: error.stack });
-    }
-  })();
+  // The helpers never reject, so the copy result is the only thing to report.
+  void (feedback === "selection" ? selectionHaptic() : lightImpactHaptic());
 
   return await clipboardWrite;
 }

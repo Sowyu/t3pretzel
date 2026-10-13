@@ -9,7 +9,7 @@ import {
 import { deriveSubagentElapsedMs, formatDuration } from "@t3tools/shared/orchestrationTiming";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import * as DateTime from "effect/DateTime";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { useEffect, useState } from "react";
 import { Platform, Pressable, ScrollView, View } from "react-native";
 import { Screen, ScreenStack, ScreenStackHeaderConfig } from "react-native-screens";
@@ -43,7 +43,7 @@ export function ThreadAgentsSheet({ route }: StaticScreenProps<AgentsTarget>) {
   const hasLiveAgent = (turn?.liveCount ?? 0) > 0;
 
   const openChildThread = (childThreadId: ThreadId) => {
-    void Haptics.selectionAsync();
+    void selectionHaptic();
     // Replace rather than push: the sheet is a leaf, and the child thread
     // belongs in the workspace stack where Home's back button expects it.
     navigation.dispatch(

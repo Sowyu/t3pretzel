@@ -133,6 +133,8 @@ function useVoiceInputRuntime() {
   const audioLevels = useSharedValue(audioLevelsRef.current);
   const sessionRef = useRef<VoiceInputSession | null>(null);
   const recorderRef = useRef<LazyVoiceRecorder<RecorderState> | null>(null);
+  // True while the mic permission dialog is up; see the AppState listener below.
+  const permissionRequestInFlightRef = useRef(false);
 
   if (!sessionRef.current || !recorderRef.current) {
     // The native recorder is created when dictation starts, not on app launch.
@@ -167,8 +169,13 @@ function useVoiceInputRuntime() {
       recorder,
       getTranscriber: getLocalVoiceTranscriber,
       requestPermission: async () => {
-        const permission = await requestRecordingPermissionsAsync();
-        return { granted: permission.granted, canAskAgain: permission.canAskAgain };
+        permissionRequestInFlightRef.current = true;
+        try {
+          const permission = await requestRecordingPermissionsAsync();
+          return { granted: permission.granted, canAskAgain: permission.canAskAgain };
+        } finally {
+          permissionRequestInFlightRef.current = false;
+        }
       },
       configureRecording: configureVoiceRecordingAudio,
       releaseRecording: releaseVoiceRecordingAudio,
@@ -191,7 +198,11 @@ function useVoiceInputRuntime() {
       // iOS reports `inactive` while its permission dialog is open. Only the
       // real background state cancels preparation; recorder status handles
       // calls and route interruptions during capture.
-      if (nextState === "background") controller.appMovedToBackground();
+      if (nextState !== "background") return;
+      // Android's permission dialog is its own activity, so asking for the mic
+      // pauses ours and AppState reports `background` until the user answers.
+      if (Platform.OS === "android" && permissionRequestInFlightRef.current) return;
+      controller.appMovedToBackground();
     });
     return () => subscription.remove();
   }, [controller]);

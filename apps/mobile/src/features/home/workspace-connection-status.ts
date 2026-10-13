@@ -16,6 +16,20 @@ function shouldShowWorkspaceConnectionStatus(state: WorkspaceState): boolean {
   );
 }
 
+/**
+ * A reconnect that has already failed once, or has been trying for longer than
+ * a reconnect takes, is an environment we cannot reach right now. The
+ * supervisor keeps retrying underneath; the title shows nothing rather than
+ * promising a reconnect that is not coming.
+ */
+function isUnreachable(state: WorkspaceState, stalled: boolean): boolean {
+  return (
+    state.connectingEnvironments.length > 0 &&
+    (stalled ||
+      state.connectingEnvironments.every((environment) => environment.connectionError !== null))
+  );
+}
+
 function workspaceConnectionStatusLabel(state: WorkspaceState): string {
   if (state.networkStatus === "offline") return "You are offline";
   if (state.connectingEnvironments.length === 1) {
@@ -34,8 +48,22 @@ function workspaceConnectionStatusLabel(state: WorkspaceState): string {
 /** Header-title presentation of the connection state, or null while connected. */
 export function workspaceConnectionStatusPresentation(
   state: WorkspaceState,
+  options: { readonly stalled?: boolean } = {},
 ): WorkspaceConnectionStatusPresentation | null {
   if (!shouldShowWorkspaceConnectionStatus(state)) return null;
+  // With one environment ready, another one failing or reconnecting is that
+  // environment's problem, not the workspace's: only shell catch-up shows.
+  if (state.networkStatus !== "offline" && state.hasReadyEnvironment) {
+    return state.hasPendingShellSnapshot
+      ? {
+          label: state.hasLoadedShellSnapshot ? "Syncing threads..." : "Loading threads...",
+          showsProgress: true,
+        }
+      : null;
+  }
+  if (state.networkStatus !== "offline" && isUnreachable(state, options.stalled === true)) {
+    return null;
+  }
   return {
     label: workspaceConnectionStatusLabel(state),
     showsProgress:

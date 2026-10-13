@@ -16,20 +16,22 @@ function hashReviewDiffKey(diff: string | null | undefined): string {
   return `${diff.length}:${(hash >>> 0).toString(36)}`;
 }
 
+/**
+ * A new key makes the native view drop every token, so it only covers what changes token
+ * meaning. Row counts are left out on purpose. A lazily loaded file patch or a new comment
+ * adds rows whose IDs embed their file's cache key, so the tokens already drawn stay valid
+ * and the diff doesn't flash back to plain text.
+ */
 export function buildNativeReviewTokensResetKey(input: {
   readonly threadKey: string | null;
   readonly sectionId: string | null;
   readonly scheme: NativeReviewDiffHighlightScheme;
   readonly diff: string | null | undefined;
-  readonly fileCount: number;
-  readonly rowCount: number;
 }): string {
   return [
     input.threadKey ?? "none",
     input.sectionId ?? "none",
     input.scheme,
     hashReviewDiffKey(input.diff),
-    input.fileCount,
-    input.rowCount,
   ].join(":");
 }

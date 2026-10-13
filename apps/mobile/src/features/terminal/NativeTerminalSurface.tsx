@@ -37,6 +37,10 @@ interface TerminalResizeEvent {
 interface TerminalSurfaceProps extends ViewProps {
   readonly terminalKey: string;
   readonly buffer: string | null;
+  /** Output offset of `buffer[0]`; lets the native view append only the new tail. */
+  readonly bufferStartOffset: number;
+  /** Changes when output offsets restart; the native view rebuilds instead of appending. */
+  readonly bufferResetKey: string;
   readonly fontSize?: number;
   readonly isRunning: boolean;
   readonly readOnly?: boolean;
@@ -47,6 +51,7 @@ interface TerminalSurfaceProps extends ViewProps {
   readonly theme?: TerminalTheme;
   readonly onInput: (data: string) => void;
   readonly onResize: (size: { readonly cols: number; readonly rows: number }) => void;
+  readonly onTerminalFocus?: () => void;
 }
 
 type ReadyTerminalSurfaceProps = Omit<TerminalSurfaceProps, "buffer"> & {
@@ -163,6 +168,7 @@ const FallbackTerminalSurface = memo(function FallbackTerminalSurface(
               props.onInput(`${text}\r`);
             }
           }}
+          onFocus={props.onTerminalFocus}
         />
         <Pressable
           disabled={!props.isRunning || props.readOnly}
@@ -185,8 +191,8 @@ const FallbackTerminalSurface = memo(function FallbackTerminalSurface(
 });
 
 export const TerminalSurface = memo(function TerminalSurface(props: TerminalSurfaceProps) {
-  const buffer = useTerminalSurfaceBuffer(props);
-  return <ReadyTerminalSurface {...props} buffer={buffer} />;
+  const bufferWindow = useTerminalSurfaceBuffer(props);
+  return <ReadyTerminalSurface {...props} {...bufferWindow} />;
 });
 
 const ReadyTerminalSurface = memo(function ReadyTerminalSurface(props: ReadyTerminalSurfaceProps) {
@@ -242,6 +248,8 @@ const ReadyTerminalSurface = memo(function ReadyTerminalSurface(props: ReadyTerm
           mutedForegroundColor={theme.mutedForeground}
           terminalKey={props.terminalKey}
           initialBuffer={props.buffer}
+          bufferStartOffset={props.bufferStartOffset}
+          bufferResetKey={props.bufferResetKey}
           fontSize={fontSize}
           style={{ flex: 1 }}
           themeConfig={buildGhosttyThemeConfig(theme)}
@@ -249,6 +257,7 @@ const ReadyTerminalSurface = memo(function ReadyTerminalSurface(props: ReadyTerm
           onResize={handleNativeResize}
           captureRequest={props.captureRequest}
           onCapture={(event) => props.onCapture?.(event.nativeEvent.text)}
+          onTerminalFocus={props.onTerminalFocus}
         />
       </View>
     );

@@ -53,6 +53,29 @@ function makeSnapshot(
 }
 
 describe("buildArchivedThreadGroups", () => {
+  it("leaves archived subagent threads out, as the thread list does", () => {
+    const project = makeProject({ id: ProjectId.make("project-1"), title: "T3 Code" });
+    const parent = makeThread({ id: ThreadId.make("parent"), projectId: project.id, title: "P" });
+    const child = {
+      ...makeThread({ id: ThreadId.make("child"), projectId: project.id, title: "C" }),
+      lineage: {
+        rootThreadId: parent.id,
+        parentThreadId: parent.id,
+        relationshipToParent: "subagent" as const,
+      },
+    };
+
+    const result = buildArchivedThreadGroups({
+      snapshots: [makeSnapshot([project], [parent, child])],
+      environmentLabels: {},
+      environmentId: null,
+      searchQuery: "",
+      sortOrder: "newest",
+    });
+
+    expect(result[0]?.threads.map((thread) => thread.id)).toEqual(["parent"]);
+  });
+
   it("groups archived threads by project and sorts newest first", () => {
     const project = makeProject({ id: ProjectId.make("project-1"), title: "T3 Code" });
     const older = makeThread({

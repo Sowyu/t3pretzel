@@ -58,10 +58,8 @@ export function useNativeReviewDiffBridge(input: {
         sectionId,
         scheme,
         diff,
-        fileCount: data.files.length,
-        rowCount: data.rows.length,
       }),
-    [data.files.length, data.rows.length, diff, scheme, sectionId, threadKey],
+    [diff, scheme, sectionId, threadKey],
   );
   const { tokensPatchJson, updateVisibleRange } = useNativeReviewDiffHighlighting({
     files: data.files,

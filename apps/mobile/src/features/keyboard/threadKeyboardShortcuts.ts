@@ -1,6 +1,6 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { THREAD_JUMP_KEYBINDING_COMMANDS } from "@t3tools/contracts";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { ThreadListV2ListItem } from "../threads/threadListV2";
 import {
@@ -32,13 +32,16 @@ export function useThreadJumpShortcuts(
   items: ReadonlyArray<ThreadShortcutListItem>,
   onSelectThread: (thread: EnvironmentThreadShell) => void,
 ) {
-  const jumpToThread = useCallback(
-    (command: HardwareKeyboardCommand) => {
-      const thread = threadJumpTarget(items, command);
-      if (thread !== null) onSelectThread(thread);
-      return true;
-    },
-    [items, onSelectThread],
-  );
+  // The handler reads the latest list through a ref, so list updates don't
+  // re-register the nine jump commands.
+  const latest = useRef({ items, onSelectThread });
+  useEffect(() => {
+    latest.current = { items, onSelectThread };
+  }, [items, onSelectThread]);
+  const jumpToThread = useCallback((command: HardwareKeyboardCommand) => {
+    const thread = threadJumpTarget(latest.current.items, command);
+    if (thread !== null) latest.current.onSelectThread(thread);
+    return true;
+  }, []);
   useHardwareKeyboardCommand(THREAD_JUMP_KEYBINDING_COMMANDS, jumpToThread);
 }

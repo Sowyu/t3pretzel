@@ -11,7 +11,7 @@ import {
   WorktreeSetupCard,
   type WorktreeSetupCardProps,
 } from "./worktree-setup-card";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic, successHaptic } from "../../lib/haptics";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import { useViewabilityAmount, type LegendListRef } from "@legendapp/list/react-native";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -177,6 +177,7 @@ import {
 } from "../../lib/threadActivity";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import {
+  resolveScrollToEndVisible,
   resolveThreadFeedLiveFollow,
   type ThreadFeedLiveFollowEvent,
   type ThreadWorkGroupScrollPosition,
@@ -308,6 +309,8 @@ export interface ThreadFeedProps {
   readonly usesAutomaticContentInsets?: boolean;
   readonly onHeaderMaterialVisibilityChange?: (visible: boolean) => void;
   readonly onEndFollowEnabledChange?: (enabled: boolean) => void;
+  /** True while the reader is away from the end: the scroll-to-end button's cue. */
+  readonly onAwayFromEndChange?: (away: boolean) => void;
   readonly skills?: ReadonlyArray<SelectableMarkdownSkill>;
   readonly onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
 }
@@ -391,7 +394,7 @@ function AssistantForkButton(props: {
       onPress={() => {
         const targetThreadId = ThreadId.make(uuidv4());
         setBusy(true);
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         void forkFromRun({
           environmentId: props.environmentId,
           input: {
@@ -719,6 +722,8 @@ function MessageAttachmentUnknown(props: { readonly name: string }) {
 
 // LegendList only computes hook visibility when the list has a viewability config.
 const THREAD_MEDIA_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 0 };
+// In viewports; large enough that no thread length is ever outside it.
+const FOLLOW_FROM_ANYWHERE_THRESHOLD = 1000;
 
 function ThreadMediaVisibility(props: { readonly children: ReactNode }) {
   const [visible, setVisible] = useState(false);
@@ -1573,7 +1578,7 @@ function UserMessageContent(props: UserMessageContentProps) {
                   records: [record],
                 },
               )
-                .then(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success))
+                .then(() => successHaptic())
                 .catch(() => {
                   Alert.alert("Could not copy context", "Try copying this context again.");
                 });
@@ -1744,11 +1749,25 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     },
     [props.onEndFollowEnabledChange],
   );
+  const awayFromEndRef = useRef(false);
   const transitionEndFollow = useCallback(
     (event: ThreadFeedLiveFollowEvent) => {
       setEndFollow(resolveThreadFeedLiveFollow(endFollowEnabledRef.current, event));
+      // Follow pauses on touch-down, but a touch that starts and stays at the
+      // end must not surface the scroll-to-end button; only leaving the end does.
+      const isAtEnd =
+        "isAtEnd" in event ? event.isAtEnd : (props.listRef.current?.getState().isAtEnd ?? false);
+      const away = resolveScrollToEndVisible({
+        followEnabled: endFollowEnabledRef.current,
+        userScrollSessionActive: userScrollSessionRef.current,
+        isAtEnd,
+      });
+      if (away !== awayFromEndRef.current) {
+        awayFromEndRef.current = away;
+        props.onAwayFromEndChange?.(away);
+      }
     },
-    [setEndFollow],
+    [props.listRef, props.onAwayFromEndChange, setEndFollow],
   );
   const [interactionState, setInteractionState] = useState<{
     readonly copiedRowId: string | null;
@@ -1831,7 +1850,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         imageEmbed,
       });
       if (media) {
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         if (media.kind === "video") {
           setExpandedVideo((current) => current ?? media.source);
         } else {
@@ -1847,7 +1866,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
           presentation.path,
         );
         if (relativePath) {
-          void Haptics.selectionAsync();
+          void selectionHaptic();
           navigation.navigate("ThreadFile", {
             environmentId: String(props.environmentId),
             threadId: String(props.threadId),
@@ -1861,7 +1880,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       // A host file outside the workspace, such as a report an agent wrote to
       // a temp directory, opens read-only in the file screen.
       if (presentation.kind === "file" && isAbsolutePath(presentation.path)) {
-        void Haptics.selectionAsync();
+        void selectionHaptic();
         navigation.navigate("ThreadFile", {
           environmentId: String(props.environmentId),
           threadId: String(props.threadId),
@@ -2035,6 +2054,8 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       worktreeSetup: props.worktreeSetup,
       setupWorkingStartedAt: props.setupWorkingStartedAt,
       dispatchingMessageId: props.dispatchingMessageId,
+      // Skills resolve after the first render; rows must redraw their skill chips.
+      skills: props.skills,
       unsettledTurnId,
       copiedRowId,
       expandedWorkGroups,
@@ -2051,6 +2072,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       props.worktreeSetup,
       props.setupWorkingStartedAt,
       props.dispatchingMessageId,
+      props.skills,
       unsettledTurnId,
       copiedRowId,
       expandedWorkGroups,
@@ -2679,6 +2701,12 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             freeze={props.freeze}
             // Follow the measured end immediately. Animating toward an estimated
             // end races row measurement when a pending message is acknowledged.
+            // LegendList only re-pins when the list is already within a tenth
+            // of a viewport of the end. A message row that measures far taller
+            // than its estimate on open, or a streaming burst, leaves it behind
+            // for good. The follow latch above already says when following is
+            // wanted, so while it does the list re-pins from anywhere.
+            maintainScrollAtEndThreshold={FOLLOW_FROM_ANYWHERE_THRESHOLD}
             maintainScrollAtEnd={
               disclosureToggleSettling || !endFollowEnabled
                 ? false

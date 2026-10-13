@@ -60,12 +60,18 @@ const usageByWindowAtom = Atom.family((windowKey: string) =>
         session: Option.getOrNull(AsyncResult.value(sessionResult)),
         hasSessionError: sessionResult._tag === "Failure",
       });
+      const isConnected = presentation.connection.phase === "connected";
       if (!access.canReadDiagnostics) {
         statuses.push({
           environmentId,
           label: presentation.entry.target.label,
-          isConnected: presentation.connection.phase === "connected",
+          isConnected,
           ...access,
+          // A host that is asleep keeps the connection backing off; its session
+          // check cannot finish until it connects, so there is nothing to wait for.
+          ...(access.isPending && !isConnected
+            ? { isPending: false, error: "Not connected." }
+            : {}),
           summary: null,
           needsCursorKeychainAccess: false,
         });
@@ -73,13 +79,21 @@ const usageByWindowAtom = Atom.family((windowKey: string) =>
       }
       const result = get(serverEnvironment.usageSummary({ environmentId, input }));
       const summary = Option.getOrNull(AsyncResult.value(result));
+      // The query never runs before the environment connects, so one that is
+      // connecting or backing off with nothing saved has nothing to wait for.
+      const unreachable = !isConnected && summary === null;
       statuses.push({
         environmentId,
         label: presentation.entry.target.label,
-        isPending: result.waiting,
-        isConnected: presentation.connection.phase === "connected",
+        isPending: unreachable ? false : result.waiting,
+        isConnected,
         canReadDiagnostics: true,
-        error: result._tag === "Failure" ? "This environment could not report usage." : null,
+        error:
+          result._tag === "Failure"
+            ? "This environment could not report usage."
+            : unreachable
+              ? "Not connected."
+              : null,
         summary,
         needsCursorKeychainAccess: needsCursorKeychainAccess(
           summary,

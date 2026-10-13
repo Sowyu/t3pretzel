@@ -58,6 +58,48 @@ describe("workspace connection status", () => {
     });
   });
 
+  it("shows nothing once the reconnect has failed", () => {
+    const state = workspaceState({
+      hasConnectingEnvironment: true,
+      hasReadyEnvironment: false,
+      connectingEnvironments: [
+        {
+          environmentId: "environment-1" as never,
+          environmentLabel: "Julius’s Mac mini",
+          displayUrl: "",
+          isRelayManaged: true,
+          isEnabled: true,
+          connectionState: "reconnecting",
+          connectionError: "Environment offline",
+          connectionErrorTraceId: null,
+        },
+      ],
+    });
+
+    expect(workspaceConnectionStatusPresentation(state)).toBeNull();
+  });
+
+  it("shows nothing once the reconnect has stalled", () => {
+    const state = workspaceState({
+      hasConnectingEnvironment: true,
+      hasReadyEnvironment: false,
+      connectingEnvironments: [
+        {
+          environmentId: "environment-1" as never,
+          environmentLabel: "Julius’s Mac mini",
+          displayUrl: "",
+          isRelayManaged: true,
+          isEnabled: true,
+          connectionState: "reconnecting",
+          connectionError: null,
+          connectionErrorTraceId: null,
+        },
+      ],
+    });
+
+    expect(workspaceConnectionStatusPresentation(state, { stalled: true })).toBeNull();
+  });
+
   it("surfaces connection errors before the generic disconnected fallback", () => {
     const state = workspaceState({
       connectionError: "Could not reach Julius’s Mac mini",
@@ -90,5 +132,26 @@ describe("workspace connection status", () => {
       label: "Loading threads...",
       showsProgress: true,
     });
+  });
+
+  it("keeps a failing environment out of the title while another is ready", () => {
+    const state = workspaceState({
+      connectionError: "Could not reach Julius’s Mac mini",
+      hasConnectingEnvironment: true,
+      connectingEnvironments: [
+        {
+          environmentId: "environment-1" as never,
+          environmentLabel: "Julius’s Mac mini",
+          displayUrl: "",
+          isRelayManaged: true,
+          isEnabled: true,
+          connectionState: "reconnecting",
+          connectionError: null,
+          connectionErrorTraceId: null,
+        },
+      ],
+    });
+
+    expect(workspaceConnectionStatusPresentation(state)).toBeNull();
   });
 });

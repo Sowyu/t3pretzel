@@ -24,7 +24,7 @@ import {
 } from "@t3tools/shared/model";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { type NativeStackNavigationProp } from "@react-navigation/native-stack";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { AsyncResult } from "effect/reactivity";
 import {
   createContext,
@@ -427,7 +427,7 @@ function ThreadSettingsSessionProvider(
             );
       const pending = { favorite: !previousFavorite, settings: currentSettings, pending: true };
       pendingFavorites.current.set(key, pending);
-      void Haptics.selectionAsync();
+      void selectionHaptic();
       try {
         const result = await saveSettings({
           environmentId: props.environmentId,
@@ -481,7 +481,7 @@ function ThreadSettingsSessionProvider(
         return;
       pendingHidden.current.add(option.key);
       setPendingHiddenKeys(new Set(pendingHidden.current));
-      void Haptics.selectionAsync();
+      void selectionHaptic();
       void saveSettings({
         environmentId: props.environmentId,
         input: {
@@ -565,7 +565,7 @@ function ThreadSettingsSessionProvider(
         );
         return false;
       }
-      void Haptics.selectionAsync();
+      void selectionHaptic();
       props.onSelectModel(pendingModel);
     }
     return true;
@@ -602,7 +602,7 @@ function ThreadSettingsSessionProvider(
 
   const pressModel = useCallback(
     (option: ModelOption) => {
-      void Haptics.selectionAsync();
+      void selectionHaptic();
       setPendingModel((current) =>
         pendingModelAfterPress({
           current,
@@ -1179,7 +1179,7 @@ function ThreadSettingsChoiceContent(props: {
             description: choice.description,
             selected: choice.mode === session.runtimeMode,
             onPress: () => {
-              void Haptics.selectionAsync();
+              void selectionHaptic();
               session.onUpdateRuntimeMode(choice.mode);
               props.onSelected();
             },
@@ -1199,7 +1199,7 @@ function ThreadSettingsChoiceContent(props: {
                   session.reportedModelSelection,
                 ),
               onPress: () => {
-                void Haptics.selectionAsync();
+                void selectionHaptic();
                 session.applyOptionChange(activeDescriptor.id, choice.id);
                 props.onSelected();
               },

@@ -133,7 +133,7 @@ import {
   SettingsLegalDocumentCloseHeaderButton,
   SettingsLegalDocumentExternalHeaderButton,
 } from "./features/settings/components/SettingsLegalDocumentRouteScreen";
-import { useAppShortcuts } from "./features/shortcuts/useAppShortcuts";
+import { RecentThreadShortcutSync, useAppShortcuts } from "./features/shortcuts/useAppShortcuts";
 import { useIncomingShare } from "./features/sharing/IncomingShareProvider";
 import {
   EMPTY_INCOMING_SHARE_PRESENTATION_STATE,
@@ -632,8 +632,9 @@ function RootStackLayout(props: {
   useAgentNotificationNavigation(workspaceLocation.pathname);
   // Presents the T3 Connect onboarding sheet after an in-session sign-in.
   useConnectOnboardingNavigation();
-  // Launcher app shortcuts: routes shortcut taps and tracks opened threads.
-  useAppShortcuts(props.state);
+  // Launcher app shortcuts: routes shortcut taps. RecentThreadShortcutSync
+  // below tracks opened threads.
+  useAppShortcuts();
   useEffect(() => {
     const topRouteName = props.state.routes[props.state.index]?.name;
     const transition = transitionIncomingSharePresentation(sharePresentationRef.current, {
@@ -653,6 +654,7 @@ function RootStackLayout(props: {
   return (
     <HardwareKeyboardCommandProvider pathname={pathname}>
       <ThreadOutboxDrainWorker />
+      {Platform.OS === "android" ? <RecentThreadShortcutSync state={props.state} /> : null}
       <ShowcaseCaptureCoordinator pathname={pathname} />
       <ExistingThreadSettingsRouteProvider>
         <AndroidWorkspaceTabsProvider>
@@ -701,7 +703,7 @@ function NotFoundScreen() {
       </Text>
       <Pressable
         style={returnHomeButtonStyle}
-        onPress={() => navigation.dispatch(StackActions.replace("Home"))}
+        onPress={() => navigation.dispatch(StackActions.popTo("Home"))}
       >
         <Text className="text-base font-t3-bold text-primary-foreground">Return home</Text>
       </Pressable>

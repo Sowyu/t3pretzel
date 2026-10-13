@@ -16,7 +16,7 @@ let root: ReturnType<typeof createRoot>;
 const displayed = vi.fn<(value: { buffer: string; readOnly: boolean }) => void>();
 
 function BufferProbe(input: Input) {
-  const buffer = useTerminalSurfaceBuffer(input);
+  const { buffer } = useTerminalSurfaceBuffer(input);
   useEffect(() => {
     displayed({ buffer, readOnly: input.readOnly });
   }, [buffer, input.readOnly]);
@@ -29,6 +29,8 @@ function render(changes: Partial<Input> = {}) {
       createElement(BufferProbe, {
         terminalKey: "environment:thread:term-1",
         buffer: "host output",
+        bufferStartOffset: 0,
+        bufferResetKey: "0:0",
         readOnly: false,
         ...changes,
       }),
@@ -90,6 +92,36 @@ it.each([
   expect(displayed).toHaveBeenLastCalledWith({ buffer: "", readOnly: false });
   await render({ terminalKey, buffer: "new target" });
   expect(displayed).toHaveBeenLastCalledWith({ buffer: "new target", readOnly: false });
+});
+
+it("keeps the offsets of the held buffer", async () => {
+  let held: ReturnType<typeof useTerminalSurfaceBuffer> | null = null;
+  function WindowProbe(input: Input) {
+    held = useTerminalSurfaceBuffer(input);
+    return null;
+  }
+  const base = { terminalKey: "t", readOnly: false };
+  await act(() =>
+    root.render(
+      createElement(WindowProbe, {
+        ...base,
+        buffer: "tail",
+        bufferStartOffset: 40,
+        bufferResetKey: "1:2",
+      }),
+    ),
+  );
+  await act(() =>
+    root.render(
+      createElement(WindowProbe, {
+        ...base,
+        buffer: null,
+        bufferStartOffset: 0,
+        bufferResetKey: "0:0",
+      }),
+    ),
+  );
+  expect(held).toEqual({ buffer: "tail", bufferStartOffset: 40, bufferResetKey: "1:2" });
 });
 
 it("starts empty until its first snapshot arrives", async () => {

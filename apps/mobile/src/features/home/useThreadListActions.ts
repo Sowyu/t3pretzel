@@ -3,7 +3,7 @@ import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell
 import { canSnooze, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
-import * as Haptics from "expo-haptics";
+import { lightImpactHaptic } from "../../lib/haptics";
 import { useCallback, useRef } from "react";
 import { Alert, Platform } from "react-native";
 
@@ -99,7 +99,7 @@ function actionFailureMessage(action: ThreadListAction, cause: Cause.Cause<unkno
 }
 
 function selectionHaptic(): void {
-  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  void lightImpactHaptic();
 }
 
 function actionFailureTitle(action: ThreadListAction): string {

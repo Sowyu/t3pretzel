@@ -7,7 +7,7 @@ import { useIsFocused, useNavigation, type StaticScreenProps } from "@react-navi
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import * as Haptics from "expo-haptics";
+import { selectionHaptic } from "../../lib/haptics";
 import { Accelerometer } from "expo-sensors";
 import { Alert, AppState, BackHandler, Pressable, StatusBar, View } from "react-native";
 import Animated, { FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
@@ -110,7 +110,7 @@ function DevicePreviewScreen({
     Accelerometer.setUpdateInterval(50);
     const subscription = Accelerometer.addListener((sample) => {
       if (!shaken({ ...sample, timestamp: sample.timestamp * 1000 })) return;
-      void Haptics.selectionAsync();
+      void selectionHaptic();
       setControlsVisible((visible) => !visible);
     });
     return () => subscription.remove();

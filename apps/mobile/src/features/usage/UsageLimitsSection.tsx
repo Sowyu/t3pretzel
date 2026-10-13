@@ -19,7 +19,7 @@ import {
 } from "@t3tools/shared/usageLimits";
 import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "react";
 import { refreshUsageLimits } from "@t3tools/client-runtime/state/usage";
-import { Alert, Linking, Pressable, View } from "react-native";
+import { Alert, AppState, Linking, Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
 import { ProviderIcon } from "../../components/ProviderIcon";
@@ -295,8 +295,9 @@ export function ResetCredits(props: {
 /**
  * Re-probes every provider (and usage-limit source) on each connected
  * environment; the fresh snapshots then arrive over the config stream.
- * Countdowns and pace anchor to `now` rather than ticking, so a refresh also
- * re-anchors the clock: quota and elapsed time move together, or not at all.
+ * Countdowns and pace anchor to `now`, which a refresh re-anchors and which
+ * otherwise ticks once a minute while the Limits tab is on screen, so "Resets
+ * in" does not freeze at the value it had when the tab opened.
  * Environments whose probe failed are named, since their rows keep showing
  * the previous quota with nothing else to say so.
  */
@@ -364,6 +365,14 @@ export function useRefreshLimits(
     .map(([environmentId]) => environmentId)
     .sort()
     .join(",");
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const timer = setInterval(() => {
+      if (AppState.currentState === "active") setNow(Date.now());
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [active]);
   const autoRefreshLimits = useEffectEvent(() => refresh(true));
   useEffect(() => {
     if (active && connectedLimitsEnvironments) void autoRefreshLimits();
