@@ -111,11 +111,7 @@ function firstRouteParam(value: string | string[] | undefined): string | null {
 }
 
 function ThreadPane(props: { readonly children: ReactNode }) {
-  return (
-    <View className="flex-1 bg-screen android:overflow-hidden android:rounded-t-[28px] android:bg-thread-canvas">
-      {props.children}
-    </View>
-  );
+  return <View className="flex-1 bg-screen android:bg-thread-canvas">{props.children}</View>;
 }
 
 function ThreadRouteFallbackLayout(props: { readonly children: ReactNode }) {
