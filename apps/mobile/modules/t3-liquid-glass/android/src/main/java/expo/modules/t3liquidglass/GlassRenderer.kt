@@ -12,20 +12,31 @@ import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import kotlin.math.ceil
 
 /** Saturation boost applied to the backdrop, like iOS glass's vibrancy. */
 internal const val GLASS_SATURATION = 1.35f
 
 /**
- * One glass element's offscreen layer. [node] holds the backdrop recording,
- * translated so the glass shows what lies under it, and carries the whole
- * effect chain as one RenderEffect. Effects are rebuilt only in [configure]
- * (size, shape, or params changed); per-frame work is re-recording a
- * translate plus one drawRenderNode.
+ * One glass element's offscreen layers. [node] holds the backdrop recording,
+ * translated so the glass shows what lies under it, and carries the effect
+ * chain. Effects are rebuilt only in [configure] (size, shape, or params
+ * changed); per-frame work is re-recording a translate plus a drawRenderNode.
+ *
+ * HWUI redraws every glass layer on every frame it renders, whatever changed:
+ * a RenderNode drawn in two places (the backdrop on screen, and again inside
+ * each glass) fully damages its second parent. So the wins are in making each
+ * layer cheap, not in skipping redraws:
+ * - API 33+ glass blurs in [blurNode] at half resolution, and the lens, rim and
+ *   mask run at full resolution on the upscaled result. Same look (58.7 dB
+ *   PSNR on the header), about half the GPU time on the emulator.
+ * - The scroll-edge band has no crisp features, so it renders at a quarter of
+ *   the resolution and is scaled up.
  */
 @RequiresApi(Build.VERSION_CODES.S)
 internal class GlassRenderer {
   private val node = RenderNode("T3LiquidGlass")
+  private val blurNode = RenderNode("T3LiquidGlassBlur")
   private val lens: LensShader? =
     if (Build.VERSION.SDK_INT >= GlassTier.RUNTIME_SHADER_SDK) LensShader() else null
   private val edgeShader: EdgeShader? =
@@ -34,12 +45,13 @@ internal class GlassRenderer {
   private var width = 0
   private var height = 0
 
-  /**
-   * The scroll-edge band has no crisp features (no rim, no shape edge), so it
-   * renders at a quarter of the resolution and is scaled up: 1/16 the fill
-   * for a full-width blurred band, with no visible difference.
-   */
+  /** [node]'s resolution relative to the view: 1, or EDGE_SCALE for the band. */
   private var scale = 1f
+
+  /** Glass blurs separately in [blurNode] at [BLUR_SCALE]. */
+  private var separateBlur = false
+  private var blurWidth = 0
+  private var blurHeight = 0
 
   /** FULL draws tint and rim in the shader; BLUR leaves them to the view's canvas. */
   val isFull: Boolean get() = lens != null
@@ -57,8 +69,8 @@ internal class GlassRenderer {
     edgeFadeStart: Float? = null,
   ) {
     scale = if (edgeFadeStart != null) EDGE_SCALE else 1f
-    val scaledWidth = maxOf(1, kotlin.math.ceil(width * scale).toInt())
-    val scaledHeight = maxOf(1, kotlin.math.ceil(height * scale).toInt())
+    val scaledWidth = maxOf(1, ceil(width * scale).toInt())
+    val scaledHeight = maxOf(1, ceil(height * scale).toInt())
     this.width = scaledWidth
     this.height = scaledHeight
     node.setPosition(0, 0, scaledWidth, scaledHeight)
@@ -67,36 +79,46 @@ internal class GlassRenderer {
     node.scaleX = width.toFloat() / scaledWidth
     node.scaleY = height.toFloat() / scaledHeight
     val blurRadius = params.blurRadius * scale
-    val blur =
-      if (blurRadius > 0f) {
-        RenderEffect.createBlurEffect(blurRadius, blurRadius, Shader.TileMode.CLAMP)
-      } else {
-        null
-      }
     val lens = lens
     val edgeShader = edgeShader
-    if (edgeFadeStart != null && edgeShader != null) {
-      node.setRenderEffect(edgeShader.effect(scaledWidth, scaledHeight, tintColor, edgeFadeStart, blur))
-      node.setClipToOutline(false)
-    } else if (edgeFadeStart != null) {
-      // API 31-32: the view masks the fade and draws the tint gradient.
-      node.setRenderEffect(blur)
-      node.setClipToOutline(false)
-    } else if (lens != null) {
-      lens.configure(width, height, corner, params, GLASS_SATURATION, tintColor, rimAlpha, shadeAlpha)
-      node.setRenderEffect(lens.effect(blur))
-      node.setClipToOutline(false)
-    } else {
-      val saturation = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(GLASS_SATURATION) })
-      node.setRenderEffect(
-        if (blur != null) RenderEffect.createColorFilterEffect(saturation, blur)
-        else RenderEffect.createColorFilterEffect(saturation),
-      )
-      outline.setRoundRect(0, 0, width, height, corner.outlineRadius)
-      node.setOutline(outline)
-      node.setClipToOutline(true)
+    separateBlur = edgeFadeStart == null && lens != null && blurRadius > 0f
+    when {
+      edgeFadeStart != null && edgeShader != null -> {
+        node.setRenderEffect(edgeShader.effect(scaledWidth, scaledHeight, tintColor, edgeFadeStart, blur(blurRadius)))
+        node.setClipToOutline(false)
+      }
+      edgeFadeStart != null -> {
+        // API 31-32: the view masks the fade and draws the tint gradient.
+        node.setRenderEffect(blur(blurRadius))
+        node.setClipToOutline(false)
+      }
+      lens != null -> {
+        lens.configure(width, height, corner, params, GLASS_SATURATION, tintColor, rimAlpha, shadeAlpha)
+        if (separateBlur) {
+          blurWidth = maxOf(1, ceil(width * BLUR_SCALE).toInt())
+          blurHeight = maxOf(1, ceil(height * BLUR_SCALE).toInt())
+          blurNode.setPosition(0, 0, blurWidth, blurHeight)
+          blurNode.setRenderEffect(blur(blurRadius * BLUR_SCALE))
+        }
+        node.setRenderEffect(lens.effect(if (separateBlur) null else blur(blurRadius)))
+        node.setClipToOutline(false)
+      }
+      else -> {
+        val saturation = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(GLASS_SATURATION) })
+        val blur = blur(blurRadius)
+        node.setRenderEffect(
+          if (blur != null) RenderEffect.createColorFilterEffect(saturation, blur)
+          else RenderEffect.createColorFilterEffect(saturation),
+        )
+        outline.setRoundRect(0, 0, width, height, corner.outlineRadius)
+        node.setOutline(outline)
+        node.setClipToOutline(true)
+      }
     }
   }
+
+  private fun blur(radius: Float): RenderEffect? =
+    if (radius > 0f) RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP) else null
 
   /**
    * Records the backdrop so local point p shows the backdrop at the screen
@@ -105,13 +127,28 @@ internal class GlassRenderer {
    */
   fun record(source: BackdropRecording, offsetX: Float, offsetY: Float, transform: PressTransform) {
     if (width == 0 || height == 0) return
+    val fullWidth = width / scale
+    val fullHeight = height / scale
+    if (separateBlur) {
+      val blurCanvas = blurNode.beginRecording(blurWidth, blurHeight)
+      try {
+        blurCanvas.scale(blurWidth / fullWidth, blurHeight / fullHeight)
+        transformToSource(blurCanvas, fullWidth / 2f, fullHeight / 2f, transform, offsetX, offsetY)
+        blurCanvas.drawRenderNode(source.node)
+      } finally {
+        blurNode.endRecording()
+      }
+    }
     val canvas = node.beginRecording(width, height)
     try {
-      if (scale != 1f) canvas.scale(scale, scale)
-      val fullWidth = width / scale
-      val fullHeight = height / scale
-      transformToSource(canvas, fullWidth / 2f, fullHeight / 2f, transform, offsetX, offsetY)
-      canvas.drawRenderNode(source.node)
+      if (separateBlur) {
+        canvas.scale(fullWidth / blurWidth, fullHeight / blurHeight)
+        canvas.drawRenderNode(blurNode)
+      } else {
+        if (scale != 1f) canvas.scale(scale, scale)
+        transformToSource(canvas, fullWidth / 2f, fullHeight / 2f, transform, offsetX, offsetY)
+        canvas.drawRenderNode(source.node)
+      }
     } finally {
       node.endRecording()
     }
@@ -123,10 +160,12 @@ internal class GlassRenderer {
 
   fun release() {
     node.discardDisplayList()
+    blurNode.discardDisplayList()
   }
 
   private companion object {
     const val EDGE_SCALE = 0.25f
+    const val BLUR_SCALE = 0.5f
   }
 }
 

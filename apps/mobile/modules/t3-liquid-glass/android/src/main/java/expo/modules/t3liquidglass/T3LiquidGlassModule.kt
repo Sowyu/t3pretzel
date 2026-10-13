@@ -1,58 +1,15 @@
 package expo.modules.t3liquidglass
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Build
-import android.os.PowerManager
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 class T3LiquidGlassModule : Module() {
-  private var powerSaveReceiver: BroadcastReceiver? = null
-
-  private val context: Context?
-    get() = appContext.reactContext?.applicationContext
-
-  private fun systemState(): Map<String, Any> {
-    val powerSave =
-      (context?.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isPowerSaveMode == true
-    return mapOf(
-      "tier" to GlassTier.select(Build.VERSION.SDK_INT, powerSave).jsValue,
-      "powerSaveMode" to powerSave,
-    )
-  }
-
   override fun definition() = ModuleDefinition {
     Name("T3LiquidGlass")
 
-    Events("onSystemStateChange")
-
-    /** The tier the device allows right now, before the user setting. */
-    Function("getSystemState") { systemState() }
-
-    OnStartObserving("onSystemStateChange") {
-      val context = context ?: return@OnStartObserving
-      if (powerSaveReceiver != null) return@OnStartObserving
-      val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-          sendEvent("onSystemStateChange", systemState())
-        }
-      }
-      val filter = IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-      } else {
-        context.registerReceiver(receiver, filter)
-      }
-      powerSaveReceiver = receiver
-    }
-
-    OnStopObserving("onSystemStateChange") {
-      powerSaveReceiver?.let { context?.unregisterReceiver(it) }
-      powerSaveReceiver = null
-    }
+    /** The tier this device can draw, before the user setting. Fixed per device. */
+    Function("getTier") { GlassTier.select(Build.VERSION.SDK_INT).jsValue }
 
     View(GlassBackdropView::class) {
       Name("T3GlassBackdrop")

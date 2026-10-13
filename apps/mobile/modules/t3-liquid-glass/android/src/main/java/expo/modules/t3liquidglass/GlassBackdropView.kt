@@ -29,18 +29,16 @@ class GlassBackdropView(context: Context, appContext: AppContext) : ExpoView(con
   private var recording: BackdropRecording? = null
 
   /**
-   * Bumped whenever anything inside changes. A descendant redraw updates its
-   * own RenderNode without re-running this view's draw(), and the shared
-   * [content] node only reports that change to its first parent, so glass
-   * layers would go stale. Consumers compare this in onPreDraw and re-record
-   * their effect node (a few display-list ops) to mark their layer damaged.
+   * Marks every glass that samples this backdrop for a re-record when anything
+   * inside changes. A descendant redraw updates its own RenderNode without
+   * re-running this view's draw(), so the glass effect nodes are re-recorded
+   * in their onPreDraw (a few display-list ops). Narrowing this to glass whose
+   * area the change touches saved nothing measurable: HWUI redraws every glass
+   * layer each frame anyway (see GlassRenderer).
    */
-  internal var contentVersion = 0
-    private set
-
   override fun onDescendantInvalidated(child: View, target: View) {
     super.onDescendantInvalidated(child, target)
-    if (consumers.isNotEmpty()) contentVersion++
+    for (index in consumers.indices) consumers[index].markContentDirty()
   }
 
   /** True once [content] holds a recording consumers can draw. */

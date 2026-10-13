@@ -161,7 +161,7 @@ class LiquidGlassView(context: Context, appContext: AppContext) :
   private var offsetY = Float.NaN
   private val location = IntArray(2)
   private val searchLocation = IntArray(2)
-  private var seenContentVersion = -1
+  private var contentDirty = true
   private var drewGlass = false
 
   // Press animation (Kyant InteractiveHighlight specs).
@@ -254,10 +254,9 @@ class LiquidGlassView(context: Context, appContext: AppContext) :
     source.getLocationInWindow(location)
     val x = (glassX - location[0]).toFloat()
     val y = (glassY - location[1]).toFloat()
-    if (x != offsetX || y != offsetY || source.contentVersion != seenContentVersion) {
+    if (x != offsetX || y != offsetY || contentDirty) {
       offsetX = x
       offsetY = y
-      seenContentVersion = source.contentVersion
       recordEffect()
     }
     return true
@@ -266,6 +265,10 @@ class LiquidGlassView(context: Context, appContext: AppContext) :
   // endregion
 
   // region Source
+
+  internal fun markContentDirty() {
+    contentDirty = true
+  }
 
   /** Called from the source's draw, after it re-recorded its content. */
   internal fun onSourceRecorded() {
@@ -433,6 +436,7 @@ class LiquidGlassView(context: Context, appContext: AppContext) :
     val source = source ?: return
     val content = source.content ?: return
     if (!source.hasContent || offsetX.isNaN()) return
+    contentDirty = false
     renderer.record(content, offsetX, offsetY, pressTransform)
   }
 

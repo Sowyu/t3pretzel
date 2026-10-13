@@ -7,17 +7,8 @@ const MODULE_NAME = "T3LiquidGlass";
 /** What the device draws: full glass (API 33+), blur and tint (API 31-32), or the opaque fill. */
 export type LiquidGlassTier = "full" | "blur" | "none";
 
-interface LiquidGlassSystemState {
-  readonly tier: LiquidGlassTier;
-  readonly powerSaveMode: boolean;
-}
-
 interface LiquidGlassModule {
-  getSystemState(): LiquidGlassSystemState;
-  addListener(
-    event: "onSystemStateChange",
-    listener: (state: LiquidGlassSystemState) => void,
-  ): { remove(): void };
+  getTier(): LiquidGlassTier;
 }
 
 export interface LiquidGlassViewProps extends ViewProps {
@@ -37,8 +28,6 @@ export interface LiquidGlassViewProps extends ViewProps {
   readonly onTabSelect?: (event: NativeSyntheticEvent<{ readonly index: number }>) => void;
 }
 
-const UNAVAILABLE: LiquidGlassSystemState = { tier: "none", powerSaveMode: false };
-
 let module: LiquidGlassModule | null | undefined;
 function nativeModule() {
   if (module === undefined) {
@@ -50,20 +39,12 @@ function nativeModule() {
   return module;
 }
 
-let state: LiquidGlassSystemState | null = null;
+let tier: LiquidGlassTier | undefined;
 
-/** Snapshot for useSyncExternalStore. Battery saver flips it live. */
-export function getLiquidGlassSystemState(): LiquidGlassSystemState {
-  state ??= nativeModule()?.getSystemState() ?? UNAVAILABLE;
-  return state;
-}
-
-export function subscribeLiquidGlassSystemState(onChange: () => void) {
-  const subscription = nativeModule()?.addListener("onSystemStateChange", (next) => {
-    state = next;
-    onChange();
-  });
-  return () => subscription?.remove();
+/** The tier this device can draw (API level only), before the user setting. */
+export function getLiquidGlassDeviceTier(): LiquidGlassTier {
+  tier ??= nativeModule()?.getTier() ?? "none";
+  return tier;
 }
 
 let glassView: ComponentType<LiquidGlassViewProps> | null | undefined;

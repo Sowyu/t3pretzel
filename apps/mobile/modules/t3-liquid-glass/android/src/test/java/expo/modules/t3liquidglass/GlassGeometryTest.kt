@@ -8,14 +8,12 @@ import kotlin.math.sqrt
 
 class GlassGeometryTest {
   @Test
-  fun tierFollowsApiLevelAndBatterySaver() {
-    assertEquals(GlassTier.FULL, GlassTier.select(36, powerSaveMode = false))
-    assertEquals(GlassTier.FULL, GlassTier.select(33, powerSaveMode = false))
-    assertEquals(GlassTier.BLUR, GlassTier.select(32, powerSaveMode = false))
-    assertEquals(GlassTier.BLUR, GlassTier.select(31, powerSaveMode = false))
-    assertEquals(GlassTier.NONE, GlassTier.select(30, powerSaveMode = false))
-    assertEquals(GlassTier.NONE, GlassTier.select(36, powerSaveMode = true))
-    assertEquals(GlassTier.NONE, GlassTier.select(31, powerSaveMode = true))
+  fun tierFollowsApiLevel() {
+    assertEquals(GlassTier.FULL, GlassTier.select(36))
+    assertEquals(GlassTier.FULL, GlassTier.select(33))
+    assertEquals(GlassTier.BLUR, GlassTier.select(32))
+    assertEquals(GlassTier.BLUR, GlassTier.select(31))
+    assertEquals(GlassTier.NONE, GlassTier.select(30))
   }
 
   @Test
@@ -109,4 +107,5 @@ class GlassGeometryTest {
     repeat(120) { spring.step(1f / 20f) }
     assertEquals(3f, spring.value)
   }
+
 }

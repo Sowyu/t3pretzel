@@ -28,8 +28,7 @@ enum class GlassTier(val jsValue: String) {
     const val RUNTIME_SHADER_SDK = 33
     const val RENDER_EFFECT_SDK = 31
 
-    fun select(sdk: Int, powerSaveMode: Boolean): GlassTier = when {
-      powerSaveMode -> NONE
+    fun select(sdk: Int): GlassTier = when {
       sdk >= RUNTIME_SHADER_SDK -> FULL
       sdk >= RENDER_EFFECT_SDK -> BLUR
       else -> NONE
