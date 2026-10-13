@@ -1,10 +1,8 @@
 import { type ComponentProps, type ReactNode, useRef } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { cn } from "../lib/cn";
 import { SymbolView } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
-import { MaterialIconButton } from "./MaterialIconButton";
-import { MaterialButton } from "./MaterialButton";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
 export { ControlPillMenu } from "./ControlPillMenu";
@@ -66,6 +64,8 @@ export function ControlPill(props: {
       : variant === "danger"
         ? "bg-danger"
         : "bg-subtle",
+    // iOS dims bar buttons on press; Android has no system feedback here otherwise.
+    "android:active:opacity-50",
     props.className,
   );
   const labelClassName = cn(
@@ -78,47 +78,6 @@ export function ControlPill(props: {
         ? "text-danger-foreground"
         : "text-foreground",
   );
-
-  if (
-    Platform.OS === "android" &&
-    (variant === "pill" || variant === "primary") &&
-    props.label &&
-    props.onPress &&
-    !props.icon &&
-    !props.iconNode &&
-    !props.className &&
-    !props.activateOnPressIn &&
-    (!props.accessibilityLabel || props.accessibilityLabel === props.label)
-  ) {
-    return (
-      <MaterialButton
-        label={props.label}
-        onPress={props.onPress}
-        disabled={props.disabled}
-        tone={variant === "primary" ? "primary" : "secondary"}
-      />
-    );
-  }
-
-  if (
-    Platform.OS === "android" &&
-    props.accessibilityLabel &&
-    props.icon &&
-    !props.iconNode &&
-    !props.label &&
-    !props.className &&
-    !props.activateOnPressIn
-  ) {
-    return (
-      <MaterialIconButton
-        accessibilityLabel={props.accessibilityLabel}
-        icon={props.icon}
-        onPress={props.onPress}
-        disabled={props.disabled}
-        variant={variant === "primary" ? "primary" : variant === "danger" ? "danger" : "tonal"}
-      />
-    );
-  }
 
   return (
     <Pressable
