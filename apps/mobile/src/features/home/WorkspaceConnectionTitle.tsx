@@ -129,10 +129,7 @@ export function WorkspaceConnectionTitle(props: {
         hitSlop={8}
         onPress={props.onPress}
         className="flex-row items-center gap-2"
-        style={[
-          { flexShrink: 1, marginLeft: props.statusOffset ?? 0 },
-          Platform.OS === "android" && { gap: 7 * scale },
-        ]}
+        style={{ flexShrink: 1, marginLeft: props.statusOffset ?? 0 }}
       >
         {status.showsProgress ? (
           <AppActivityIndicator
