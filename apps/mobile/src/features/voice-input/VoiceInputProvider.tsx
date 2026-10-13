@@ -47,13 +47,21 @@ const VOICE_METERING_INTERVAL_MS = 80;
 // builds them with expo-audio's internal `createRecordingOptions`.
 const { ios: IOS_RECORDING_OPTIONS, android: ANDROID_RECORDING_OPTIONS } =
   RecordingPresets.HIGH_QUALITY;
+// Android's on-device recognizer takes 16 kHz mono PCM. Recording at that rate
+// lets native/voiceTranscription decode the AAC file without resampling.
+const ANDROID_VOICE_RECORDING_OPTIONS = {
+  ...ANDROID_RECORDING_OPTIONS,
+  sampleRate: 16_000,
+  numberOfChannels: 1,
+  bitRate: 64_000,
+};
 const VOICE_RECORDING_OPTIONS = {
   extension: RecordingPresets.HIGH_QUALITY.extension,
   sampleRate: RecordingPresets.HIGH_QUALITY.sampleRate,
   numberOfChannels: RecordingPresets.HIGH_QUALITY.numberOfChannels,
   bitRate: RecordingPresets.HIGH_QUALITY.bitRate,
   isMeteringEnabled: true,
-  ...(Platform.OS === "ios" ? IOS_RECORDING_OPTIONS : ANDROID_RECORDING_OPTIONS),
+  ...(Platform.OS === "ios" ? IOS_RECORDING_OPTIONS : ANDROID_VOICE_RECORDING_OPTIONS),
 };
 
 async function releaseVoiceRecordingAudio(): Promise<void> {
