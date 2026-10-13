@@ -604,6 +604,7 @@ internal class SelectionAwareEditText(context: Context) : EditText(context) {
   var readOnly = false
   var selectionListener: ((Int, Int) -> Unit)? = null
   var pasteImagesListener: ((List<String>) -> Unit)? = null
+  var submitListener: (() -> Unit)? = null
   var pasteContextListener: ((Map<String, String>) -> Unit)? = null
   var pasteTextListener: ((String, Int, Int) -> Unit)? = null
   var textPasteThresholdBytes = 0
