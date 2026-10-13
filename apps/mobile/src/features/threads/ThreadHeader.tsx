@@ -1,10 +1,12 @@
 import { useMemo } from "react";
+import { Platform } from "react-native";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { ScreenHeaderButton } from "../../components/ScreenHeaderButton";
 import type { ScreenHeaderAction } from "../../components/ScreenHeader.types";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import type { ThreadInspectorMode } from "./thread-inspector-content-stack";
 import { useThreadHeaderOptions } from "./useThreadHeaderOptions";
+import { useThreadGitMenuDefinition } from "./ThreadGitControls";
 import { useWorkspaceListNavigation } from "../workspace/useAndroidWorkspaceNavigation";
 
 export function ThreadHeader(
@@ -22,6 +24,13 @@ export function ThreadHeader(
   const { layout, panes, toggleAuxiliaryPane } = useAdaptiveWorkspaceLayout();
   const { onOpenTerminal, onMergeBack } = props.gitControls;
   const native = useThreadHeaderOptions(props);
+  // iOS builds this menu into its native header items; Android shows the same
+  // branch status, quick action and review entry from its header menu.
+  const gitMenu = useThreadGitMenuDefinition({
+    ...props.gitControls,
+    onOpenGitInspector: props.onOpenGitInspector,
+  });
+  const androidGitMenus = Platform.OS === "android" && gitMenu ? [gitMenu] : undefined;
   const androidHeaderActions = useMemo<ReadonlyArray<ScreenHeaderAction>>(() => {
     const actions: ScreenHeaderAction[] = [];
     if (props.onReturnToThread) {
@@ -47,11 +56,13 @@ export function ThreadHeader(
         onPress: () => onOpenTerminal(null),
       });
     }
-    actions.push({
-      accessibilityLabel: "Open git controls",
-      icon: "point.topleft.down.curvedto.point.bottomright.up",
-      onPress: props.onOpenGitInspector,
-    });
+    if (!androidGitMenus) {
+      actions.push({
+        accessibilityLabel: "Open git controls",
+        icon: "point.topleft.down.curvedto.point.bottomright.up",
+        onPress: props.onOpenGitInspector,
+      });
+    }
     if (onMergeBack) {
       actions.push({
         accessibilityLabel: "Merge back to source",
@@ -72,6 +83,7 @@ export function ThreadHeader(
     props.hasThreadCwd,
     props.hasWorkspaceRoot,
     props.gitControls.canOpenTerminal,
+    androidGitMenus,
   ]);
 
   return (
@@ -98,6 +110,7 @@ export function ThreadHeader(
         }
         onBack={layout.usesSplitView ? undefined : returnToList}
         actions={androidHeaderActions}
+        menus={androidGitMenus}
         hideBottomBorder
       />
       {native.fallback}
