@@ -42,7 +42,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  TextInput,
+  type TextInputInstance,
   View,
 } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
@@ -54,6 +54,7 @@ import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { MaterialButton } from "../../components/MaterialButton";
 import { MaterialIconButton } from "../../components/MaterialIconButton";
+import { MaterialSearchField } from "../../components/MaterialSearchField";
 import { ProviderIcon } from "../../components/ProviderIcon";
 import { ThemedSwitch } from "../../components/ThemedSwitch";
 import { cn } from "../../lib/cn";
@@ -176,7 +177,7 @@ function ProviderHeader(props: {
         accessibilityLabel={`${props.label}, ${props.modelCount} models`}
         accessibilityRole="button"
         accessibilityState={{ expanded: !props.collapsed }}
-        className="mx-4 mt-1 min-h-11 flex-row items-center gap-2 rounded-xl px-1 pt-2 active:opacity-60 android:min-h-12"
+        className="mx-4 mt-1 min-h-11 flex-row items-center gap-2 rounded-xl px-1 pt-2 active:opacity-60"
         onPress={props.onToggle}
       >
         {content}
@@ -203,7 +204,7 @@ function DisclosureRow(props: {
       accessibilityRole="button"
       onPress={props.onPress}
       className={cn(
-        "min-h-11 flex-row items-center gap-2 bg-grouped-card px-4 py-2 active:bg-subtle android:min-h-14",
+        "min-h-11 flex-row items-center gap-2 bg-grouped-card px-4 py-2 active:bg-subtle",
         !props.isLast && "border-b border-border-subtle",
       )}
     >
@@ -1011,6 +1012,7 @@ function ThreadSettingsMainContent(props: {
     });
   }, [isRefreshingProviders, refreshProviderCatalog, session.environmentId]);
   const catalogItems = useThreadSettingsCatalogItems(session);
+  const modelSearchInput = useRef<TextInputInstance>(null);
   const [animationsReady, setAnimationsReady] = useState(false);
   const hasActiveCatalogFilter =
     session.providerFilter !== null || session.searchQuery.trim().length > 0;
@@ -1092,7 +1094,7 @@ function ThreadSettingsMainContent(props: {
       contentContainerStyle={{ paddingTop: 4 }}
       contentInsetAdjustmentBehavior="automatic"
       data={listItems}
-      estimatedItemSize={Platform.OS === "android" ? 56 : 48}
+      estimatedItemSize={48}
       extraData={animationsReady}
       getItemType={(item) => item.kind}
       itemLayoutAnimation={THREAD_SETTINGS_CATALOG_LAYOUT_TRANSITION}
@@ -1103,40 +1105,17 @@ function ThreadSettingsMainContent(props: {
       ListHeaderComponent={
         <>
           {Platform.OS === "android" ? (
-            <View className="px-4 pb-2 pt-3">
-              <View
-                className="flex-row items-center rounded-full bg-input px-2"
-                style={{ minHeight: 56 }}
-              >
-                <View pointerEvents="none" className="px-2">
-                  <SymbolView
-                    name="magnifyingglass"
-                    size={24}
-                    tintColorClassName="accent-icon-subtle"
-                  />
-                </View>
-                <TextInput
-                  accessibilityLabel="Find a model"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  className="min-w-0 flex-1 px-2 py-0 text-base text-foreground"
-                  style={{ minHeight: 56, includeFontPadding: false, textAlignVertical: "center" }}
-                  onChangeText={session.setSearchQuery}
-                  placeholder="Find a model"
-                  placeholderTextColorClassName="accent-placeholder"
-                  selectionColorClassName="accent-focus/32"
-                  cursorColorClassName="accent-focus"
-                  selectionHandleColorClassName="accent-focus"
-                  value={session.searchQuery}
-                />
-                {session.searchQuery.length > 0 ? (
-                  <MaterialIconButton
-                    accessibilityLabel="Clear model search"
-                    icon="xmark"
-                    onPress={() => session.setSearchQuery("")}
-                  />
-                ) : null}
-              </View>
+            // Stands in for the iOS navigation bar search field.
+            <View className="flex-row px-4 pb-2 pt-3">
+              <MaterialSearchField
+                inputRef={modelSearchInput}
+                autoFocus={false}
+                accessibilityLabel="Find a model"
+                clearAccessibilityLabel="Clear model search"
+                placeholder="Find a model"
+                value={session.searchQuery}
+                onChangeText={session.setSearchQuery}
+              />
             </View>
           ) : null}
         </>
