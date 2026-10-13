@@ -40,6 +40,7 @@ import { useSelectedThreadGitState } from "../../../state/use-selected-thread-gi
 import { useSelectedThreadWorktree } from "../../../state/use-selected-thread-worktree";
 import { vcsEnvironment } from "../../../state/vcs";
 import { resolveGitOverviewReviewNavigationAction } from "./git-overview-navigation";
+import { cn } from "../../../lib/cn";
 import { MetaCard, SheetListRow, menuItemIconName, statusSummary } from "./gitSheetComponents";
 
 const HEADER_SCROLL_EDGE_EFFECTS = nativeHeaderScrollEdgeEffects(Platform.OS, Platform.Version);
@@ -272,9 +273,9 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       showsVerticalScrollIndicator={false}
       contentInset={{ bottom: Math.max(insets.bottom, 18) + 18 }}
       contentContainerStyle={{
-        paddingHorizontal: Platform.OS === "android" ? 8 : isInspector ? 12 : 20,
+        paddingHorizontal: isInspector ? 12 : 20,
         paddingTop: 8,
-        gap: Platform.OS === "android" ? 8 : 14,
+        gap: 14,
       }}
       refreshControl={
         Platform.OS === "ios" || isInspector ? (
@@ -283,15 +284,14 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       }
     >
       <View
-        className={`overflow-hidden bg-card android:rounded-[20px] ios:border ios:border-border ${
-          isInspector ? "ios:rounded-2xl ios:px-3 ios:py-1" : "ios:rounded-[22px] ios:px-4 ios:py-1"
-        }`}
+        className={cn(
+          "overflow-hidden border border-border bg-card py-1",
+          isInspector ? "rounded-2xl px-3" : "rounded-[22px] px-4",
+        )}
       >
         {sheetMenuItems.map(({ item, disabledReason }, index) => (
           <View key={`${item.id}-${item.label}`}>
-            {index > 0 && Platform.OS !== "android" ? (
-              <View className="ml-12 h-px bg-border" />
-            ) : null}
+            {index > 0 ? <View className="ml-12 h-px bg-border" /> : null}
             <SheetListRow
               icon={menuItemIconName(item.icon)}
               title={item.label}
@@ -303,7 +303,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
         ))}
         {behindCount > 0 ? (
           <>
-            {Platform.OS !== "android" ? <View className="ml-12 h-px bg-border" /> : null}
+            <View className="ml-12 h-px bg-border" />
             <SheetListRow
               icon="arrow.down.circle"
               title="Pull latest"
@@ -317,7 +317,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
             />
           </>
         ) : null}
-        {Platform.OS !== "android" ? <View className="ml-12 h-px bg-border" /> : null}
+        <View className="ml-12 h-px bg-border" />
         <SheetListRow
           icon="text.bubble"
           title="Review changes"
@@ -332,7 +332,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
             );
           }}
         />
-        {Platform.OS !== "android" ? <View className="ml-12 h-px bg-border" /> : null}
+        <View className="ml-12 h-px bg-border" />
         <SheetListRow
           icon="point.topleft.down.curvedto.point.bottomright.up"
           title="Branches & worktrees"
@@ -359,7 +359,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
           {linkedPrChains.map((chain) => (
             <View
               key={threadPullRequestKeyOf(chain.layers[0]!)}
-              className="overflow-hidden bg-card android:rounded-[20px] ios:rounded-2xl ios:border ios:border-border ios:px-3 ios:py-1"
+              className="overflow-hidden rounded-2xl border border-border bg-card px-3 py-1"
             >
               {chain.layers.length > 1 ? (
                 <View className="flex-row items-center gap-2 px-1 pt-2 pb-1">
@@ -376,9 +376,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
               ) : null}
               {chain.layers.map((link, index) => (
                 <View key={threadPullRequestKeyOf(link)}>
-                  {index > 0 && Platform.OS !== "android" ? (
-                    <View className="ml-12 h-px bg-border" />
-                  ) : null}
+                  {index > 0 ? <View className="ml-12 h-px bg-border" /> : null}
                   <SheetListRow
                     icon="arrow.triangle.pull"
                     title={`#${link.number} ${link.snapshot?.title ?? "Pull request"}`}
@@ -495,13 +493,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
   return (
     <View
       collapsable={false}
-      className={
-        Platform.OS === "android"
-          ? "flex-1 bg-sheet"
-          : isInspector
-            ? "flex-1 border-l border-border bg-sheet"
-            : "flex-1 bg-sheet"
-      }
+      className={isInspector ? "flex-1 border-l border-border bg-sheet" : "flex-1 bg-sheet"}
     >
       {isInspector ? (
         <View
@@ -513,7 +505,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       ) : null}
 
       {isInspector ? (
-        <View className="gap-1 px-4 pb-4 pt-3 ios:border-b ios:border-border">
+        <View className="gap-1 border-b border-border px-4 pb-4 pt-3">
           {Platform.OS === "android" ? (
             <View className="absolute right-3 top-4 z-[1]">{refreshMenu}</View>
           ) : (
