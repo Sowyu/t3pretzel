@@ -307,20 +307,20 @@ export function UsageRouteScreen() {
             <>
               {/* Period and metric together: neither applies to Limits, and
                 both change every number below, so they share one bar. */}
-              <View className="gap-3 ios:flex-row ios:items-center">
+              <View className="flex-row items-center gap-3">
                 <SegmentedControl
                   options={WINDOW_OPTIONS}
                   selected={windowDays}
                   onSelect={selectWindow}
                   size="compact"
-                  className="w-full ios:flex-1"
+                  className="flex-1"
                 />
                 <SegmentedControl
                   options={METRIC_OPTIONS}
                   selected={metric}
                   onSelect={setMetric}
                   size="compact"
-                  className="w-full ios:w-36"
+                  className="w-36"
                 />
               </View>
               <ChatGptUsageSummary selectedEnvironmentIds={selectedEnvironmentIds} />

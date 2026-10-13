@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  type TextInputInstance,
   View,
   type ScrollViewProps,
 } from "react-native";
@@ -19,6 +20,7 @@ import { AppText as Text, AppTextInput as TextInput } from "../../components/App
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { EmptyState } from "../../components/EmptyState";
 import { MaterialButton } from "../../components/MaterialButton";
+import { MaterialSearchField } from "../../components/MaterialSearchField";
 import { SymbolView } from "../../components/AppSymbol";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { useNativeLayoutMetrics } from "../../native/native-layout-metrics";
@@ -51,6 +53,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<PullRequestReviewerCandidate>>(null);
+  const searchInput = useRef<TextInputInstance>(null);
   const nativeMetrics = useNativeLayoutMetrics();
   const integratedSearch =
     NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED &&
@@ -187,15 +190,18 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                 Tap someone to request a review. Tap a requested reviewer to remove the request.
               </Text>
               {Platform.OS === "android" ? (
-                <TextInput
-                  accessibilityLabel="Search reviewers"
-                  placeholder="Search reviewers"
-                  placeholderTextColorClassName="accent-foreground-muted"
-                  value={query}
-                  onChangeText={setQuery}
-                  autoCapitalize="none"
-                  className="min-h-11 rounded-xl bg-grouped-card px-3 text-sm"
-                />
+                // Stands in for the iOS navigation bar search field.
+                <View className="flex-row">
+                  <MaterialSearchField
+                    inputRef={searchInput}
+                    autoFocus={false}
+                    accessibilityLabel="Search reviewers"
+                    clearAccessibilityLabel="Clear reviewer search"
+                    placeholder="Search reviewers"
+                    value={query}
+                    onChangeText={setQuery}
+                  />
+                </View>
               ) : null}
               {!allowed ? (
                 <Text className="text-xs text-foreground-muted">

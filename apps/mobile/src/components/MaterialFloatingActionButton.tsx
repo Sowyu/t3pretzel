@@ -3,7 +3,7 @@ import { AppText } from "./AppText";
 import { SymbolView, type AppSymbolName } from "./AppSymbol";
 import { cn } from "../lib/cn";
 
-/** The iPad empty-detail action. Android uses EmptyState's plain action button. */
+/** The tablet empty-detail action. */
 export function MaterialFloatingActionButton(props: {
   readonly onPress: () => void;
   readonly label: string;

@@ -11,6 +11,7 @@ export function MaterialSearchField({
   placeholder,
   value,
   onChangeText,
+  autoFocus = true,
 }: {
   readonly inputRef: RefObject<TextInputInstance | null>;
   readonly accessibilityLabel: string;
@@ -18,6 +19,8 @@ export function MaterialSearchField({
   readonly placeholder: string;
   readonly value: string;
   readonly onChangeText: (value: string) => void;
+  /** Header search opens on demand and focuses; persistent fields pass false. */
+  readonly autoFocus?: boolean;
 }) {
   const { scale, mediumIconSize } = useAndroidControlSizing();
   return (
@@ -39,7 +42,7 @@ export function MaterialSearchField({
       <TextInput
         ref={inputRef}
         accessibilityLabel={accessibilityLabel}
-        autoFocus
+        autoFocus={autoFocus}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"

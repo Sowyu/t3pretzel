@@ -976,41 +976,20 @@ export function HomeScreen(props: HomeScreenProps) {
   // special empty state: their shelf header is a list row even while collapsed.
   const v2ListEmpty =
     hasSearchQuery && threadSearch.isPending ? undefined : hasSearchQuery ? (
-      <EmptyState
-        title="No results"
-        detail={`No threads matching "${props.searchQuery}".`}
-        variant={Platform.OS === "android" ? "plain" : undefined}
-      />
+      <EmptyState title="No results" detail={`No threads matching "${props.searchQuery}".`} />
     ) : v2ScopedProjectGroup !== null ? (
       <EmptyState
         title={`No threads in ${v2ScopedProjectGroup.title}`}
         detail="Choose another project or create a new task."
-        variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : selectedEnvironmentLabel ? (
       <EmptyState
         title={`No threads in ${selectedEnvironmentLabel}`}
         detail="Choose another environment or create a new task."
-        variant={Platform.OS === "android" ? "plain" : undefined}
       />
     ) : (
-      <EmptyState
-        title="No threads yet"
-        detail="Create a task to start a new coding session."
-        variant={Platform.OS === "android" ? "plain" : undefined}
-      />
+      <EmptyState title="No threads yet" detail="Create a task to start a new coding session." />
     );
-
-  if (Platform.OS === "android" && threadListV2Items.length === 0) {
-    return (
-      <View
-        className="flex-1 items-center justify-center bg-screen px-4"
-        style={{ paddingBottom: insets.bottom }}
-      >
-        {v2ListEmpty}
-      </View>
-    );
-  }
 
   return (
     <View className={containerClassName}>

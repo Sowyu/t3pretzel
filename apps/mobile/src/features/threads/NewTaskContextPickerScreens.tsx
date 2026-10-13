@@ -1,5 +1,5 @@
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
-import { MaterialListRow } from "../../components/MaterialListRow";
+import { MaterialSearchField } from "../../components/MaterialSearchField";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { shouldCheckoutNewTaskBranch } from "./new-task-context-presentation";
 import type { VcsRef } from "@t3tools/client-runtime/state/vcs";
@@ -12,7 +12,7 @@ import {
 import { selectionHaptic } from "../../lib/haptics";
 import { useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, type TextInputInstance, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
@@ -44,35 +44,6 @@ function SelectionRow(props: {
   readonly subtitle?: string;
   readonly title: string;
 }) {
-  if (Platform.OS === "android") {
-    return (
-      <MaterialListRow
-        className="bg-grouped-card"
-        title={props.title}
-        subtitle={props.subtitle}
-        leading={
-          props.icon === "arrow.triangle.branch" ? (
-            <SymbolView
-              name="arrow.triangle.branch"
-              size={24}
-              tintColorClassName="accent-icon-muted"
-            />
-          ) : (
-            props.icon
-          )
-        }
-        trailing={
-          props.selected ? (
-            <SymbolView name="checkmark" size={20} tintColorClassName="accent-focus" />
-          ) : null
-        }
-        accessibilityRole="radio"
-        accessibilityState={{ checked: props.selected }}
-        disabled={props.disabled}
-        onPress={props.onPress}
-      />
-    );
-  }
   return (
     <Pressable
       accessibilityLabel={[props.title, props.subtitle].filter(Boolean).join(", ")}
@@ -126,13 +97,7 @@ function ToggleRow(props: {
 }) {
   return (
     <View className="min-h-14 flex-row items-center gap-3 bg-grouped-card px-4 py-3">
-      <Text
-        className={cn(
-          "min-w-0 flex-1 text-base text-foreground",
-          Platform.OS !== "android" && "font-t3-medium",
-        )}
-        numberOfLines={1}
-      >
+      <Text className="min-w-0 flex-1 text-base font-t3-medium text-foreground" numberOfLines={1}>
         {props.title}
       </Text>
       <ThemedSwitch
@@ -158,14 +123,8 @@ function BranchSelectionRow(props: {
   return (
     <View
       className={cn(
-        props.isFirst &&
-          (Platform.OS === "android"
-            ? "overflow-hidden rounded-t-[28px]"
-            : "overflow-hidden rounded-t-2xl"),
-        props.isLast &&
-          (Platform.OS === "android"
-            ? "overflow-hidden rounded-b-[28px]"
-            : "overflow-hidden rounded-b-2xl"),
+        props.isFirst && "overflow-hidden rounded-t-2xl",
+        props.isLast && "overflow-hidden rounded-b-2xl",
       )}
     >
       <SelectionRow
@@ -182,17 +141,7 @@ function BranchSelectionRow(props: {
 }
 
 function PickerSurface(props: { readonly children: ReactNode }) {
-  return (
-    <View
-      className={
-        Platform.OS === "android"
-          ? "overflow-hidden rounded-[24px] bg-grouped-card"
-          : "overflow-hidden rounded-2xl bg-grouped-card"
-      }
-    >
-      {props.children}
-    </View>
-  );
+  return <View className="overflow-hidden rounded-2xl bg-grouped-card">{props.children}</View>;
 }
 
 export function NewTaskEnvironmentPickerRouteScreen() {
@@ -234,7 +183,7 @@ export function NewTaskEnvironmentPickerRouteScreen() {
                     kind={resolveEnvironmentMachineKind(
                       serverConfigs.get(environment.environmentId) ?? null,
                     )}
-                    size={Platform.OS === "android" ? 24 : 17}
+                    size={17}
                     tintColorClassName="accent-icon-muted"
                   />
                 }
@@ -406,6 +355,7 @@ export function BranchPickerScreen(props: {
 }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const searchInput = useRef<TextInputInstance>(null);
   const usesNativeMailSearchToolbar = useNativeMailSearchToolbar();
   const selectedBranchName =
     props.selectedBranchName ??
@@ -447,12 +397,7 @@ export function BranchPickerScreen(props: {
   );
 
   const branchListHeader = props.worktree ? (
-    <View
-      className={cn(
-        "mb-3 overflow-hidden",
-        Platform.OS === "android" ? "rounded-[24px]" : "rounded-2xl",
-      )}
-    >
+    <View className="mb-3 overflow-hidden rounded-2xl">
       <ToggleRow
         onValueChange={props.worktree.onChangeStartFromOrigin}
         title="Start from origin"
@@ -538,19 +483,16 @@ export function BranchPickerScreen(props: {
           hideBottomBorder
           onBack={() => navigation.goBack()}
         />
-        <View className="px-4 pb-3 pt-1">
-          <TextInput
-            autoCapitalize="none"
-            autoCorrect={false}
+        {/* Stands in for the iOS navigation bar search field. */}
+        <View className="flex-row px-4 pb-3 pt-1">
+          <MaterialSearchField
+            inputRef={searchInput}
+            autoFocus={false}
             accessibilityLabel="Find a branch"
-            className="h-12 rounded-full border border-input-border bg-input px-4 font-sans text-base text-foreground"
-            selectionColorClassName="accent-focus/32"
-            cursorColorClassName="accent-focus"
-            selectionHandleColorClassName="accent-focus"
-            onChangeText={props.onQueryChange}
+            clearAccessibilityLabel="Clear branch search"
             placeholder="Find a branch"
-            placeholderTextColorClassName="accent-placeholder"
             value={props.query}
+            onChangeText={props.onQueryChange}
           />
         </View>
         <MaterialScreenContent>{branchContent}</MaterialScreenContent>

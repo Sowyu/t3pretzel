@@ -37,8 +37,9 @@ export function CompactBrandTitle(
       accessibilityLabel={props.accessibilityLabel ?? "T3 Code, Threads"}
       accessible
       role="heading"
-      className="flex-row items-center gap-1.5"
-      style={[{ marginLeft: titleOffset }, Platform.OS === "android" && { gap: 5.25 * scale }]}
+      className="flex-row items-center"
+      // scale is 1 on iOS; Android follows the app text size setting.
+      style={{ marginLeft: titleOffset, gap: 6 * scale }}
     >
       <T3Wordmark colorClassName="accent-icon" height={Math.round(15 * scale)} />
       <Text
@@ -49,12 +50,8 @@ export function CompactBrandTitle(
         Code
       </Text>
       <View
-        className="rounded-full bg-subtle px-1.5 py-0.5"
-        style={
-          Platform.OS === "android"
-            ? { paddingHorizontal: 5.25 * scale, paddingVertical: 1.75 * scale }
-            : undefined
-        }
+        className="rounded-full bg-subtle"
+        style={{ paddingHorizontal: 6 * scale, paddingVertical: 2 * scale }}
       >
         <Text
           allowFontScaling={props.allowFontScaling}
