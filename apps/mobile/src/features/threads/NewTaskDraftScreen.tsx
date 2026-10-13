@@ -65,6 +65,7 @@ import {
 } from "../../state/composer-attachment-uploads";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
 import { VideoPreviewModal, type VideoPreviewSource } from "../../components/VideoPreviewModal";
+import { usePromptStashMenu } from "./PromptStashSheet";
 import { ProviderIcon } from "../../components/ProviderIcon";
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
@@ -470,6 +471,10 @@ export function NewTaskDraftScreen(props: {
   const isImportingContext = flow.draftKey ? contextImports[flow.draftKey] === true : false;
   const isComposerInteractionLocked =
     isIncomingShareTransferPending || flow.submitting || isImportingContext;
+  const promptStash = usePromptStashMenu(
+    flow.draftKey ?? "",
+    flow.prompt.trim().length > 0 || flow.attachments.length > 0,
+  );
   // Hardware keyboard: step to the next machine, from the one a switch in
   // progress is heading to so repeated presses keep advancing.
   const { environments, selectedEnvironmentId, switchEnvironment, switchingToEnvironmentId } = flow;
@@ -1798,6 +1803,7 @@ export function NewTaskDraftScreen(props: {
                     )}
                     onPickMedia={handlePickMedia}
                     onPickFiles={handlePickFiles}
+                    stash={flow.draftKey ? promptStash.menu : undefined}
                   />
                   <View className="min-w-0 flex-1 flex-row items-center justify-end gap-2">
                     <View className="min-w-0 shrink">
@@ -1878,6 +1884,7 @@ export function NewTaskDraftScreen(props: {
           </ComposerDictationToolbar>
         </Animated.View>
       </ComposerSurface>
+      {promptStash.sheet}
       <VideoPreviewModal source={previewVideo} onRequestClose={closeMediaPreview} />
       <FilePreviewModal source={previewFile} onRequestClose={closeMediaPreview} />
     </View>

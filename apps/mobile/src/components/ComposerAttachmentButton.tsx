@@ -10,11 +10,34 @@ const ATTACHMENT_MENU_ACTIONS: MenuAction[] = [
   { id: "files", title: "Choose Files", image: "folder" },
 ];
 
+/** Prompt stash entries offered under the attachment menu. */
+export interface ComposerStashMenu {
+  readonly canStash: boolean;
+  readonly count: number;
+  readonly onStash: () => void;
+  readonly onOpen: () => void;
+}
+
+function stashMenuActions(stash: ComposerStashMenu): MenuAction[] {
+  return [
+    {
+      id: "stash",
+      title: "Stash prompt",
+      image: "tray.and.arrow.down",
+      attributes: { disabled: !stash.canStash },
+    },
+    ...(stash.count > 0
+      ? [{ id: "stashed", title: `Stashed prompts (${stash.count})`, image: "tray.full" }]
+      : []),
+  ];
+}
+
 export function ComposerAttachmentButton(props: {
   readonly disabled?: boolean;
   readonly supportsFiles: boolean;
   readonly onPickMedia: () => Promise<void>;
   readonly onPickFiles: () => Promise<void>;
+  readonly stash?: ComposerStashMenu;
 }) {
   const { scale } = useAndroidControlSizing();
   const button = (
@@ -24,7 +47,7 @@ export function ComposerAttachmentButton(props: {
       accessibilityState={{ disabled: props.disabled }}
       className="size-[44px] shrink-0 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
       disabled={props.disabled}
-      onPress={props.supportsFiles ? undefined : () => void props.onPickMedia()}
+      onPress={props.supportsFiles || props.stash ? undefined : () => void props.onPickMedia()}
     >
       <SymbolView
         name="plus"
@@ -36,21 +59,31 @@ export function ComposerAttachmentButton(props: {
     </Pressable>
   );
 
-  if (props.disabled || !props.supportsFiles) {
+  if (props.disabled || (!props.supportsFiles && !props.stash)) {
     return button;
   }
+  const attachmentActions = props.supportsFiles
+    ? ATTACHMENT_MENU_ACTIONS
+    : ATTACHMENT_MENU_ACTIONS.filter((action) => action.id === "photos");
+  const actions = props.stash
+    ? [...attachmentActions, ...stashMenuActions(props.stash)]
+    : attachmentActions;
 
   return (
     <ControlPillMenu
       accessible
       accessibilityLabel="Add attachment"
       accessibilityRole="button"
-      actions={ATTACHMENT_MENU_ACTIONS}
+      actions={actions}
       onPressAction={({ nativeEvent }) => {
         if (nativeEvent.event === "photos") {
           void props.onPickMedia();
         } else if (nativeEvent.event === "files") {
           void props.onPickFiles();
+        } else if (nativeEvent.event === "stash") {
+          props.stash?.onStash();
+        } else if (nativeEvent.event === "stashed") {
+          props.stash?.onOpen();
         }
       }}
     >

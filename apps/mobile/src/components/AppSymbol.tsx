@@ -123,6 +123,7 @@ import IconTextDecrease from "@tabler/icons-react-native/IconTextDecrease";
 import IconTextIncrease from "@tabler/icons-react-native/IconTextIncrease";
 import IconTool from "@tabler/icons-react-native/IconTool";
 import IconTrash from "@tabler/icons-react-native/IconTrash";
+import IconInbox from "@tabler/icons-react-native/IconInbox";
 import IconTypography from "@tabler/icons-react-native/IconTypography";
 import IconUpload from "@tabler/icons-react-native/IconUpload";
 import IconUserCircle from "@tabler/icons-react-native/IconUserCircle";
@@ -272,6 +273,8 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "textformat.size.larger": IconTextIncrease,
   "textformat.size.smaller": IconTextDecrease,
   "tray.and.arrow.up": IconUpload,
+  "tray.and.arrow.down": IconInbox,
+  "tray.full": IconStack2,
   trash: IconTrash,
   wifi: IconWifi,
   "wifi.slash": IconWifiOff,

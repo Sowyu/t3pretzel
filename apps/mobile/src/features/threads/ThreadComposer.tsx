@@ -108,6 +108,7 @@ import { ComposerCommandPopover } from "./ComposerCommandPopover";
 import { ComposerPopoverAnchor } from "./ComposerPopoverAnchor";
 import { ComposerQueuedEditAttachments } from "./ComposerQueuedEdit";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
+import { usePromptStashMenu } from "./PromptStashSheet";
 import {
   ComposerDictationCancelAction,
   ComposerDictationDraftContent,
@@ -472,6 +473,12 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
   // Content lives under the edit's own draft while a queued message is open;
   // the owner key still identifies this composer for settings and dictation.
   const composerDraftKey = props.draftKey ?? composerOwnerKey;
+  const promptStash = usePromptStashMenu(
+    composerDraftKey,
+    props.draftMessage.trim().length > 0 || props.draftAttachments.length > 0,
+  );
+  // A queued message being edited is not a draft the stash can take.
+  const stashMenu = queuedEdit === null ? promptStash.menu : undefined;
   const openDraftDocument = (attachment: ComposerDocumentAttachment) => {
     Keyboard.dismiss();
     navigation.navigate("ThreadAttachment", {
@@ -929,6 +936,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                 )}
                 onPickMedia={props.onPickDraftMedia}
                 onPickFiles={props.onPickDraftFiles}
+                stash={stashMenu}
               />
             ) : null}
             {isExpanded && queuedEdit !== null && queuedEdit.existingAttachments.length > 0 ? (
@@ -1215,6 +1223,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
                       )}
                       onPickMedia={props.onPickDraftMedia}
                       onPickFiles={props.onPickDraftFiles}
+                      stash={stashMenu}
                     />
                     <View className="min-w-0 shrink">
                       <ComposerInlineControl
@@ -1272,6 +1281,7 @@ export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposer
         ) : null}
       </Animated.View>
 
+      {promptStash.sheet}
       <VideoPreviewModal source={previewVideo} onRequestClose={closePreview} />
       <FilePreviewModal source={previewFile} onRequestClose={closePreview} />
     </Animated.View>
