@@ -4,8 +4,8 @@ export function useReviewHeaderPresentation(
   props: Parameters<typeof useIosReviewHeaderPresentation>[0],
 ): ReturnType<typeof useIosReviewHeaderPresentation> {
   return {
-    title: "Review changes",
-    subtitle: props.androidSubtitle || "Select a diff",
+    title: props.title,
+    subtitle: props.subtitle,
     gitMenu: null,
     menuIcon: "ellipsis",
     refreshAction: {

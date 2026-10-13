@@ -162,12 +162,7 @@ const SHOWCASE_ENABLED = process.env.EXPO_PUBLIC_SHOWCASE === "1";
 
 const ReviewNotice = memo(function ReviewNotice(props: { readonly notice: string }) {
   return (
-    <View
-      className={cn(
-        "bg-warning px-4 py-3",
-        Platform.OS === "android" ? "m-2 rounded-[20px]" : "border-b border-warning-border",
-      )}
-    >
+    <View className="border-b border-warning-border bg-warning px-4 py-3">
       <Text className="text-xs font-t3-bold uppercase text-warning-foreground">Partial diff</Text>
       <Text className="text-xs leading-normal text-warning-foreground">{props.notice}</Text>
     </View>
@@ -260,14 +255,9 @@ const ReviewFileNavigatorRow = memo(function ReviewFileNavigatorRow(props: {
       accessibilityRole="button"
       accessibilityState={{ selected }}
       className={
-        Platform.OS === "android"
-          ? cn(
-              "mt-1 min-h-12 justify-center rounded-[20px] px-3 py-2 active:bg-subtle",
-              selected && "bg-subtle-strong",
-            )
-          : selected
-            ? "mt-1 min-h-12 justify-center rounded-xl bg-subtle-strong px-3 py-2"
-            : "mt-1 min-h-12 justify-center rounded-xl px-3 py-2 active:bg-subtle"
+        selected
+          ? "mt-1 min-h-12 justify-center rounded-xl bg-subtle-strong px-3 py-2"
+          : "mt-1 min-h-12 justify-center rounded-xl px-3 py-2 active:bg-subtle"
       }
       onPress={handlePress}
     >
@@ -418,11 +408,7 @@ function ReviewFileNavigator({
   }
 
   return (
-    <View
-      className={
-        Platform.OS === "android" ? "flex-1 bg-sheet" : "flex-1 border-l border-border bg-sheet"
-      }
-    >
+    <View className="flex-1 border-l border-border bg-sheet">
       {Platform.OS === "android" ? (
         <AndroidScreenHeader
           title="Changed files"
@@ -658,13 +644,6 @@ export function ReviewSheet(props: ReviewSheetProps) {
       threadId: String(threadId),
     });
   }, [environmentId, navigation, threadId]);
-  const androidHeaderSubtitle = [
-    selectedSection?.title,
-    headerDiffSummary.additions,
-    headerDiffSummary.deletions,
-  ]
-    .filter((part): part is string => Boolean(part))
-    .join(" · ");
 
   // The changed-files navigator drives the native diff surface via
   // scrollToFile, so it is only useful when that surface resolved. In raw
@@ -685,13 +664,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
 
     if (error) {
       children.push(
-        <View
-          key="review-error"
-          className={cn(
-            "bg-card px-4 py-3",
-            Platform.OS === "android" ? "m-2 rounded-[20px]" : "border-b border-border",
-          )}
-        >
+        <View key="review-error" className="border-b border-border bg-card px-4 py-3">
           <Text className="text-sm font-t3-bold text-foreground">Review unavailable</Text>
           <Text className="text-xs leading-normal text-foreground-muted">{error}</Text>
         </View>,
@@ -726,7 +699,6 @@ export function ReviewSheet(props: ReviewSheetProps) {
         threadId={threadId}
         title={headerTitleText}
         subtitle={headerSubtitle}
-        androidSubtitle={androidHeaderSubtitle}
         iconColor={headerIcon}
         selectedThreadCwd={selectedThreadCwd}
         sectionMenu={sectionMenu}
@@ -804,11 +776,6 @@ export function ReviewSheet(props: ReviewSheetProps) {
             </View>
           ) : (
             <ScrollView
-              contentContainerStyle={
-                Platform.OS === "android" && (parsedDiff.kind === "empty" || !selectedSection)
-                  ? { flexGrow: 1, justifyContent: "center" }
-                  : undefined
-              }
               contentInsetAdjustmentBehavior="never"
               contentInset={{ top: topContentInset, bottom: bottomContentInset }}
               contentOffset={{ x: 0, y: -topContentInset }}
@@ -830,59 +797,27 @@ export function ReviewSheet(props: ReviewSheetProps) {
               {listHeader}
               {!selectedSection ? (
                 error ? null : (
-                  <View
-                    className={
-                      Platform.OS === "android"
-                        ? "items-center px-6 py-5"
-                        : "border-b border-border bg-card px-4 py-5"
-                    }
-                  >
+                  <View className="border-b border-border bg-card px-4 py-5">
                     <Text className="text-sm font-t3-bold text-foreground">No review diffs</Text>
-                    <Text
-                      className={cn(
-                        "text-xs leading-normal text-foreground-muted",
-                        Platform.OS === "android" && "mt-2 text-center",
-                      )}
-                    >
+                    <Text className="text-xs leading-normal text-foreground-muted">
                       This thread has no ready turn diffs and the worktree diff is empty.
                     </Text>
                   </View>
                 )
               ) : selectedSection.isLoading && selectedSection.diff === null ? (
-                <View
-                  className={cn(
-                    "items-center gap-3 px-4 py-6",
-                    Platform.OS !== "android" && "border-b border-border bg-card",
-                  )}
-                >
+                <View className="items-center gap-3 border-b border-border bg-card px-4 py-6">
                   <AppActivityIndicator size="small" />
                   <Text className="text-xs text-foreground-muted">Loading diff…</Text>
                 </View>
               ) : parsedDiff.kind === "empty" ? (
-                <View
-                  className={
-                    Platform.OS === "android"
-                      ? "items-center px-6 py-5"
-                      : "border-b border-border bg-card px-4 py-5"
-                  }
-                >
+                <View className="border-b border-border bg-card px-4 py-5">
                   <Text className="text-sm font-t3-bold text-foreground">No changes</Text>
-                  <Text
-                    className={cn(
-                      "text-xs leading-normal text-foreground-muted",
-                      Platform.OS === "android" && "mt-2 text-center",
-                    )}
-                  >
+                  <Text className="text-xs leading-normal text-foreground-muted">
                     {selectedSection.subtitle ?? "This diff is empty."}
                   </Text>
                 </View>
               ) : parsedDiff.kind === "raw" ? (
-                <View
-                  className={cn(
-                    "gap-3 bg-card px-4 py-4",
-                    Platform.OS === "android" ? "m-2 rounded-[20px]" : "border-b border-border",
-                  )}
-                >
+                <View className="gap-3 border-b border-border bg-card px-4 py-4">
                   <Text className="text-xs leading-normal text-foreground-muted">
                     {parsedDiff.reason}
                   </Text>
@@ -895,12 +830,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
               ) : parsedDiff.kind === "files" ? (
                 // The native diff surface could not be resolved on this binary;
                 // degrade to the raw patch instead of crashing the app.
-                <View
-                  className={cn(
-                    "gap-3 bg-card px-4 py-4",
-                    Platform.OS === "android" ? "m-2 rounded-[20px]" : "border-b border-border",
-                  )}
-                >
+                <View className="gap-3 border-b border-border bg-card px-4 py-4">
                   <Text className="text-xs leading-normal text-foreground-muted">
                     Native diff view unavailable. Showing the raw patch.
                   </Text>
