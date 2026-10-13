@@ -6,7 +6,7 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { useCallback } from "react";
 import { Alert } from "react-native";
 
-import { describePairingFailure } from "../features/connection/pairing";
+import { describePairingFailure } from "../lib/pairingFailure";
 import { useConnectionController } from "../features/connection/useConnectionController";
 import { environmentPresentations } from "./presentation";
 import { useWorkspaceConnectionState, useWorkspaceEnvironments } from "./workspace";
