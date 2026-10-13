@@ -90,6 +90,7 @@ function MenuRow({
   readonly onPress: () => void;
 }) {
   const { scale } = useAndroidControlSizing();
+  const { themeAppearance } = useAppearancePreferences();
   const iconSize = Math.round(18 * scale);
   const tint = props.disabled
     ? "accent-icon-subtle"
@@ -115,6 +116,8 @@ function MenuRow({
         gap: 10 * scale,
         paddingVertical: 10 * scale,
         borderTopWidth: props.separator ? StyleSheet.hairlineWidth : 0,
+        // The theme separator vanishes on the lifted dark menu fill.
+        ...(themeAppearance === "dark" ? { borderColor: "rgba(255, 255, 255, 0.08)" } : null),
       }}
     >
       {props.back ? (
@@ -159,7 +162,8 @@ function MenuRow({
  */
 export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const { scale, menuWidth: desiredMenuWidth } = useAndroidControlSizing();
-  const { themeVariables: colors } = useAppearancePreferences();
+  const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
+  const isDark = themeAppearance === "dark";
   const [anchor, setAnchor] = useState<AnchorSnapshot | null>(null);
   const [path, setPath] = useState<readonly MenuAction[]>([]);
   // Height of the overlay root. Menus that flip above their anchor are pinned
@@ -316,7 +320,11 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
                   borderWidth: StyleSheet.hairlineWidth,
                   // Solid: iOS blurs what is behind a menu, and without a blur any
                   // translucency lets the text underneath read through the items.
-                  backgroundColor: colors["--color-card-alt"],
+                  // Dark menus sit a step above the screen, like iOS's lighter dark menus.
+                  backgroundColor: isDark
+                    ? colors["--color-grouped-card"]
+                    : colors["--color-card-alt"],
+                  ...(isDark ? { borderColor: "rgba(255, 255, 255, 0.1)" } : null),
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.18)",
                   transformOrigin: `${opensDown ? "top" : "bottom"} ${alignsLeft ? "left" : "right"}`,
                   ...(opensDown
