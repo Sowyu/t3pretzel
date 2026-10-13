@@ -13,7 +13,8 @@ import { APP_BAR_HEIGHT } from "../../lib/layoutMetrics";
 import { themeColorWithAlpha } from "../../lib/mobileTheme";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
-import type { GitActionProgress } from "../../state/use-vcs-action-state";
+import { formatGitActionElapsed, type GitActionProgress } from "../../state/use-vcs-action-state";
+import { useVisibleSecondClock } from "./use-visible-second-clock";
 
 const OVERLAY_LAYOUT_TRANSITION = LinearTransition.duration(220);
 const OVERLAY_TOP_GAP = 8;
@@ -94,6 +95,8 @@ function OverlayContent(props: { readonly progress: GitActionProgress }) {
           <Text className="text-2xs text-foreground-muted" numberOfLines={1}>
             {progress.description}
           </Text>
+        ) : progress.runningSinceMs != null ? (
+          <ElapsedDescription sinceMs={progress.runningSinceMs} />
         ) : null}
       </View>
 
@@ -157,6 +160,17 @@ function OverlayContent(props: { readonly progress: GitActionProgress }) {
     >
       {content}
     </Animated.View>
+  );
+}
+
+// Owns the one-second clock so only this label repaints while an action runs.
+function ElapsedDescription(props: { readonly sinceMs: number }) {
+  const nowMs = useVisibleSecondClock(true);
+  const label = formatGitActionElapsed(props.sinceMs, nowMs);
+  return label === null ? null : (
+    <Text className="text-2xs text-foreground-muted" numberOfLines={1}>
+      {label}
+    </Text>
   );
 }
 

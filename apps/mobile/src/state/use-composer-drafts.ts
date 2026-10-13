@@ -58,6 +58,7 @@ import {
   type QueuedThreadMessage,
 } from "./thread-outbox-model";
 import { flushThreadOutbox, threadOutboxManager } from "./thread-outbox";
+import { promptStashAtom, waitForPromptStashLoaded } from "./prompt-stash";
 import { composerDraftEnvironmentId } from "../lib/composerAttachmentUploadQueue";
 
 const COMPOSER_DRAFTS_SCHEMA_VERSION = 1;
@@ -816,28 +817,11 @@ function signedOutAttachmentOwners() {
   ]);
 }
 
-interface ComposerAttachmentOwnerSource {
-  /** Loads the store, so an unhydrated one is never mistaken for an empty one. */
-  readonly hydrate: () => Promise<void>;
-  readonly owners: () => ReadonlyArray<{
-    readonly attachments: ReadonlyArray<DraftComposerAttachment>;
-  }>;
-}
-
-const extraAttachmentOwnerSources = new Set<ComposerAttachmentOwnerSource>();
-
-/**
- * Registers a store outside the drafts atom that also owns attachment files
- * (the prompt stash). Its attachments count as referenced, so the unused-file
- * sweep leaves their bytes alone. Sources register at module load; the sweep
- * hydrates them before it reads their owners.
- */
-export function registerComposerAttachmentOwnerSource(source: ComposerAttachmentOwnerSource): void {
-  extraAttachmentOwnerSources.add(source);
-}
-
-function extraAttachmentOwners() {
-  return [...extraAttachmentOwnerSources].flatMap((source) => source.owners());
+// A stashed attachment still owns its file, so the sweep reads the stash too.
+// Read directly rather than registered from the stash module: a registration
+// would only exist once something happened to load that module.
+function promptStashAttachmentOwners() {
+  return appAtomRegistry.get(promptStashAtom);
 }
 
 /** Clipboard fragments can refer to a local file that has not finished uploading yet. */
@@ -872,7 +856,7 @@ function isComposerAttachmentFileReferenced(fileUri: string): boolean {
     ...drafts,
     ...queuedMessages,
     ...signedOutAttachmentOwners(),
-    ...extraAttachmentOwners(),
+    ...promptStashAttachmentOwners(),
   ].some((owner) =>
     owner.attachments.some(
       (attachment) =>
@@ -894,7 +878,7 @@ function isComposerAttachmentUploadReferenced(
     ...drafts,
     ...queuedMessages,
     ...signedOutAttachmentOwners(),
-    ...extraAttachmentOwners(),
+    ...promptStashAttachmentOwners(),
   ].some((owner) =>
     owner.attachments.some(
       (attachment) =>
@@ -943,7 +927,7 @@ export async function releaseUnusedComposerAttachmentFiles(
   await flushThreadOutbox();
   // A stash that has not loaded yet looks like it owns nothing, and its files
   // would all read as unused. A failed load rejects here and skips the sweep.
-  await Promise.all([...extraAttachmentOwnerSources].map((source) => source.hydrate()));
+  await waitForPromptStashLoaded();
 
   const allFilesReferenced = [...candidates].every(isComposerAttachmentFileReferenced);
   const allUploadsReferenced = [...uploadCandidates].every(([environmentId, attachmentIds]) =>

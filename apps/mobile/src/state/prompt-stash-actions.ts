@@ -1,25 +1,12 @@
 import { appAtomRegistry } from "./atom-registry";
-import {
-  addPromptStashEntry,
-  promptStashAtom,
-  takePromptStashEntry,
-  waitForPromptStashLoaded,
-} from "./prompt-stash";
+import { addPromptStashEntry, promptStashAtom, takePromptStashEntry } from "./prompt-stash";
 import {
   clearComposerDraftContent,
   getComposerDraftSnapshot,
   mergeComposerDraftContent,
-  registerComposerAttachmentOwnerSource,
   scheduleUnusedComposerAttachmentCleanup,
   setComposerDraftText,
 } from "./use-composer-drafts";
-
-// A stashed attachment still owns its file. Without this the sweep that runs
-// when the composer is cleared would delete bytes only the stash points at.
-registerComposerAttachmentOwnerSource({
-  hydrate: waitForPromptStashLoaded,
-  owners: () => appAtomRegistry.get(promptStashAtom),
-});
 
 /**
  * Moves the draft's content into the stash. The composer is cleared only once

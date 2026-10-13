@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { type VcsActionState, type VcsActionTarget } from "@t3tools/client-runtime/state/vcs";
 import { Atom } from "effect/reactivity";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import { appAtomRegistry } from "./atom-registry";
 import { vcsActionManager } from "./vcs";
@@ -58,6 +58,12 @@ export interface GitActionProgress {
   readonly phase: GitActionProgressPhase;
   readonly label: string | null;
   readonly description: string | null;
+  /**
+   * When a running action without output started. The overlay ticks its own
+   * elapsed label from this, so the screen calling the hook never re-renders
+   * on a clock.
+   */
+  readonly runningSinceMs?: number | null;
   readonly prUrl?: string;
 }
 
@@ -67,9 +73,9 @@ const EMPTY_PROGRESS: GitActionProgress = {
   description: null,
 };
 
-function formatElapsedSeconds(ms: number | null): string | null {
-  if (ms === null) return null;
-  const elapsed = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+/** "Running for 12s", or null for the first two seconds. */
+export function formatGitActionElapsed(sinceMs: number, nowMs: number): string | null {
+  const elapsed = Math.max(0, Math.floor((nowMs - sinceMs) / 1000));
   if (elapsed < 2) return null;
   return `Running for ${elapsed}s`;
 }
@@ -77,50 +83,28 @@ function formatElapsedSeconds(ms: number | null): string | null {
 export function useGitActionProgress(target: VcsActionTarget): GitActionProgress {
   const actionState = useVcsActionState(target);
   const { result } = useGitActionResultNotification();
+  const running = actionState.isRunning;
+  const label = actionState.currentLabel;
+  const outputLine = actionState.lastOutputLine;
+  const runningSinceMs = actionState.hookStartedAtMs ?? actionState.phaseStartedAtMs;
 
-  const [, forceUpdate] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startElapsedTimer = useCallback(() => {
-    if (intervalRef.current) return;
-    intervalRef.current = setInterval(() => forceUpdate((n) => n + 1), 1000);
-  }, []);
-
-  const stopElapsedTimer = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  return useMemo((): GitActionProgress => {
+    if (running) {
+      return {
+        phase: "running",
+        label,
+        description: outputLine,
+        runningSinceMs: outputLine === null ? runningSinceMs : null,
+      };
     }
-  }, []);
-
-  useEffect(() => {
-    if (actionState.isRunning) {
-      startElapsedTimer();
-    } else {
-      stopElapsedTimer();
+    if (result) {
+      return {
+        phase: result.type,
+        label: result.title,
+        description: result.description ?? null,
+        prUrl: result.prUrl,
+      };
     }
-    return stopElapsedTimer;
-  }, [actionState.isRunning, startElapsedTimer, stopElapsedTimer]);
-
-  if (actionState.isRunning) {
-    const description =
-      actionState.lastOutputLine ??
-      formatElapsedSeconds(actionState.hookStartedAtMs ?? actionState.phaseStartedAtMs);
-    return {
-      phase: "running",
-      label: actionState.currentLabel,
-      description,
-    };
-  }
-
-  if (result) {
-    return {
-      phase: result.type,
-      label: result.title,
-      description: result.description ?? null,
-      prUrl: result.prUrl,
-    };
-  }
-
-  return EMPTY_PROGRESS;
+    return EMPTY_PROGRESS;
+  }, [label, outputLine, result, running, runningSinceMs]);
 }

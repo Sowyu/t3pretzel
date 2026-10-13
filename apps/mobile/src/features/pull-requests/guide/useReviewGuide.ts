@@ -2,6 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useFocusEffect } from "@react-navigation/native";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { useCallback, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { usePullRequestConnected } from "../usePullRequestConnected";
 import { composerPullRequests } from "../../../state/pull-requests";
 import { useEnvironmentQuery } from "../../../state/query";
@@ -38,7 +39,10 @@ export function useReviewGuide(params: PullRequestParams) {
       if (!enabled) return;
       refresh();
       if (!running) return;
-      const timer = setInterval(refresh, 5_000);
+      // A focused screen stays focused in the background; skip polls until the app is back.
+      const timer = setInterval(() => {
+        if (AppState.currentState === "active") refresh();
+      }, 5_000);
       return () => clearInterval(timer);
     }, [enabled, refresh, running]),
   );

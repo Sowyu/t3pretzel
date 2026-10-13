@@ -9,6 +9,9 @@ import {
   withRememberedModelOptions,
 } from "./use-model-option-memory";
 
+// The prompt stash behind the drafts store imports expo-crypto, which needs the RN runtime.
+vi.mock("expo-crypto", () => ({ randomUUID: () => "00000000-0000-4000-8000-000000000000" }));
+
 const XHIGH = [{ id: "thinking", value: "xhigh" }] as const;
 const HIGH = [{ id: "thinking", value: "high" }] as const;
 

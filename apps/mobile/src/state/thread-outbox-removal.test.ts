@@ -1,6 +1,9 @@
 import { CommandId, EnvironmentId, MessageId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
+// The prompt stash behind the drafts store imports expo-crypto, which needs the RN runtime.
+vi.mock("expo-crypto", () => ({ randomUUID: () => "00000000-0000-4000-8000-000000000000" }));
+
 const harness = vi.hoisted(() => ({
   cleanup: vi.fn(),
   clearDraft: vi.fn<typeof import("./use-composer-drafts").clearComposerDraft>(),

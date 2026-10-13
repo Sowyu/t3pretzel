@@ -34,9 +34,39 @@ const resolveShikiDependencyRoot = (packageName) => {
   return currentDir;
 };
 
+// Inline requires defer evaluating a module until its first use instead of at
+// startup, so screens and libraries off the first route cost nothing at cold
+// start. A module whose import-time side effects must happen eagerly needs a
+// bare `import "x"` (never inlined) or an entry below. Expo marks `expo`,
+// `expo-asset`, and `expo-task-manager` as having import-time side effects.
+const transformOptions = {
+  experimentalImportSupport: true,
+  inlineRequires: true,
+  nonInlinedRequires: [
+    "React",
+    "react",
+    "react/jsx-dev-runtime",
+    "react/jsx-runtime",
+    "react-compiler-runtime",
+    "react-native",
+    "expo",
+    "expo-asset",
+    "expo-task-manager",
+  ],
+};
+config.transformer = {
+  ...config.transformer,
+  getTransformOptions: async () => ({ transform: transformOptions }),
+};
 config.watchFolders = [...new Set([...(config.watchFolders ?? []), workspaceRoot])];
 config.resolver = {
   ...config.resolver,
+  // Inline requires turn ESM imports into require calls before dependencies are
+  // collected, so workspace packages that only export an "import" condition
+  // would stop resolving.
+  unstable_conditionNames: [
+    ...new Set([...(config.resolver?.unstable_conditionNames ?? ["require"]), "import"]),
+  ],
   blockList: [
     ...(Array.isArray(config.resolver?.blockList)
       ? config.resolver.blockList

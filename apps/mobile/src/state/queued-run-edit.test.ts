@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   ChatAttachmentId,
   ComposerContextId,
@@ -11,6 +11,9 @@ import {
 import { composerDraftEnvironmentId } from "../lib/composerAttachmentUploadQueue";
 import { isQueuedEditDraftKey, queuedEditDraftKey } from "./queued-edit-draft-key";
 import { resolveQueuedEditPayload, type QueuedRunEdit } from "./queued-run-edit";
+
+// The prompt stash behind the drafts store imports expo-crypto, which needs the RN runtime.
+vi.mock("expo-crypto", () => ({ randomUUID: () => "00000000-0000-4000-8000-000000000000" }));
 
 const image = (id: string): ChatAttachment => ({
   type: "image",
