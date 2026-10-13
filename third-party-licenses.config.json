@@ -129,6 +129,21 @@
       ]
     },
     {
+      "bundles": ["android", "mobile"],
+      "license": "Apache-2.0",
+      "name": "AndroidLiquidGlass",
+      "sourceUrl": "https://github.com/Kyant0/AndroidLiquidGlass",
+      "generatedNotices": [
+        {
+          "licenseId": "Apache-2.0",
+          "preamble": [
+            "The Android Liquid Glass lens, rim and press-highlight shaders in apps/mobile/modules/t3-liquid-glass are ported from AndroidLiquidGlass by Kyant:\nhttps://github.com/Kyant0/AndroidLiquidGlass"
+          ],
+          "copyrights": ["Copyright 2025 Kyant"]
+        }
+      ]
+    },
+    {
       "bundles": ["mobile"],
       "license": "MIT",
       "name": "react-native-uitextview",

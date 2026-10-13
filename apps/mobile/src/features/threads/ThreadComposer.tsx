@@ -76,6 +76,7 @@ import {
 } from "../../components/ComposerAttachmentStrip";
 import { VideoPreviewModal, type VideoPreviewSource } from "../../components/VideoPreviewModal";
 import { GlassSurface } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { ComposerEditor, type ComposerEditorHandle } from "../../components/ComposerEditor";
 import { fileRoutePathSegments } from "../files/filePath";
 import {
@@ -326,6 +327,9 @@ export function ComposerSurface(props: {
   const colors = useUniwindTheme();
   const { themeAppearance } = useAppearancePreferences();
   const isAndroid = Platform.OS === "android";
+  // Android Liquid Glass replaces the opaque fill, border and elevation.
+  const glassTier = useLiquidGlass().tier;
+  const androidGlass = isAndroid && glassTier !== "none";
   const targetBorderRadius =
     typeof props.style.borderRadius === "number" ? props.style.borderRadius : 0;
   const animatedBorderRadius = useSharedValue(targetBorderRadius);
@@ -348,16 +352,18 @@ export function ComposerSurface(props: {
   return (
     <Animated.View
       className={
-        isAndroid
-          ? themeAppearance === "dark"
-            ? "border border-white/10"
-            : "border border-composer-border"
-          : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
+        androidGlass
+          ? undefined
+          : isAndroid
+            ? themeAppearance === "dark"
+              ? "border border-white/10"
+              : "border border-composer-border"
+            : "shadow-[0_6px_28px] shadow-adaptive-black-a15-a35"
       }
       layout={layoutTransition}
       style={[
         animatedShapeStyle,
-        isAndroid
+        isAndroid && !androidGlass
           ? {
               overflow: "hidden",
               // Static lift in place of the iOS shadow. The fill is opaque: Android
@@ -369,6 +375,15 @@ export function ComposerSurface(props: {
           : { overflow: "hidden" },
       ]}
     >
+      {androidGlass ? (
+        <GlassSurface
+          chrome="none"
+          pointerEvents="none"
+          style={{ position: "absolute", inset: 0, borderRadius: targetBorderRadius }}
+        >
+          {null}
+        </GlassSurface>
+      ) : null}
       {isAndroid ? null : (
         <AnimatedGlassSurface
           chrome="none"

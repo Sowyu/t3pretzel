@@ -1,21 +1,15 @@
 import { createContext, use, useState, type ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  View,
-  type ColorValue,
-  type ViewStyle,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View, type ColorValue } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import type { AppSymbolName } from "./AppSymbol";
 import { SymbolView } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
 import { cn } from "../lib/cn";
-import { themeColorWithMinimumAlpha } from "../lib/mobileTheme";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
+import { GlassSurface } from "./GlassSurface";
+import { useLiquidGlass } from "./useLiquidGlass";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
 
@@ -28,6 +22,9 @@ export interface AndroidHeaderAction {
   readonly selected?: boolean;
 }
 
+/** How far the scroll-edge band reaches below the bar, matching the static scrim's fade. */
+const SCROLL_EDGE_FADE = 24;
+
 /** Buttons inside a shared capsule drop their own surface and become 44dp slots. */
 const InHeaderCapsuleContext = createContext(false);
 
@@ -38,27 +35,35 @@ function useHeaderButtonSize() {
 }
 
 /**
- * The GlassSurface look without live blur: an opaque theme fill, a hairline
- * edge and a small lift. Shared by the circle and the capsule.
+ * Header glass: real Liquid Glass when the device and setting allow it,
+ * otherwise an opaque theme fill with a hairline edge and a small lift.
+ * Shared by the circle and the capsule; both swell under the finger.
  */
-function useHeaderGlassSurface(size: number) {
-  const { themeAppearance, themeVariables } = useAppearancePreferences();
-  const fill = themeVariables["--color-glass-fallback"];
-  return {
-    className: themeAppearance === "dark" ? "border-white/10" : "border-border",
-    style: {
-      height: size,
-      minWidth: size,
-      borderRadius: size / 2,
-      borderWidth: StyleSheet.hairlineWidth,
-      backgroundColor: typeof fill === "string" ? themeColorWithMinimumAlpha(fill, 1) : fill,
-      elevation: 2,
-    } satisfies ViewStyle,
-  };
+function HeaderGlass(props: { readonly size: number; readonly children: ReactNode }) {
+  const { themeAppearance } = useAppearancePreferences();
+  return (
+    <GlassSurface
+      chrome="none"
+      interactive
+      shape="capsule"
+      fallbackClassName={themeAppearance === "dark" ? "border-white/10" : "border-border"}
+      className="flex-row items-center"
+      style={{
+        height: props.size,
+        minWidth: props.size,
+        borderRadius: props.size / 2,
+        borderWidth: StyleSheet.hairlineWidth,
+        elevation: 2,
+        gap: 2,
+      }}
+    >
+      {props.children}
+    </GlassSurface>
+  );
 }
 
 /**
- * The iOS 26 bar button: a 44dp opaque glass circle. Inside an
+ * The iOS 26 bar button: a 44dp glass circle. Inside an
  * AndroidHeaderButtonGroup it renders as one bare slot of the shared capsule.
  */
 export function AndroidHeaderIconButton(props: {
@@ -70,7 +75,8 @@ export function AndroidHeaderIconButton(props: {
 }) {
   const inCapsule = use(InHeaderCapsuleContext);
   const { scale, size } = useHeaderButtonSize();
-  const surface = useHeaderGlassSurface(size);
+  // Glass buttons answer a press by swelling, not by dimming.
+  const glass = useLiquidGlass().tier !== "none";
   const icon = (
     <SymbolView
       name={props.icon}
@@ -79,18 +85,15 @@ export function AndroidHeaderIconButton(props: {
       type="monochrome"
     />
   );
-  return (
+  const button = (
     <Pressable
       accessibilityLabel={props.accessibilityLabel}
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(props.disabled), selected: props.selected }}
       disabled={props.disabled}
       onPress={props.onPress}
-      className={cn(
-        "items-center justify-center rounded-full active:opacity-50",
-        !inCapsule && surface.className,
-      )}
-      style={inCapsule ? { width: size, height: size } : [surface.style, { width: size }]}
+      className={cn("items-center justify-center rounded-full", !glass && "active:opacity-50")}
+      style={{ width: size, height: size }}
     >
       {props.selected ? (
         <View
@@ -104,19 +107,16 @@ export function AndroidHeaderIconButton(props: {
       )}
     </Pressable>
   );
+  return inCapsule ? button : <HeaderGlass size={size}>{button}</HeaderGlass>;
 }
 
 /** One glass capsule around several bar buttons; a single button reads as a circle. */
 export function AndroidHeaderButtonGroup(props: { readonly children: ReactNode }) {
   const { size } = useHeaderButtonSize();
-  const surface = useHeaderGlassSurface(size);
   return (
-    <View
-      className={cn("flex-row items-center", surface.className)}
-      style={[surface.style, { gap: 2 }]}
-    >
+    <HeaderGlass size={size}>
       <InHeaderCapsuleContext value>{props.children}</InHeaderCapsuleContext>
-    </View>
+    </HeaderGlass>
   );
 }
 
@@ -178,6 +178,7 @@ export function AndroidScreenHeader(props: {
   readonly hideBottomBorder?: boolean;
 }) {
   const { scale, size } = useHeaderButtonSize();
+  const liquid = useLiquidGlass().tier !== "none";
   const { height: toolbarHeight, ...headerPadding } = useMaterialToolbarLayout(props.embedded);
   const [headerWidth, setHeaderWidth] = useState(0);
   const [sideWidths, setSideWidths] = useState({ leading: 0, trailing: 0 });
@@ -322,13 +323,36 @@ export function AndroidScreenHeader(props: {
   );
 
   if (!props.overlay) return bar;
+  const barHeight = headerPadding.paddingTop + toolbarHeight + headerPadding.paddingBottom;
   return (
     <View pointerEvents="box-none" className="absolute inset-x-0 top-0" style={{ zIndex: 10 }}>
       <HeaderScrim
         color={props.overlay.color}
         safeTop={headerPadding.paddingTop}
-        height={headerPadding.paddingTop + toolbarHeight + headerPadding.paddingBottom}
+        height={barHeight}
       />
+      {liquid ? (
+        // iOS 26's scroll-edge effect: content under the bar is blurred and
+        // fades into the screen color, so the title stays legible. It covers
+        // the static scrim when a backdrop is under it.
+        <GlassSurface
+          chrome="none"
+          variant="edge"
+          pointerEvents="none"
+          tintColor={props.overlay.color}
+          edgeFadeStart={barHeight / (barHeight + SCROLL_EDGE_FADE)}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: barHeight + SCROLL_EDGE_FADE,
+            borderRadius: 0,
+          }}
+        >
+          {null}
+        </GlassSurface>
+      ) : null}
       {bar}
     </View>
   );

@@ -6,9 +6,10 @@ import { useKeyboardState } from "react-native-keyboard-controller";
 
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView, type AppSymbolName } from "../../components/AppSymbol";
+import { GlassSurface } from "../../components/GlassSurface";
+import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import { cn } from "../../lib/cn";
-import { themeColorWithMinimumAlpha } from "../../lib/mobileTheme";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import type { WorkspaceTab } from "./workspace-tabs-state";
 
@@ -47,20 +48,15 @@ const TABS: ReadonlyArray<{
 ];
 
 /**
- * The header's glass look at tab-bar scale: an opaque glass fill (no live blur
- * on Android, and a translucent fill shows the shadow through as a halo), a
- * hairline edge, and a fixed elevation.
+ * The fallback look when real glass is off: an opaque glass fill (a
+ * translucent fill shows the shadow through as a halo), a hairline edge, and
+ * a fixed elevation. Real glass drops all three for its own rim.
  */
 function useTabBarGlass() {
-  const { themeAppearance, themeVariables } = useAppearancePreferences();
-  const fill = themeVariables["--color-glass-fallback"];
+  const { themeAppearance } = useAppearancePreferences();
   return {
-    className: themeAppearance === "dark" ? "border-white/10" : "border-border",
-    style: {
-      borderWidth: StyleSheet.hairlineWidth,
-      backgroundColor: typeof fill === "string" ? themeColorWithMinimumAlpha(fill, 1) : fill,
-      elevation: 6,
-    } satisfies ViewStyle,
+    fallbackClassName: themeAppearance === "dark" ? "border-white/10" : "border-border",
+    style: { borderWidth: StyleSheet.hairlineWidth, elevation: 6 } satisfies ViewStyle,
   };
 }
 
@@ -79,6 +75,9 @@ export const AndroidWorkspaceNavigation = memo(function AndroidWorkspaceNavigati
   const keyboardVisible = useKeyboardState((state) => state.isVisible);
   const { scale } = useAndroidControlSizing();
   const glass = useTabBarGlass();
+  // Real glass draws its own sliding selection lens; the fallback keeps the pill.
+  const liquid = useLiquidGlass().tier !== "none";
+  const selectedIndex = TABS.findIndex((item) => item.tab === props.selectedTab);
   if (keyboardVisible) return null;
   const height = ANDROID_WORKSPACE_TAB_BAR_HEIGHT * Math.max(1, scale);
   const iconSize = Math.round(24 * scale);
@@ -93,10 +92,22 @@ export const AndroidWorkspaceNavigation = memo(function AndroidWorkspaceNavigati
         gap: GAP,
       }}
     >
-      <View
+      <GlassSurface
         accessibilityRole="tablist"
-        className={cn("flex-1 flex-row rounded-full", glass.className)}
-        style={[glass.style, { height, padding: PILL_INSET }]}
+        chrome="none"
+        shape="capsule"
+        fallbackClassName={glass.fallbackClassName}
+        className="flex-1 flex-row"
+        style={[glass.style, { height, padding: PILL_INSET, borderRadius: height / 2 }]}
+        tabs={{
+          count: TABS.length,
+          selected: Math.max(0, selectedIndex),
+          inset: PILL_INSET,
+          onSelect: (index) => {
+            const tab = TABS[index]?.tab;
+            if (tab && tab !== props.selectedTab) props.onSelect(tab);
+          },
+        }}
       >
         {TABS.map((item) => {
           const selected = props.selectedTab === item.tab;
@@ -111,8 +122,9 @@ export const AndroidWorkspaceNavigation = memo(function AndroidWorkspaceNavigati
                 if (!selected) props.onSelect(item.tab);
               }}
               className={cn(
-                "flex-1 items-center justify-center rounded-full active:opacity-60",
-                selected && "bg-foreground/10",
+                "flex-1 items-center justify-center rounded-full",
+                !liquid && "active:opacity-60",
+                !liquid && selected && "bg-foreground/10",
               )}
               style={{ gap: 1 * scale }}
             >
@@ -132,27 +144,31 @@ export const AndroidWorkspaceNavigation = memo(function AndroidWorkspaceNavigati
             </Pressable>
           );
         })}
-      </View>
-      <Pressable
-        accessibilityLabel="New chat"
-        accessibilityRole="button"
-        onPress={() => {
-          Keyboard.dismiss();
-          navigation.navigate("NewTaskSheet", { screen: "NewTask" });
-        }}
-        className={cn(
-          "items-center justify-center rounded-full active:opacity-60",
-          glass.className,
-        )}
-        style={[glass.style, { width: height, height }]}
+      </GlassSurface>
+      <GlassSurface
+        chrome="none"
+        interactive
+        shape="circle"
+        fallbackClassName={glass.fallbackClassName}
+        style={[glass.style, { width: height, height, borderRadius: height / 2 }]}
       >
-        <SymbolView
-          name="square.and.pencil"
-          size={iconSize}
-          tintColorClassName="accent-foreground"
-          type="monochrome"
-        />
-      </Pressable>
+        <Pressable
+          accessibilityLabel="New chat"
+          accessibilityRole="button"
+          onPress={() => {
+            Keyboard.dismiss();
+            navigation.navigate("NewTaskSheet", { screen: "NewTask" });
+          }}
+          className={cn("flex-1 items-center justify-center", !liquid && "active:opacity-60")}
+        >
+          <SymbolView
+            name="square.and.pencil"
+            size={iconSize}
+            tintColorClassName="accent-foreground"
+            type="monochrome"
+          />
+        </Pressable>
+      </GlassSurface>
     </View>
   );
 });

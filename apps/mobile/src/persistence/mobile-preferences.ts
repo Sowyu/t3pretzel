@@ -99,6 +99,8 @@ export interface Preferences {
   readonly backgroundRefreshEnabled?: boolean;
   /** Android only. Local alerts for finished turns that no relay push covers. Unset means on. */
   readonly turnNotificationsEnabled?: boolean;
+  /** Android only. Real Liquid Glass on glass surfaces. Unset means on. */
+  readonly liquidGlassEnabled?: boolean;
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -169,6 +171,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     pullRequestListFilters?: PullRequestListPreferences;
     backgroundRefreshEnabled?: boolean;
     turnNotificationsEnabled?: boolean;
+    liquidGlassEnabled?: boolean;
   } = {};
 
   if (typeof parsed.pullRequestHideTestFiles === "boolean") {
@@ -294,6 +297,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.turnNotificationsEnabled === "boolean") {
     preferences.turnNotificationsEnabled = parsed.turnNotificationsEnabled;
+  }
+  if (typeof parsed.liquidGlassEnabled === "boolean") {
+    preferences.liquidGlassEnabled = parsed.liquidGlassEnabled;
   }
   return preferences;
 }

@@ -24,7 +24,9 @@ import { cn } from "../lib/cn";
 import { menuSections } from "./menuSections";
 import { AppText as Text } from "./AppText";
 import { isAppSymbolName, SymbolView } from "./AppSymbol";
+import { GlassSurface } from "./GlassSurface";
 import { OverlayPortal } from "./OverlayPortal";
+import { useLiquidGlass } from "./useLiquidGlass";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
 const SCREEN_MARGIN = 12;
@@ -228,6 +230,7 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const desiredMenuWidth = props.popover ? (props.popoverWidth ?? menuWidth) : menuWidth;
   const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
   const isDark = themeAppearance === "dark";
+  const liquid = useLiquidGlass().tier !== "none";
   const [anchor, setAnchor] = useState<AnchorSnapshot | null>(null);
   const [path, setPath] = useState<readonly MenuAction[]>([]);
   // Height of the overlay root. Menus that flip above their anchor are pinned
@@ -382,13 +385,16 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
                   maxHeight,
                   width: cardWidth,
                   borderRadius: 24,
-                  borderWidth: StyleSheet.hairlineWidth,
-                  // Solid: iOS blurs what is behind a menu, and without a blur any
-                  // translucency lets the text underneath read through the items.
-                  // Dark menus sit a step above the screen, like iOS's lighter dark menus.
-                  backgroundColor: isDark
-                    ? colors["--color-grouped-card"]
-                    : colors["--color-card-alt"],
+                  // Glass draws its own rim. Without glass the card is solid: any
+                  // translucency without a blur lets the text underneath read
+                  // through the items. Dark menus sit a step above the screen,
+                  // like iOS's lighter dark menus.
+                  borderWidth: liquid ? 0 : StyleSheet.hairlineWidth,
+                  backgroundColor: liquid
+                    ? "transparent"
+                    : isDark
+                      ? colors["--color-grouped-card"]
+                      : colors["--color-card-alt"],
                   borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
                   boxShadow: isDark
                     ? "0 16px 48px rgba(0, 0, 0, 0.55)"
@@ -399,6 +405,16 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
                     : { bottom: (overlay?.height ?? 0) - local.y + ANCHOR_GAP }),
                 }}
               >
+                {liquid ? (
+                  <GlassSurface
+                    chrome="none"
+                    variant="menu"
+                    pointerEvents="none"
+                    style={{ position: "absolute", inset: 0, borderRadius: 24 }}
+                  >
+                    {null}
+                  </GlassSurface>
+                ) : null}
                 {props.popover ? (
                   props.popover(close)
                 ) : (

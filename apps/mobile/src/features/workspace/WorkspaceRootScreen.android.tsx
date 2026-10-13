@@ -5,6 +5,7 @@ import { ScreenContainer } from "react-native-screens";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { EmptyState } from "../../components/EmptyState";
+import { GlassBackdropSource } from "../../components/GlassBackdropSource";
 import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import { HomeRouteScreen } from "../home/HomeRouteScreen";
 import { PullRequestsScreen } from "../pull-requests/PullRequestsScreen";
@@ -71,17 +72,20 @@ export function WorkspaceRootScreen() {
     <View className="flex-1 bg-screen">
       <NativeStackScreenOptions options={{ headerShown: false }} />
       <SafeAreaInsetsContext value={listInsets}>
-        <ScreenContainer enabled hasTwoStates style={{ flex: 1 }}>
-          <AndroidRetainedTab active={selectedTab === "threads"} workspace={threadsContext}>
-            {THREADS_TAB}
-          </AndroidRetainedTab>
-          <AndroidRetainedTab
-            active={selectedTab === "pullRequests"}
-            workspace={pullRequestsContext}
-          >
-            {PULL_REQUESTS_TAB}
-          </AndroidRetainedTab>
-        </ScreenContainer>
+        {/* The floating tab bar refracts the lists under it. */}
+        <GlassBackdropSource style={{ flex: 1 }}>
+          <ScreenContainer enabled hasTwoStates style={{ flex: 1 }}>
+            <AndroidRetainedTab active={selectedTab === "threads"} workspace={threadsContext}>
+              {THREADS_TAB}
+            </AndroidRetainedTab>
+            <AndroidRetainedTab
+              active={selectedTab === "pullRequests"}
+              workspace={pullRequestsContext}
+            >
+              {PULL_REQUESTS_TAB}
+            </AndroidRetainedTab>
+          </ScreenContainer>
+        </GlassBackdropSource>
       </SafeAreaInsetsContext>
       <AndroidWorkspaceNavigation selectedTab={selectedTab} onSelect={selectTab} />
     </View>

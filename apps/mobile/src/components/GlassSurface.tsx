@@ -1,7 +1,9 @@
 import { GlassView, isGlassEffectAPIAvailable } from "expo-glass-effect";
-import type { ReactNode, Ref } from "react";
+import type { ComponentType, ReactNode, Ref } from "react";
 import {
   Platform,
+  processColor,
+  StyleSheet,
   View,
   type ColorValue,
   type ViewInstance,
@@ -10,16 +12,40 @@ import {
 } from "react-native";
 import { withUniwind } from "uniwind";
 
+import { liquidGlassView, type LiquidGlassViewProps } from "../../modules/t3-liquid-glass";
 import { cn } from "../lib/cn";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
-import { themeColorWithMinimumAlpha } from "../lib/mobileTheme";
+import { themeColorWithAlpha, themeColorWithMinimumAlpha } from "../lib/mobileTheme";
 import { GlassBackdrop } from "./GlassBackdrop";
+import { useLiquidGlass } from "./useLiquidGlass";
 
 // Explicit mappings keep the native glassEffectStyle enum out of style-array conversion.
 const ThemedGlassView = withUniwind(GlassView, {
   style: { fromClassName: "className" },
   tintColor: { fromClassName: "tintColorClassName", styleProperty: "accentColor" },
 });
+
+type ThemedLiquidGlassProps = LiquidGlassViewProps & {
+  readonly className?: string;
+  readonly ref?: Ref<ViewInstance>;
+};
+const NativeLiquidGlass = liquidGlassView();
+const ThemedLiquidGlass = NativeLiquidGlass
+  ? (withUniwind(NativeLiquidGlass) as unknown as ComponentType<ThemedLiquidGlassProps>)
+  : null;
+
+/** The tab-bar preset: a sliding, draggable selection lens over `count` equal tabs. */
+interface GlassTabs {
+  readonly count: number;
+  readonly selected: number;
+  /** Padding between the bar edge and the indicator, in dp. */
+  readonly inset: number;
+  readonly onSelect: (index: number) => void;
+}
+
+function toColorInt(color: ColorValue) {
+  return Number(processColor(color) ?? 0);
+}
 
 interface GlassSurfaceProps extends ViewProps {
   readonly ref?: Ref<ViewInstance>;
@@ -32,6 +58,19 @@ interface GlassSurfaceProps extends ViewProps {
   readonly fallbackColor?: ColorValue;
   /** Uniwind styling used only when native Liquid Glass is unavailable. */
   readonly fallbackClassName?: string;
+  /** Android Liquid Glass shape; defaults to a continuous-corner rect from `borderRadius`. */
+  readonly shape?: "circle" | "capsule" | "roundedRect";
+  /** Android: the glass swells and glows under the finger while pressed (iOS glass buttons). */
+  readonly interactive?: boolean;
+  /**
+   * Android: "menu" is the thicker, more opaque material of context menus.
+   * "edge" is iOS's scroll-edge band under a floating header: blurred backdrop
+   * under `tintColor` (the screen color), fading out from `edgeFadeStart`.
+   */
+  readonly variant?: "regular" | "menu" | "edge";
+  /** Fraction of the "edge" band's height where it starts fading out. */
+  readonly edgeFadeStart?: number;
+  readonly tabs?: GlassTabs;
 }
 
 export function GlassSurface({
@@ -43,11 +82,17 @@ export function GlassSurface({
   tintColorClassName,
   fallbackColor,
   fallbackClassName,
+  shape = "roundedRect",
+  interactive = false,
+  variant = "regular",
+  edgeFadeStart = 0.7,
+  tabs,
   className,
   style,
   ...props
 }: GlassSurfaceProps) {
   const { themeAppearance, themeVariables } = useAppearancePreferences();
+  const { tier } = useLiquidGlass();
   const isDarkMode = themeAppearance === "dark";
   const isAndroid = Platform.OS === "android";
   const supportsGlass = Platform.OS === "ios" && isGlassEffectAPIAvailable();
@@ -83,6 +128,55 @@ export function GlassSurface({
       >
         {children}
       </ThemedGlassView>
+    );
+  }
+
+  if (ThemedLiquidGlass && isAndroid && tier !== "none") {
+    // Real glass has no Material shadow or border: the native rim replaces both.
+    const {
+      elevation: _elevation,
+      borderWidth: _borderWidth,
+      borderColor: _borderColor,
+      shadowColor: _shadowColor,
+      shadowOpacity: _shadowOpacity,
+      shadowRadius: _shadowRadius,
+      shadowOffset: _shadowOffset,
+      boxShadow: _boxShadow,
+      backgroundColor: _backgroundColor,
+      ...glassStyle
+    } = StyleSheet.flatten(style) ?? {};
+    const fill = fallbackColor ?? themeVariables["--color-glass-fallback"];
+    const tint =
+      variant === "edge"
+        ? themeColorWithAlpha(String(tintColor ?? themeVariables["--color-screen"]), 0.86)
+        : themeColorWithAlpha(
+            themeVariables["--color-glass-surface"],
+            variant === "menu" ? (isDarkMode ? 0.74 : 0.8) : isDarkMode ? 0.4 : 0.46,
+          );
+    const borderRadius = typeof glassStyle.borderRadius === "number" ? glassStyle.borderRadius : 32;
+    return (
+      <ThemedLiquidGlass
+        {...props}
+        ref={ref}
+        className={className}
+        style={[{ borderRadius }, glassStyle]}
+        shape={shape}
+        cornerRadius={borderRadius}
+        tintColor={toColorInt(tint)}
+        fallbackColor={toColorInt(
+          typeof fill === "string" ? themeColorWithMinimumAlpha(fill, 1) : fill,
+        )}
+        dark={isDarkMode}
+        blurRadius={variant === "menu" ? 12 : variant === "edge" ? 8 : 4}
+        edgeFadeStart={variant === "edge" ? edgeFadeStart : -1}
+        interactive={interactive}
+        tabCount={tabs?.count ?? 0}
+        selectedTab={tabs?.selected ?? 0}
+        tabInset={tabs?.inset ?? 0}
+        onTabSelect={tabs ? (event) => tabs.onSelect(event.nativeEvent.index) : undefined}
+      >
+        {children}
+      </ThemedLiquidGlass>
     );
   }
 

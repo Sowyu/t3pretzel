@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Pressable } from "react-native";
+import { Pressable, processColor, View } from "react-native";
 import Animated, {
   Easing,
   interpolateColor,
@@ -9,8 +9,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { liquidToggleView } from "../../modules/t3-liquid-glass";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import type { ThemedSwitchProps } from "./ThemedSwitch";
+import { useLiquidGlass } from "./useLiquidGlass";
 
 // iOS 26 UISwitch geometry: a 63x28 track with a 37x24 pill thumb.
 const TRACK_WIDTH = 63;
@@ -26,12 +28,69 @@ const OFF_TRACK_DARK = "rgba(120, 120, 128, 0.32)";
 // Pads the 28dp track out to Android's 48dp minimum touch target.
 const HIT_SLOP = { top: 10, bottom: 10, left: 4, right: 4 };
 
+const LiquidToggle = liquidToggleView();
+
+/** Kyant's LiquidToggle when Liquid glass is on, otherwise the JS switch. */
+export function ThemedSwitch(props: ThemedSwitchProps) {
+  const liquid = useLiquidGlass().tier !== "none";
+  return LiquidToggle && liquid ? <LiquidSwitch {...props} /> : <JsSwitch {...props} />;
+}
+
+/**
+ * The native glass switch. It owns the gesture (tap toggles, the thumb drags);
+ * this wrapper owns accessibility and pads the 63x28dp track to a 48dp target.
+ */
+function LiquidSwitch(props: ThemedSwitchProps) {
+  const { themeVariables: colors, themeAppearance } = useAppearancePreferences();
+  const value = Boolean(props.value);
+  const disabled = Boolean(props.disabled);
+  if (!LiquidToggle) return null;
+  return (
+    <View
+      accessible
+      accessibilityRole="switch"
+      accessibilityLabel={props.accessibilityLabel}
+      accessibilityHint={props.accessibilityHint}
+      accessibilityState={{ checked: value, disabled }}
+      accessibilityActions={[{ name: "activate" }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "activate" && !disabled) {
+          props.onValueChange?.(!value);
+        }
+      }}
+      style={[
+        {
+          width: TRACK_WIDTH + HIT_SLOP.left + HIT_SLOP.right,
+          height: TRACK_HEIGHT + HIT_SLOP.top + HIT_SLOP.bottom,
+          marginHorizontal: -HIT_SLOP.left,
+          marginVertical: -HIT_SLOP.top,
+          opacity: disabled ? 0.5 : 1,
+        },
+        props.style,
+      ]}
+      testID={props.testID}
+    >
+      <LiquidToggle
+        value={value}
+        enabled={!disabled}
+        onTrackColor={Number(processColor(colors["--color-switch-active-track"]) ?? 0)}
+        offTrackColor={Number(
+          processColor(themeAppearance === "dark" ? OFF_TRACK_DARK : OFF_TRACK_LIGHT) ?? 0,
+        )}
+        dark={themeAppearance === "dark"}
+        onValueChange={(event) => props.onValueChange?.(event.nativeEvent.value)}
+        style={{ flex: 1 }}
+      />
+    </View>
+  );
+}
+
 /**
  * An iOS-style switch drawn in JS. Taps are the only input: one Pressable
  * press reports `!value` once. The fork's old switch also committed from a
  * pan gesture and fired twice per tap, so there is deliberately no drag.
  */
-export function ThemedSwitch(props: ThemedSwitchProps) {
+function JsSwitch(props: ThemedSwitchProps) {
   const { themeVariables: colors, themeAppearance } = useAppearancePreferences();
   const value = Boolean(props.value);
   const progress = useSharedValue(value ? 1 : 0);

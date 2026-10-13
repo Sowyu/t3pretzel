@@ -71,6 +71,9 @@ interface AppearancePreferencesContextValue {
   /** Pass null to clear the override and follow the base font size. */
   readonly setCodeFontSize: (value: number | null) => void;
   readonly setCodeWordBreak: (value: boolean) => void;
+  /** Android only. Unset means on; the device tier can still force the fallback. */
+  readonly liquidGlassEnabled: boolean;
+  readonly setLiquidGlassEnabled: (value: boolean) => void;
 }
 
 const AppearancePreferencesContext = createContext<AppearancePreferencesContextValue | null>(null);
@@ -272,6 +275,14 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
     [updatePreferences],
   );
 
+  const setLiquidGlassEnabled = useCallback(
+    (value: boolean) => {
+      updatePreferences({ liquidGlassEnabled: value });
+    },
+    [updatePreferences],
+  );
+  const liquidGlassEnabled = storedPreferences?.liquidGlassEnabled !== false;
+
   const value = useMemo(
     (): AppearancePreferencesContextValue => ({
       appearance,
@@ -292,6 +303,8 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       setTerminalFontSize,
       setCodeFontSize,
       setCodeWordBreak,
+      liquidGlassEnabled,
+      setLiquidGlassEnabled,
     }),
     [
       appearance,
@@ -311,6 +324,8 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       setTerminalFontSize,
       setCodeFontSize,
       setCodeWordBreak,
+      liquidGlassEnabled,
+      setLiquidGlassEnabled,
     ],
   );
 
