@@ -21,6 +21,8 @@ import { WorkspaceEmptyDetail } from "../layout/WorkspaceEmptyDetail";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { checkForAppUpdateOnLaunch, startAppUpdateForegroundRecheck } from "../updates/app-updates";
 import { startNightlyUpdater } from "../updates/nightly-updater-runtime";
+import { startBackgroundRefresh } from "../../connection/background-refresh";
+import { startTurnCompletionNotifications } from "../agent-awareness/turnCompletionNotifier";
 import { HomeScreen } from "./HomeScreen";
 import { HomeHeader } from "./HomeHeader";
 import { useHomeListOptions } from "./home-list-options";
@@ -83,6 +85,8 @@ export function HomeRouteScreen() {
     void checkForAppUpdateOnLaunch();
     startAppUpdateForegroundRecheck();
     startNightlyUpdater();
+    startBackgroundRefresh();
+    startTurnCompletionNotifications();
   }, []);
 
   const {

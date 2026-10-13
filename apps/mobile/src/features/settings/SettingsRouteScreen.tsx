@@ -9,6 +9,7 @@ import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { useSavedRemoteConnections } from "../../state/use-remote-environment-registry";
+import { BackgroundSettingsRows } from "./BackgroundSettingsRows";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -231,6 +232,7 @@ function AppSettingsSection() {
   const nightly = useNightlyUpdater();
   return (
     <SettingsSection title="App">
+      {Platform.OS === "android" ? <BackgroundSettingsRows /> : null}
       <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
       <SettingsRow icon="info.circle" label="About T3 Code" target="SettingsAbout" />
       {nightly.applies ? <NightlyUpdatesRow nightly={nightly} /> : null}

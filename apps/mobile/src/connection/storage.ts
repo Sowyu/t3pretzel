@@ -39,6 +39,23 @@ function targetPersistenceError(
   });
 }
 
+const targetListeners = new Set<() => void>();
+
+/**
+ * Fires after an environment is added, removed, rerouted, or switched on or
+ * off, so background refresh arms its schedule when the first one is paired.
+ */
+export function onConnectionTargetsChanged(listener: () => void): () => void {
+  targetListeners.add(listener);
+  return () => {
+    targetListeners.delete(listener);
+  };
+}
+
+const notifyTargetsChanged = Effect.sync(() => {
+  for (const listener of targetListeners) listener();
+});
+
 export const layer = Layer.effectContext(
   Effect.gen(function* () {
     const catalog = yield* CatalogStore.make();
@@ -62,19 +79,29 @@ export const layer = Layer.effectContext(
       register: (registration, routes) =>
         catalog
           .update((document) => registerConnectionInCatalog(document, registration, routes))
-          .pipe(Effect.mapError((error) => targetPersistenceError("register-connection", error))),
+          .pipe(
+            Effect.tap(() => notifyTargetsChanged),
+            Effect.mapError((error) => targetPersistenceError("register-connection", error)),
+          ),
       setRoutes: (environmentId, routes) =>
         catalog
           .update((document) => setRoutesInCatalog(document, environmentId, routes))
-          .pipe(Effect.mapError((error) => targetPersistenceError("set-connection-routes", error))),
+          .pipe(
+            Effect.tap(() => notifyTargetsChanged),
+            Effect.mapError((error) => targetPersistenceError("set-connection-routes", error)),
+          ),
       remove: (environmentId) =>
         catalog
           .update((document) => removeConnectionFromCatalog(document, environmentId))
-          .pipe(Effect.mapError((error) => targetPersistenceError("remove-connection", error))),
+          .pipe(
+            Effect.tap(() => notifyTargetsChanged),
+            Effect.mapError((error) => targetPersistenceError("remove-connection", error)),
+          ),
       setEnabled: (environmentId, enabled) =>
         catalog
           .update((document) => setConnectionEnabledInCatalog(document, environmentId, enabled))
           .pipe(
+            Effect.tap(() => notifyTargetsChanged),
             Effect.mapError((error) => targetPersistenceError("set-connection-enabled", error)),
           ),
     });

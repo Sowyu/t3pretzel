@@ -12,6 +12,7 @@ import { tryCopyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import { SettingsActionRow } from "../settings/components/SettingsActionRow";
 import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { SettingsSection } from "../settings/components/SettingsSection";
+import { BackgroundRefreshDiagnostics } from "./BackgroundRefreshDiagnostics";
 import {
   formatStartupCrashReport,
   parseStartupCrashRecords,
@@ -123,6 +124,8 @@ export function SettingsDiagnosticsRouteScreen() {
             it over before sharing.
           </Text>
         </View>
+
+        <BackgroundRefreshDiagnostics />
       </ScrollView>
     </SettingsScreen>
   );

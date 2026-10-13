@@ -6,6 +6,7 @@ interface AndroidAgentNotifications {
   configure(deviceId: string, userId: string, scheme: string, ongoingEnabled: boolean): void;
   clear(): void;
   setThreadOnScreen?(path: string | null): void;
+  postLocalAlert?(scheme: string, data: Record<string, string>): void;
   openLiveUpdateSettings?(): boolean;
   showShowcaseActivity?(scheme: string, data: Record<string, string>): void;
 }
@@ -36,6 +37,27 @@ export function configureAndroidAgentNotifications(
 export function showAndroidShowcaseAgentActivity(data: Record<string, string>): boolean {
   if (!native?.showShowcaseActivity) return false;
   native.showShowcaseActivity(appScheme(), data);
+  return true;
+}
+
+/**
+ * Posts an alert through the same native path as relay pushes: same channel,
+ * same tap-to-open, and the same seen-alert history, so a repeated `alertId`
+ * never posts twice. False when this build lacks the native function.
+ */
+export function postAndroidLocalAgentAlert(alert: {
+  readonly alertId: string;
+  readonly title: string;
+  readonly body: string;
+  readonly path: string;
+}): boolean {
+  if (!native?.postLocalAlert) return false;
+  native.postLocalAlert(appScheme(), {
+    alert_id: alert.alertId,
+    alert_title: alert.title,
+    alert_body: alert.body,
+    alert_path: alert.path,
+  });
   return true;
 }
 

@@ -9,7 +9,11 @@ import {
   Connectivity,
   Wakeups,
 } from "@t3tools/client-runtime/connection";
-import { managedRelayAccountChanges, managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
+import {
+  managedRelayAccountChanges,
+  managedRelaySessionAtom,
+  type ManagedRelaySession,
+} from "@t3tools/client-runtime/relay";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -154,41 +158,68 @@ const layerWakeups = Wakeups.layer({
   ),
 });
 
+/**
+ * T3 Connect for the connection runtime. `read` returns the live session; the
+ * background refresh passes one that falls back to a headless Clerk session.
+ * The authorization service compares sessions by reference to spot account
+ * switches, so `read` must return the same object while the account stays.
+ */
+export function mobileCloudSession(read: () => ManagedRelaySession | null) {
+  return ClientCapabilities.CloudSession.of({
+    identity: Effect.sync(() => Option.fromNullishOr(read())),
+    clerkToken: Effect.gen(function* () {
+      const session = read();
+      if (session === null) {
+        return yield* new ConnectionBlockedError({
+          reason: "authentication",
+          detail: "Sign in to T3 Connect to connect this environment.",
+        });
+      }
+      const token = yield* session.readClerkToken().pipe(
+        Effect.mapError(
+          (error) =>
+            new ConnectionTransientError({
+              reason: "network",
+              detail: error.message,
+            }),
+        ),
+      );
+      if (token === null) {
+        return yield* new ConnectionBlockedError({
+          reason: "authentication",
+          detail: "The T3 Connect session is unavailable.",
+        });
+      }
+      return token;
+    }),
+  });
+}
+
+export function mobileRelayDeviceIdentity(storage: MobileStorage.MobileStorage["Service"]) {
+  return ClientCapabilities.RelayDeviceIdentity.of({
+    deviceId: storage.loadOrCreateAgentAwarenessDeviceId.pipe(
+      Effect.mapError(
+        (cause) =>
+          new ConnectionTransientError({
+            reason: "remote-unavailable",
+            detail: `Could not load the mobile device identity: ${String(cause)}`,
+          }),
+      ),
+      Effect.map(Option.some),
+    ),
+  });
+}
+
+export const mobileClientPresentation = ClientCapabilities.ClientPresentation.of({
+  metadata: authClientMetadata(Constants.expoConfig?.version),
+});
+
 const layerCapabilities = Layer.effectContext(
   Effect.gen(function* () {
     const storage = yield* MobileStorage.MobileStorage;
     return Context.make(
       ClientCapabilities.CloudSession,
-      ClientCapabilities.CloudSession.of({
-        identity: Effect.sync(() =>
-          Option.fromNullishOr(appAtomRegistry.get(managedRelaySessionAtom)),
-        ),
-        clerkToken: Effect.gen(function* () {
-          const session = appAtomRegistry.get(managedRelaySessionAtom);
-          if (session === null) {
-            return yield* new ConnectionBlockedError({
-              reason: "authentication",
-              detail: "Sign in to T3 Connect to connect this environment.",
-            });
-          }
-          const token = yield* session.readClerkToken().pipe(
-            Effect.mapError(
-              (error) =>
-                new ConnectionTransientError({
-                  reason: "network",
-                  detail: error.message,
-                }),
-            ),
-          );
-          if (token === null) {
-            return yield* new ConnectionBlockedError({
-              reason: "authentication",
-              detail: "The T3 Connect session is unavailable.",
-            });
-          }
-          return token;
-        }),
-      }),
+      mobileCloudSession(() => appAtomRegistry.get(managedRelaySessionAtom)),
     ).pipe(
       Context.add(
         ClientCapabilities.PrimaryEnvironmentAuth,
@@ -196,27 +227,8 @@ const layerCapabilities = Layer.effectContext(
           bearerToken: Effect.succeed(Option.none()),
         }),
       ),
-      Context.add(
-        ClientCapabilities.RelayDeviceIdentity,
-        ClientCapabilities.RelayDeviceIdentity.of({
-          deviceId: storage.loadOrCreateAgentAwarenessDeviceId.pipe(
-            Effect.mapError(
-              (cause) =>
-                new ConnectionTransientError({
-                  reason: "remote-unavailable",
-                  detail: `Could not load the mobile device identity: ${String(cause)}`,
-                }),
-            ),
-            Effect.map(Option.some),
-          ),
-        }),
-      ),
-      Context.add(
-        ClientCapabilities.ClientPresentation,
-        ClientCapabilities.ClientPresentation.of({
-          metadata: authClientMetadata(Constants.expoConfig?.version),
-        }),
-      ),
+      Context.add(ClientCapabilities.RelayDeviceIdentity, mobileRelayDeviceIdentity(storage)),
+      Context.add(ClientCapabilities.ClientPresentation, mobileClientPresentation),
       Context.add(
         ClientCapabilities.SshEnvironmentGateway,
         ClientCapabilities.SshEnvironmentGateway.of({
