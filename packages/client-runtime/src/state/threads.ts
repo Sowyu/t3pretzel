@@ -29,7 +29,7 @@ import * as ConnectionWakeups from "../connection/wakeups.ts";
 import * as Persistence from "../platform/persistence.ts";
 import { runCachePersistence } from "./cachePersistence.ts";
 import * as ManagedRelay from "../relay/managedRelay.ts";
-import { subscribeDynamic } from "../rpc/client.ts";
+import { SubscriptionDefectRetry, subscribeDynamic } from "../rpc/client.ts";
 import { parseThreadKey, threadKey } from "./entities.ts";
 import { applyOrchestrationV2ProjectionEvent } from "./orchestrationV2Projection.ts";
 import { THREAD_SNAPSHOT_IDLE_TTL_MS } from "./threadRetention.ts";
@@ -183,6 +183,9 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
     RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization,
   );
   const wakeups = yield* Effect.serviceOption(ConnectionWakeups.ConnectionWakeups);
+  const defectMessage = Option.isSome(yield* SubscriptionDefectRetry)
+    ? "Lost sync with the thread. Reconnecting…"
+    : "Could not synchronize the thread.";
   const environmentId = supervisor.target.environmentId;
   const retained = resumeCache?.snapshot;
   const owner = {};
@@ -893,7 +896,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         };
       }),
       {
-        onDefect: () => setStreamError("Could not synchronize the thread."),
+        onDefect: () => setStreamError(defectMessage),
         onExpectedFailure: (cause) => setStreamError(formatThreadError(cause)),
         retryExpectedFailureAfter: "250 millis",
         resubscribe: foregroundResubscriptions,

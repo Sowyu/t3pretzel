@@ -36,6 +36,7 @@ import {
   runStream,
   subscribe,
   subscribeDynamicWithSession,
+  SubscriptionDefectRetry,
 } from "./client.ts";
 
 const TARGET = new PrimaryConnectionTarget({
@@ -680,6 +681,56 @@ describe("environment RPC", () => {
       }
       expect(observations).toEqual(["input 1", "stream", "expected failure", "input 2", "defect"]);
       expect(observedDefects).toEqual([defect]);
+    }),
+  );
+
+  it.effect("resubscribes after a defect with backoff when the client opts in", () =>
+    Effect.gen(function* () {
+      const defect = new Error("chunk this build cannot decode");
+      const subscriptionCount = yield* Ref.make(0);
+      const defects: unknown[] = [];
+      const client = {
+        [WS_METHODS.subscribeTerminalEvents]: () =>
+          Stream.unwrap(
+            Ref.getAndUpdate(subscriptionCount, (count) => count + 1).pipe(
+              Effect.map((count) => (count < 2 ? Stream.die(defect) : Stream.never)),
+            ),
+          ),
+      } as unknown as WsRpcProtocolClient;
+      const { activeSession, supervisor } = yield* makeHarness();
+      yield* SubscriptionRef.set(activeSession, Option.some(session(client)));
+      const fiber = yield* subscribe(
+        WS_METHODS.subscribeTerminalEvents,
+        {},
+        { onDefect: (cause) => Effect.sync(() => defects.push(Cause.squash(cause))) },
+      ).pipe(
+        Stream.runDrain,
+        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+        Effect.provideService(SubscriptionDefectRetry, Option.some("1 second")),
+        Effect.forkChild,
+      );
+      const waitFor = (count: number) =>
+        Effect.gen(function* () {
+          for (let attempt = 0; attempt < 100; attempt += 1) {
+            if ((yield* Ref.get(subscriptionCount)) >= count) return;
+            yield* Effect.yieldNow;
+          }
+        });
+      yield* waitFor(1);
+      expect(yield* Ref.get(subscriptionCount)).toBe(1);
+      yield* TestClock.adjust("1 second");
+      yield* waitFor(2);
+      expect(yield* Ref.get(subscriptionCount)).toBe(2);
+      // The second defect doubles the delay.
+      yield* TestClock.adjust("1 second");
+      for (let attempt = 0; attempt < 20; attempt += 1) yield* Effect.yieldNow;
+      expect(yield* Ref.get(subscriptionCount)).toBe(2);
+      yield* TestClock.adjust("1 second");
+      yield* waitFor(3);
+      expect(yield* Ref.get(subscriptionCount)).toBe(3);
+      expect(defects).toEqual([defect, defect]);
+      expect(fiber.pollUnsafe()).toBeUndefined();
+      yield* Fiber.interrupt(fiber);
     }),
   );
 });

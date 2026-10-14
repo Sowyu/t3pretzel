@@ -404,6 +404,8 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
         };
       }),
       {
+        // A defect otherwise leaves the last status up while nothing updates.
+        onDefect: (cause) => setStreamError(Cause.squash(cause)),
         onExpectedFailure: (cause) => setStreamError(Cause.squash(cause)),
         retryExpectedFailureAfter: "250 millis",
         resubscribe: foregroundResubscriptions,

@@ -73,7 +73,10 @@ import { useThreadComposerState } from "../../state/use-thread-composer-state";
 import { resolveMergeBackTargetThreadId } from "@t3tools/client-runtime/state/thread-relationships";
 import { resolveLatestMergeBackRun } from "@t3tools/client-runtime/state/thread-workflows";
 import { threadEnvironment } from "../../state/threads";
-import { projectThreadContentPresentation } from "./threadContentPresentation";
+import {
+  projectThreadContentPresentation,
+  READY_THREAD_CONTENT,
+} from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import {
   useAdaptiveWorkspaceLayout,
@@ -964,7 +967,7 @@ function ThreadRouteContent(
   // not-found error for that window is expected, not a load failure.
   const contentPresentation =
     creationState !== null
-      ? { kind: "ready" as const }
+      ? READY_THREAD_CONTENT
       : projectThreadContentPresentation({
           hasDetail: selectedThreadDetail !== null,
           detailError: Option.getOrNull(selectedThreadDetailState.error),

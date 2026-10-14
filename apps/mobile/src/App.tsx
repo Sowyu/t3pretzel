@@ -22,6 +22,7 @@ import { RootStack } from "./Stack";
 import { appAtomRegistry } from "./state/atom-registry";
 import { GlassBackdropSource } from "./components/GlassBackdropSource";
 import { OverlayPortalHost } from "./components/OverlayPortal";
+import { createAppLinkQueue, readInitialAppLink } from "./lib/appLinkQueue";
 import { shouldHandleAppLink } from "./lib/appLinking";
 import { useMobileNavigationTheme } from "./lib/useMobileNavigationTheme";
 import { useUiRuntimeMemoryWarningGc } from "./lib/useUiRuntimeMemoryWarningGc";
@@ -40,11 +41,17 @@ void SplashScreen.preventAutoHideAsync().catch(() => {
   // The native module can be unavailable in non-native test environments.
 });
 
+// Subscribed at module load so a link that arrives while the app starts is kept.
+const appLinkQueue = createAppLinkQueue();
+Linking.addEventListener("url", ({ url }) => appLinkQueue.push(url));
+
 const appLinking = {
   prefixes: [Linking.createURL("/"), "t3code://", "t3code-dev://", "t3code-preview://"],
   // Keep the compact thread list available beneath a directly opened thread.
   config: { initialRouteName: "Home" },
   filter: shouldHandleAppLink,
+  getInitialURL: () => readInitialAppLink(Linking.getInitialURL),
+  subscribe: appLinkQueue.subscribe,
 };
 
 const Navigation = createStaticNavigation(RootStack);
@@ -97,7 +104,11 @@ function AppContent() {
                 <GlobalVoiceInputControl>
                   <NativeLayoutMetricsProvider>
                     <IncomingShareProvider>
-                      <Navigation linking={appLinking} theme={navigationTheme} />
+                      <Navigation
+                        linking={appLinking}
+                        theme={navigationTheme}
+                        onReady={appLinkQueue.markReady}
+                      />
                     </IncomingShareProvider>
                     <ConfirmDialogHost />
                     <ThreadArrangementHost />

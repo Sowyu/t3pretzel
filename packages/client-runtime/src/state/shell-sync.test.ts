@@ -27,6 +27,7 @@ import {
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import * as ConnectionWakeups from "../connection/wakeups.ts";
 import * as Persistence from "../platform/persistence.ts";
+import { SubscriptionDefectRetry } from "../rpc/client.ts";
 import * as RpcSession from "../rpc/session.ts";
 import type { WsRpcProtocolClient } from "../rpc/protocol.ts";
 import { makeEnvironmentShellState } from "./shell.ts";
@@ -450,6 +451,77 @@ describe("environment shell synchronization", () => {
       }
       expect(yield* Ref.get(capturedAfterSequences)).toEqual([10, 40, 40, 20]);
       expect(yield* Ref.get(loaderCalls)).toBe(2);
+    }),
+  );
+
+  it.effect("reports a stream defect and resubscribes when the client opts in", () =>
+    Effect.gen(function* () {
+      const subscriptions = yield* Ref.make(0);
+      const client = {
+        [ORCHESTRATION_V2_WS_METHODS.subscribeShell]: () =>
+          Stream.unwrap(
+            Ref.getAndUpdate(subscriptions, (count) => count + 1).pipe(
+              Effect.map((count) =>
+                count === 0
+                  ? Stream.die(new Error("shell chunk this build cannot decode"))
+                  : Stream.make({ kind: "synchronized" } as const).pipe(
+                      Stream.concat(Stream.never),
+                    ),
+              ),
+            ),
+          ),
+      } as unknown as WsRpcProtocolClient;
+      const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
+        target: TARGET,
+        state: yield* SubscriptionRef.make(AVAILABLE_CONNECTION_STATE),
+        session: yield* SubscriptionRef.make<Option.Option<RpcSession.RpcSession>>(
+          Option.some(session(client)),
+        ),
+        prepared: yield* SubscriptionRef.make(Option.some(PREPARED)),
+        connect: Effect.void,
+        disconnect: Effect.void,
+        retryNow: Effect.void,
+      } satisfies EnvironmentSupervisor.EnvironmentSupervisor["Service"]);
+      const cache = Persistence.EnvironmentCacheStore.of({
+        loadShell: () => Effect.succeedSome(LIVE_SHELL_SNAPSHOT),
+        saveShell: () => Effect.void,
+        loadThread: () => Effect.succeedNone,
+        saveThread: () => Effect.void,
+        removeThread: () => Effect.void,
+        loadServerConfig: () => Effect.succeedNone,
+        saveServerConfig: () => Effect.void,
+        loadVcsRefs: () => Effect.succeedNone,
+        saveVcsRefs: () => Effect.void,
+        removeVcsRefs: () => Effect.void,
+        clearVcsRefs: () => Effect.void,
+        clear: () => Effect.void,
+      });
+      const shellState = yield* makeEnvironmentShellState().pipe(
+        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+        Effect.provideService(Persistence.EnvironmentCacheStore, cache),
+        Effect.provideService(
+          ShellSnapshotLoader.ShellSnapshotLoader,
+          ShellSnapshotLoader.ShellSnapshotLoader.of({
+            load: () => Effect.succeedSome(LIVE_SHELL_SNAPSHOT),
+          }),
+        ),
+        Effect.provideService(SubscriptionDefectRetry, Option.some("1 second")),
+      );
+
+      yield* SubscriptionRef.changes(shellState).pipe(
+        Stream.filter((value) => Option.isSome(value.error)),
+        Stream.runHead,
+      );
+      expect(yield* Ref.get(subscriptions)).toBe(1);
+      yield* TestClock.adjust("1 second");
+      const recovered = yield* SubscriptionRef.changes(shellState).pipe(
+        Stream.filter((value) => value.status === "live"),
+        Stream.runHead,
+      );
+      expect(yield* Ref.get(subscriptions)).toBe(2);
+      expect(Option.map(recovered, (value) => Option.isNone(value.error))).toEqual(
+        Option.some(true),
+      );
     }),
   );
 

@@ -106,6 +106,17 @@ const isEnvironmentAuthorizationError = Schema.is(EnvironmentAuthorizationError)
 /** Ceiling for the doubling delay between same-session expected-failure retries. */
 const MAX_EXPECTED_FAILURE_RETRY_DELAY_MS = 30_000;
 
+/**
+ * First delay before a durable subscription that died on a defect (for example
+ * a server chunk this build cannot decode) subscribes again on the same
+ * session. Consecutive defects double it up to 30 seconds. None, the default,
+ * lets the defect end the stream. Clients opt in by providing a value.
+ */
+export const SubscriptionDefectRetry = Context.Reference<Option.Option<Duration.Input>>(
+  "@t3tools/client-runtime/rpc/client/SubscriptionDefectRetry",
+  { defaultValue: () => Option.none() },
+);
+
 export type EnvironmentRpcInput<TTag extends EnvironmentRpcTag> = Parameters<RpcMethod<TTag>>[0];
 
 export type EnvironmentRpcSuccess<TTag extends EnvironmentUnaryRpcTag> =
@@ -269,6 +280,7 @@ function subscribeDynamicMapped<TTag extends EnvironmentSubscriptionRpcTag, A>(
     Effect.gen(function* () {
       const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
       const observer = yield* EnvironmentRpcSubscriptionObserver;
+      const retryDefectAfter = yield* SubscriptionDefectRetry;
       const sessionChanges = SubscriptionRef.changes(supervisor.session);
       const sessions =
         options?.resubscribe === undefined
@@ -297,6 +309,19 @@ function subscribeDynamicMapped<TTag extends EnvironmentSubscriptionRpcTag, A>(
               // Consecutive expected-failure retries on this session. Reset by
               // the first value a resubscribed stream delivers.
               let expectedFailureRetries = 0;
+              const retryAfterBackoff = (first: Duration.Input) => {
+                const retryDelay = Duration.millis(
+                  Math.min(
+                    Duration.toMillis(first) * 2 ** expectedFailureRetries,
+                    MAX_EXPECTED_FAILURE_RETRY_DELAY_MS,
+                  ),
+                );
+                expectedFailureRetries += 1;
+                return Stream.fromEffect(Effect.sleep(retryDelay)).pipe(
+                  Stream.drain,
+                  Stream.concat(subscribeToSession()),
+                );
+              };
               const subscribeToSession = (): Stream.Stream<A, EnvironmentRpcStreamFailure<TTag>> =>
                 Stream.suspend(() =>
                   Stream.unwrap(
@@ -364,20 +389,17 @@ function subscribeDynamicMapped<TTag extends EnvironmentSubscriptionRpcTag, A>(
                         ) {
                           return handled;
                         }
-                        const retryDelay = Duration.millis(
-                          Math.min(
-                            Duration.toMillis(options.retryExpectedFailureAfter) *
-                              2 ** expectedFailureRetries,
-                            MAX_EXPECTED_FAILURE_RETRY_DELAY_MS,
-                          ),
-                        );
-                        expectedFailureRetries += 1;
                         return handled.pipe(
-                          Stream.concat(
-                            Stream.fromEffect(Effect.sleep(retryDelay)).pipe(Stream.drain),
-                          ),
-                          Stream.concat(subscribeToSession()),
+                          Stream.concat(retryAfterBackoff(options.retryExpectedFailureAfter)),
                         );
+                      }
+                      // onDefect has already reported it. Interruption still ends the stream.
+                      if (
+                        Option.isSome(retryDefectAfter) &&
+                        Cause.hasDies(cause) &&
+                        !Cause.hasInterrupts(cause)
+                      ) {
+                        return retryAfterBackoff(retryDefectAfter.value);
                       }
                       return Stream.failCause(cause);
                     }),

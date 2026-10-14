@@ -1,9 +1,11 @@
 import { Connection } from "@t3tools/client-runtime/connection";
+import { SubscriptionDefectRetry } from "@t3tools/client-runtime/rpc";
 import { ShellSnapshotLoader } from "@t3tools/client-runtime/state/shell";
 import { PullRequestDiffLoader } from "@t3tools/client-runtime/state/pull-requests";
 import {
   BoundedThreadSnapshotLoader,
   ThreadHistoryController,
+  ThreadSnapshotLoader,
 } from "@t3tools/client-runtime/state/threads";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -17,6 +19,7 @@ import { appAtomRegistry } from "../state/atom-registry";
 import * as BackgroundActivity from "./background-activity";
 import * as ConnectionPlatform from "./platform";
 import { takeShell } from "./shell-handoff";
+import { awaitShellThreadPresence, confirmThreadMisses } from "./thread-miss-confirmation";
 
 declare const module: { readonly hot?: FoundationHotModule } | undefined;
 
@@ -41,9 +44,24 @@ const layerShellSnapshotLoader = Layer.effect(
   }),
 ).pipe(Layer.provide(ShellSnapshotLoader.layer));
 
+// A busy phone can take more than the default 6 s to receive and decode a
+// bounded snapshot while environments sync, and the socket fallback then has
+// the server build it again. 20 s matches the full snapshot deadline.
+const layerThreadSnapshotLoader = Layer.effect(
+  ThreadSnapshotLoader,
+  Effect.gen(function* () {
+    const loader = yield* ThreadSnapshotLoader;
+    return ThreadSnapshotLoader.of(confirmThreadMisses(loader, awaitShellThreadPresence));
+  }),
+).pipe(Layer.provide(BoundedThreadSnapshotLoader.layerWithOptions({ boundedTimeoutMs: 20_000 })));
+
 const layerSnapshotLoader = Layer.mergeAll(
   PullRequestDiffLoader.layer,
-  BoundedThreadSnapshotLoader.layer,
+  layerThreadSnapshotLoader,
+  // A shell or thread stream that dies on a defect (for example a server chunk
+  // this build cannot decode) subscribes again with backoff instead of leaving
+  // the list or the thread frozen.
+  Layer.succeed(SubscriptionDefectRetry, Option.some("1 second")),
   layerShellSnapshotLoader,
   ThreadHistoryController.layer,
 );

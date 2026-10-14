@@ -265,6 +265,8 @@ const THREAD_FEED_DISCLOSURE_ENTER_TRANSITION = FadeIn.delay(
 // remounts rows when they scroll back into view, and replaying an entrance for
 // old content would be its own kind of jank.
 const FRESH_ENTRY_WINDOW_MS = 3_000;
+/** Rows a fresh list mounts with before it is visible; see listData in ThreadFeed. */
+const INITIAL_FEED_WINDOW = 12;
 function isFreshTimestamp(input: string): boolean {
   const timestamp = Date.parse(input);
   return Number.isFinite(timestamp) && Date.now() - timestamp < FRESH_ENTRY_WINDOW_MS;
@@ -2237,6 +2239,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   const setupAnchorIndex = presentedFeed.findIndex(
     (entry) => entry.type === "message" && entry.message.role === "user",
   );
+  const setupAnchorId = presentedFeed[setupAnchorIndex]?.id ?? null;
   // The empty↔filled key below remounts the list and resets its imperative
   // content-inset override. Seed the fresh instance synchronously with the
   // current overlay height before the scroll integration's next reaction;
@@ -2245,6 +2248,20 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
   // content: the list must still remount, and so open at the end, when they
   // arrive.
   const listMountKey = `${feedThreadKey}:${presentedFeed.some((entry) => entry.type !== "thinking") ? "filled" : "empty"}`;
+  // LegendList keeps a fresh list hidden until it has measured the rows near
+  // the end and scrolled there, and every row inside the draw distance holds
+  // that up. A fresh list starts with only the newest rows, so the first screen
+  // shows as soon as they measure; the older rows mount above them once it is
+  // visible, while the list stays pinned to the end.
+  const [revealedListKey, setRevealedListKey] = useState<string | null>(null);
+  const listData = useMemo(
+    () =>
+      revealedListKey === listMountKey || presentedFeed.length <= INITIAL_FEED_WINDOW
+        ? presentedFeed
+        : presentedFeed.slice(-INITIAL_FEED_WINDOW),
+    [listMountKey, presentedFeed, revealedListKey],
+  );
+  const handleListLoad = useCallback(() => setRevealedListKey(listMountKey), [listMountKey]);
   useLayoutEffect(() => {
     const bottom = props.contentInsetEndAdjustment.value;
     if (bottom > 0) {
@@ -2567,9 +2584,9 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
               skills: props.skills,
               workspaceRoot: props.workspaceRoot,
             })}
-            {props.worktreeSetup && info.index === setupAnchorIndex ? (
+            {props.worktreeSetup && info.item.id === setupAnchorId ? (
               <WorktreeSetupCard key={props.threadId} {...props.worktreeSetup} />
-            ) : props.setupWorkingStartedAt && info.index === setupAnchorIndex ? (
+            ) : props.setupWorkingStartedAt && info.item.id === setupAnchorId ? (
               <WorktreeWorkingHeader startedAt={props.setupWorkingStartedAt} />
             ) : null}
           </ThreadMediaVisibility>
@@ -2580,7 +2597,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       props.worktreeSetup,
       props.setupWorkingStartedAt,
       props.threadId,
-      setupAnchorIndex,
+      setupAnchorId,
       props.dispatchingMessageId,
       props.onEditPendingMessage,
       copiedRowId,
@@ -2721,7 +2738,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             maintainVisibleContentPosition={
               endFollowEnabled && !disclosureToggleSettling ? false : maintainVisibleContentPosition
             }
-            data={presentedFeed}
+            data={listData}
             extraData={listAppearanceData}
             renderItem={renderItem}
             viewabilityConfig={THREAD_MEDIA_VIEWABILITY_CONFIG}
@@ -2755,6 +2772,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
             // user overscroll back to the adjusted rest position.
             scrollToOverflowEnabled
             estimatedItemSize={180}
+            onLoad={handleListLoad}
             // Chat-style bottom alignment: when a thread is shorter than the
             // viewport, pad above the content so messages rest just above the
             // composer instead of under the header. No effect on threads that

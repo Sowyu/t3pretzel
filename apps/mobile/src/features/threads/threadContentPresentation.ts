@@ -9,6 +9,12 @@ export type ThreadContentPresentation =
       readonly detail: string;
     };
 
+// Shared instances: ThreadFeed is memoized and receives this object as a prop,
+// so a fresh { kind: "ready" } on every parent render re-rendered the whole
+// feed each time the thread screen did, about ten times while a thread opens.
+export const READY_THREAD_CONTENT: ThreadContentPresentation = Object.freeze({ kind: "ready" });
+const LOADING_THREAD_CONTENT: ThreadContentPresentation = Object.freeze({ kind: "loading" });
+
 export function projectThreadContentPresentation(input: {
   readonly hasDetail: boolean;
   readonly detailError: string | null;
@@ -16,7 +22,7 @@ export function projectThreadContentPresentation(input: {
   readonly connectionState: EnvironmentConnectionPhase;
 }): ThreadContentPresentation {
   if (input.hasDetail) {
-    return { kind: "ready" };
+    return READY_THREAD_CONTENT;
   }
   if (input.detailDeleted) {
     return {
@@ -39,7 +45,7 @@ export function projectThreadContentPresentation(input: {
   ) {
     // Messages will arrive once the (re)connection completes — present as
     // loading; the composer's connection pill reports the connection phase.
-    return { kind: "loading" };
+    return LOADING_THREAD_CONTENT;
   }
   return {
     kind: "unavailable",

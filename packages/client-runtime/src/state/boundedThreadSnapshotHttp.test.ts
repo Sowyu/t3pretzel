@@ -1,7 +1,9 @@
 import { ThreadId } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 
 import { PrimaryConnectionTarget, type PreparedConnection } from "../connection/model.ts";
 import * as RpcHttp from "../rpc/http.ts";
@@ -288,4 +290,43 @@ describe("boundedThreadSnapshotLoader", () => {
       );
     },
   );
+
+  // A response slower than 6 s is waited for when the caller allows it, so the
+  // socket fallback does not ask the server to build the same snapshot again.
+  it.effect("keeps waiting for a slow bounded response within a longer deadline", () => {
+    let respond!: (response: Response) => void;
+    const fetchFn = (() =>
+      new Promise<Response>((resolve) => {
+        respond = resolve;
+      })) satisfies typeof fetch;
+    const load = Effect.gen(function* () {
+      const loader = yield* ThreadSnapshotLoader.ThreadSnapshotLoader;
+      return yield* loader.load(PREPARED, THREAD_ID);
+    });
+
+    return Effect.gen(function* () {
+      const defaultLoad = yield* load.pipe(
+        Effect.provide(
+          Layer.provide(BoundedThreadSnapshotHttp.layer, RpcHttp.layerRemoteHttpClient(fetchFn)),
+        ),
+        Effect.forkChild,
+      );
+      yield* TestClock.adjust("7 seconds");
+      expect((yield* Fiber.join(defaultLoad))._tag).toBe("unavailable");
+
+      const patientLoad = yield* load.pipe(
+        Effect.provide(
+          Layer.provide(
+            BoundedThreadSnapshotHttp.layerWithOptions({ boundedTimeoutMs: 20_000 }),
+            RpcHttp.layerRemoteHttpClient(fetchFn),
+          ),
+        ),
+        Effect.forkChild,
+      );
+      yield* TestClock.adjust("7 seconds");
+      respond(Response.json(boundedBody(true)));
+      const result = yield* Fiber.join(patientLoad);
+      expect(result._tag).toBe("present");
+    });
+  });
 });

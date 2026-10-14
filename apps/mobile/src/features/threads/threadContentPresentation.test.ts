@@ -54,4 +54,19 @@ describe("thread content presentation", () => {
       detail: "The thread stream failed.",
     });
   });
+
+  // ThreadFeed is memoized on this prop; a new object per render re-rendered it.
+  it("returns the same object while the presentation stays the same", () => {
+    const input = {
+      hasDetail: true,
+      detailError: null,
+      detailDeleted: false,
+      connectionState: "connected",
+    } as const;
+    expect(projectThreadContentPresentation(input)).toBe(projectThreadContentPresentation(input));
+    const loading = { ...input, hasDetail: false };
+    expect(projectThreadContentPresentation(loading)).toBe(
+      projectThreadContentPresentation(loading),
+    );
+  });
 });
