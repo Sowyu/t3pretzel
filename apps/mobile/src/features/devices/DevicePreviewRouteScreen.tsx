@@ -12,7 +12,6 @@ import { Accelerometer } from "expo-sensors";
 import { Alert, AppState, BackHandler, Pressable, StatusBar, View } from "react-native";
 import Animated, { FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHideIosStatusBar } from "../../components/IosStatusBar";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
@@ -46,7 +45,6 @@ type DevicePreviewRouteScreenProps = StaticScreenProps<{
 
 /** Full-screen viewer; controls live in an overlay toggled by the handle or a shake. */
 export function DevicePreviewRouteScreen({ route }: DevicePreviewRouteScreenProps) {
-  useHideIosStatusBar();
   const navigation = useNavigation();
   const onClose = useCallback(() => navigation.goBack(), [navigation]);
   const { environmentId, threadId } = route.params;

@@ -29,7 +29,6 @@ import {
 } from "./threadOrder";
 import { getThreadListV2OrderedSection, threadListInboxReturns } from "./threadListV2";
 import { useThreadListV2ShelfPreferences } from "./use-thread-list-v2-shelf-preferences";
-import { IosStatusBarOverlay } from "../../components/IosStatusBar";
 
 const ROW_HEIGHT = 56;
 const HEADER_HEIGHT = 48;
@@ -565,7 +564,6 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
           </View>
         </View>
       </GestureHandlerRootView>
-      <IosStatusBarOverlay />
     </Modal>
   );
 }

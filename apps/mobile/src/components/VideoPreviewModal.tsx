@@ -22,7 +22,6 @@ import { SymbolView } from "./AppSymbol";
 import { MediaActionsMenu } from "./MediaActionsMenu";
 import { MediaSourceCaption } from "./MediaSourceCaption";
 import { MediaVideoPlayer } from "./MediaVideoPlayer";
-import { IosStatusBarOverlay } from "./IosStatusBar";
 
 export type { VideoPreviewSource } from "../lib/videoPreviewSource";
 
@@ -199,7 +198,6 @@ function OpenVideoPreviewModal(props: {
           </AppText>
         </Pressable>
       </View>
-      <IosStatusBarOverlay appearance="dark" />
     </Modal>
   );
 }

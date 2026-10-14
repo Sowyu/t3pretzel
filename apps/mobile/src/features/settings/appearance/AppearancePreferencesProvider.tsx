@@ -74,9 +74,6 @@ interface AppearancePreferencesContextValue {
   /** Android only. Unset means on; the device tier can still force the fallback. */
   readonly liquidGlassEnabled: boolean;
   readonly setLiquidGlassEnabled: (value: boolean) => void;
-  /** Android only. Unset means on. */
-  readonly iosStatusBarEnabled: boolean;
-  readonly setIosStatusBarEnabled: (value: boolean) => void;
 }
 
 const AppearancePreferencesContext = createContext<AppearancePreferencesContextValue | null>(null);
@@ -285,13 +282,6 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
     [updatePreferences],
   );
   const liquidGlassEnabled = storedPreferences?.liquidGlassEnabled !== false;
-  const setIosStatusBarEnabled = useCallback(
-    (value: boolean) => {
-      updatePreferences({ iosStatusBarEnabled: value });
-    },
-    [updatePreferences],
-  );
-  const iosStatusBarEnabled = storedPreferences?.iosStatusBarEnabled !== false;
 
   const value = useMemo(
     (): AppearancePreferencesContextValue => ({
@@ -315,8 +305,6 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       setCodeWordBreak,
       liquidGlassEnabled,
       setLiquidGlassEnabled,
-      iosStatusBarEnabled,
-      setIosStatusBarEnabled,
     }),
     [
       appearance,
@@ -338,8 +326,6 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
       setCodeWordBreak,
       liquidGlassEnabled,
       setLiquidGlassEnabled,
-      iosStatusBarEnabled,
-      setIosStatusBarEnabled,
     ],
   );
 
