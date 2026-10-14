@@ -11,6 +11,7 @@ import {
   createWidgetRefresher,
   WIDGET_REFRESH_INTERVAL,
   subscriptionUsageTimeline,
+  widgetLimitsCheckedAt,
 } from "./subscriptionUsageSnapshot";
 
 const checkedAt = "2026-09-05T12:00:00.000Z";
@@ -313,5 +314,38 @@ describe("widget refresh probes", () => {
     expect(probe).toHaveBeenCalledTimes(1);
     finish();
     await first;
+  });
+
+  it("skips an environment whose limits were read within the interval", async () => {
+    const probe = vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined);
+    const refresh = createWidgetRefresher(probe);
+    const checkedAt = (id: string) => (id === "fresh" ? now - 60_000 : null);
+    await refresh(["fresh", "unknown"], now, checkedAt);
+    expect(probe.mock.calls).toEqual([["unknown"]]);
+    await refresh(["fresh"], now - 60_000 + WIDGET_REFRESH_INTERVAL, checkedAt);
+    expect(probe.mock.calls).toEqual([["unknown"], ["fresh"]]);
+  });
+});
+
+describe("widgetLimitsCheckedAt", () => {
+  it("reports the oldest Codex or Claude read and ignores other providers", () => {
+    const older = "2026-09-05T11:00:00.000Z";
+    expect(
+      widgetLimitsCheckedAt([
+        provider(),
+        provider({
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          driver: ProviderDriverKind.make("claudeAgent"),
+          usageLimits: { ...limits, checkedAt: older },
+        }),
+        provider({
+          instanceId: ProviderInstanceId.make("cursor"),
+          driver: ProviderDriverKind.make("cursor"),
+          usageLimits: { ...limits, checkedAt: "2020-01-01T00:00:00.000Z" },
+        }),
+      ]),
+    ).toBe(Date.parse(older));
+    expect(widgetLimitsCheckedAt([provider({ installed: false })])).toBeNull();
+    expect(widgetLimitsCheckedAt(undefined)).toBeNull();
   });
 });

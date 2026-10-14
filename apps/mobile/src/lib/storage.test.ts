@@ -88,6 +88,8 @@ vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: {} } },
 }));
 
+vi.mock("expo/fetch", () => ({ fetch: vi.fn() }));
+
 vi.mock("react-native", () => ({
   Platform: {
     OS: "ios",

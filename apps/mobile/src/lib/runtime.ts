@@ -1,6 +1,8 @@
+import { fetch as expoFetch } from "expo/fetch";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Socket from "effect/socket/Socket";
+import { Platform } from "react-native";
 
 import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
 
@@ -17,7 +19,14 @@ function configuredRelayUrl(): string {
   return resolveCloudPublicConfig().relay.url ?? "http://relay.invalid";
 }
 
-const layerHttpClient = layerRemoteHttpClient(fetch);
+// Environment requests on Android use Expo's fetch. React Native's fetch passes
+// each response body to JS as a base64 data URL through several native round
+// trips, and every one of them waits behind the sync work on the JS thread.
+// Expo's fetch hands the body over as one ArrayBuffer. Its init type differs
+// from the DOM one only in fields the Effect client never sets.
+const environmentFetch: typeof fetch =
+  Platform.OS === "android" ? (expoFetch as unknown as typeof fetch) : fetch;
+const layerHttpClient = layerRemoteHttpClient(environmentFetch);
 
 type RuntimeLayerSource =
   | ReturnType<typeof ManagedRelayLayer.layer>

@@ -90,6 +90,10 @@ describe("offline pull request cache", () => {
         sqlite.prepare(sql).get(...args),
       getAllAsync: async (sql: string, ...args: Array<string | number>) =>
         sqlite.prepare(sql).all(...args),
+      getFirstSync: (sql: string, ...args: Array<string | number>) =>
+        sqlite.prepare(sql).get(...args) ?? null,
+      getAllSync: (sql: string, ...args: Array<string | number>) =>
+        sqlite.prepare(sql).all(...args),
       withExclusiveTransactionAsync: async (run: (transaction: unknown) => Promise<void>) => {
         await run(database);
       },
@@ -152,5 +156,54 @@ describe("offline pull request cache", () => {
           );
         }),
       ),
+  );
+});
+
+describe("synchronous reads", () => {
+  const environmentId = "sync-environment" as import("@t3tools/contracts").EnvironmentId;
+
+  // A read waits on no async round trip: the async API never answers here.
+  it.effect("reads cache rows and preferences without the async API", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { DatabaseSync } = yield* Effect.promise(() => import("node:sqlite"));
+        const sqlite = new DatabaseSync(":memory:");
+        sqlite.exec("PRAGMA user_version = 1");
+        const never = () => new Promise<never>(() => {});
+        const database = {
+          execAsync: async (sql: string) => {
+            sqlite.exec(sql);
+          },
+          runAsync: async (sql: string, ...args: Array<string | number>) =>
+            sqlite.prepare(sql).run(...args),
+          getFirstAsync: never,
+          getAllAsync: never,
+          getFirstSync: (sql: string, ...args: Array<string | number>) =>
+            sqlite.prepare(sql).get(...args) ?? null,
+          getAllSync: (sql: string, ...args: Array<string | number>) =>
+            sqlite.prepare(sql).all(...args),
+          withExclusiveTransactionAsync: async (run: (transaction: unknown) => Promise<void>) => {
+            await run(database);
+          },
+          closeAsync: async () => {
+            sqlite.close();
+          },
+        };
+        // Migration reads user_version through the async API before the service exists.
+        database.getFirstAsync = (async (sql: string) =>
+          sqlite.prepare(sql).get()) as unknown as typeof never;
+        openDatabaseAsync.mockResolvedValueOnce(database);
+        const service = yield* MobileDatabase.makeWith({ synchronousReads: true });
+        database.getFirstAsync = never;
+
+        yield* service.saveCache(environmentId, "thread", "thread-1", 1, "payload");
+        expect(yield* service.loadCache(environmentId, "thread", "thread-1")).toEqual(
+          Option.some("payload"),
+        );
+        expect((yield* service.loadCache(environmentId, "thread", "missing"))._tag).toBe("None");
+        expect(yield* service.listCache("thread")).toEqual(["payload"]);
+        expect((yield* service.loadPreferencesJson)._tag).toBe("None");
+      }),
+    ),
   );
 });

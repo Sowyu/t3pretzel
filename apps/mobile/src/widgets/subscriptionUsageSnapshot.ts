@@ -1,3 +1,4 @@
+import type { ServerProvider } from "@t3tools/contracts";
 import {
   collectLimitAccounts,
   collectLimitPools,
@@ -21,16 +22,46 @@ export interface SubscriptionUsageSnapshot {
 // separate authenticated transport while the mobile app is suspended.
 const SNAPSHOT_MAX_AGE = 15 * 60_000;
 export const WIDGET_REFRESH_INTERVAL = 5 * 60_000;
+/**
+ * How long after launch or a return to the foreground the widget waits before
+ * probing. A probe makes the server re-read every provider and push its whole
+ * provider list twice, which competes with the initial sync for the JS thread.
+ */
+export const WIDGET_REFRESH_SETTLE_DELAY = 20_000;
 
-/** Bound probes across config updates, reconnects, and foreground transitions. */
+/**
+ * When the environment last read the limits the widget shows: the oldest read
+ * among its Codex and Claude providers, or null when it reports none.
+ */
+export function widgetLimitsCheckedAt(
+  providers: ReadonlyArray<ServerProvider> | undefined,
+): number | null {
+  let oldest: number | null = null;
+  for (const provider of providers ?? []) {
+    if (provider.driver !== "codex" && provider.driver !== "claudeAgent") continue;
+    if (!provider.enabled || !provider.installed || provider.usageLimits === undefined) continue;
+    const checkedAt = Date.parse(provider.usageLimits.checkedAt);
+    if (Number.isFinite(checkedAt) && (oldest === null || checkedAt < oldest)) oldest = checkedAt;
+  }
+  return oldest;
+}
+
+/**
+ * Bound probes across config updates, reconnects, and foreground transitions.
+ * An environment whose limits were read within the interval is not probed.
+ */
 export function createWidgetRefresher<Id>(refresh: (id: Id) => Promise<unknown>) {
   const attempted = new Map<Id, number>();
   const pending = new Set<Id>();
-  return async (connected: readonly Id[], now: number) => {
+  return async (
+    connected: readonly Id[],
+    now: number,
+    lastCheckedAt: (id: Id) => number | null = () => null,
+  ) => {
     await Promise.allSettled(
       connected.map(async (id) => {
-        if (pending.has(id) || now - (attempted.get(id) ?? -Infinity) < WIDGET_REFRESH_INTERVAL)
-          return;
+        const last = Math.max(attempted.get(id) ?? -Infinity, lastCheckedAt(id) ?? -Infinity);
+        if (pending.has(id) || now - last < WIDGET_REFRESH_INTERVAL) return;
         attempted.set(id, now);
         pending.add(id);
         try {

@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { SQLiteBindValue, SQLiteDatabase } from "expo-sqlite";
 
 const DATABASE_NAME = "t3code-client.db";
 const DATABASE_SCHEMA_VERSION = 1;
@@ -76,6 +76,54 @@ export class MobileDatabaseError extends Schema.TaggedError<MobileDatabaseError>
 
 function databaseError(operation: typeof MobileDatabaseOperation.Type) {
   return (cause: unknown) => new MobileDatabaseError({ operation, cause });
+}
+
+export interface MobileDatabaseOptions {
+  /**
+   * Run reads synchronously on the JS thread. An async expo-sqlite query is four
+   * native round trips (prepare, execute, read, finalize), and each one waits
+   * for its turn on the JS thread. While environments sync that queue is long,
+   * so one cache read can take seconds. A synchronous read of one indexed row
+   * costs milliseconds. SQLite serializes it against async writes on the same
+   * connection.
+   */
+  readonly synchronousReads: boolean;
+}
+
+function readFirst<T>(
+  database: SQLiteDatabase,
+  options: MobileDatabaseOptions,
+  operation: typeof MobileDatabaseOperation.Type,
+  source: string,
+  ...params: ReadonlyArray<SQLiteBindValue>
+): Effect.Effect<T | null, MobileDatabaseError> {
+  return options.synchronousReads
+    ? Effect.try({
+        try: () => database.getFirstSync<T>(source, ...params),
+        catch: databaseError(operation),
+      })
+    : Effect.tryPromise({
+        try: () => database.getFirstAsync<T>(source, ...params),
+        catch: databaseError(operation),
+      });
+}
+
+function readAll<T>(
+  database: SQLiteDatabase,
+  options: MobileDatabaseOptions,
+  operation: typeof MobileDatabaseOperation.Type,
+  source: string,
+  ...params: ReadonlyArray<SQLiteBindValue>
+): Effect.Effect<Array<T>, MobileDatabaseError> {
+  return options.synchronousReads
+    ? Effect.try({
+        try: () => database.getAllSync<T>(source, ...params),
+        catch: databaseError(operation),
+      })
+    : Effect.tryPromise({
+        try: () => database.getAllAsync<T>(source, ...params),
+        catch: databaseError(operation),
+      });
 }
 
 interface LegacyCacheRecord {
@@ -238,7 +286,7 @@ export class MobileDatabase extends Context.Service<
   }
 >()("@t3tools/mobile/persistence/MobileDatabase") {}
 
-const makeAvailable = Effect.gen(function* () {
+const makeAvailable = Effect.fnUntraced(function* (options: MobileDatabaseOptions) {
   const database = yield* Effect.acquireRelease(
     Effect.tryPromise({
       try: async () => {
@@ -290,30 +338,28 @@ const makeAvailable = Effect.gen(function* () {
 
   return MobileDatabase.of({
     loadCache: Effect.fn("MobileDatabase.loadCache")((environmentId, kind, cacheKey) =>
-      Effect.tryPromise({
-        try: () =>
-          database.getFirstAsync<{ readonly payload: string }>(
-            `SELECT payload
-                     FROM client_cache
-                     WHERE environment_id = ? AND kind = ? AND cache_key = ?
-                       AND (kind != 'pull-request' OR updated_at >= ?)`,
-            environmentId,
-            kind,
-            cacheKey,
-            Date.now() - 30 * 24 * 60 * 60_000,
-          ),
-        catch: databaseError("load-cache"),
-      }).pipe(Effect.map((row) => Option.fromNullishOr(row?.payload))),
+      readFirst<{ readonly payload: string }>(
+        database,
+        options,
+        "load-cache",
+        `SELECT payload
+                 FROM client_cache
+                 WHERE environment_id = ? AND kind = ? AND cache_key = ?
+                   AND (kind != 'pull-request' OR updated_at >= ?)`,
+        environmentId,
+        kind,
+        cacheKey,
+        Date.now() - 30 * 24 * 60 * 60_000,
+      ).pipe(Effect.map((row) => Option.fromNullishOr(row?.payload))),
     ),
     listCache: Effect.fn("MobileDatabase.listCache")((kind) =>
-      Effect.tryPromise({
-        try: () =>
-          database.getAllAsync<{ readonly payload: string }>(
-            "SELECT payload FROM client_cache WHERE kind = ? ORDER BY updated_at",
-            kind,
-          ),
-        catch: databaseError("list-cache"),
-      }).pipe(Effect.map((rows) => rows.map((row) => row.payload))),
+      readAll<{ readonly payload: string }>(
+        database,
+        options,
+        "list-cache",
+        "SELECT payload FROM client_cache WHERE kind = ? ORDER BY updated_at",
+        kind,
+      ).pipe(Effect.map((rows) => rows.map((row) => row.payload))),
     ),
     saveCache: Effect.fn("MobileDatabase.saveCache")(
       (environmentId, kind, cacheKey, schemaVersion, payload) =>
@@ -426,15 +472,14 @@ const makeAvailable = Effect.gen(function* () {
         })),
       ),
     ),
-    loadPreferencesJson: Effect.tryPromise({
-      try: () =>
-        database.getFirstAsync<StoredPreferencesJson>(
-          `SELECT payload, updated_at AS updatedAt
-                 FROM client_preferences
-                 WHERE singleton = 1`,
-        ),
-      catch: databaseError("load-preferences"),
-    }).pipe(Effect.map(Option.fromNullishOr)),
+    loadPreferencesJson: readFirst<StoredPreferencesJson>(
+      database,
+      options,
+      "load-preferences",
+      `SELECT payload, updated_at AS updatedAt
+             FROM client_preferences
+             WHERE singleton = 1`,
+    ).pipe(Effect.map(Option.fromNullishOr)),
     savePreferencesJson: Effect.fn("MobileDatabase.savePreferencesJson")((payload, updatedAt) =>
       Effect.tryPromise({
         try: () =>
@@ -469,10 +514,14 @@ function makeUnavailable(error: MobileDatabaseError): MobileDatabase["Service"] 
   });
 }
 
-export const make = Effect.result(makeAvailable).pipe(
-  Effect.map((result) =>
-    result._tag === "Success" ? result.success : makeUnavailable(result.failure),
-  ),
-);
+export const makeWith = (options: MobileDatabaseOptions) =>
+  Effect.result(makeAvailable(options)).pipe(
+    Effect.map((result) =>
+      result._tag === "Success" ? result.success : makeUnavailable(result.failure),
+    ),
+  );
 
-export const layer = Layer.effect(MobileDatabase, make);
+export const make = makeWith({ synchronousReads: false });
+
+export const layerWith = (options: MobileDatabaseOptions) =>
+  Layer.effect(MobileDatabase, makeWith(options));
