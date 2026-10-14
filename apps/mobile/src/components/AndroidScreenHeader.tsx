@@ -1,5 +1,6 @@
+import { AppActivityIndicator } from "./AppActivityIndicator";
 import { createContext, use, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View, type ColorValue } from "react-native";
+import { Pressable, StyleSheet, View, type ColorValue } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import type { AppSymbolName } from "./AppSymbol";
@@ -12,7 +13,7 @@ import { useInAndroidPageSheet } from "./AndroidPageSheet";
 import { GlassSurface } from "./GlassSurface";
 import { useLiquidGlass } from "./useLiquidGlass";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
-import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
+import { useAndroidHeaderLayout } from "./useAndroidHeaderLayout";
 
 export interface AndroidHeaderAction {
   readonly accessibilityLabel: string;
@@ -183,7 +184,7 @@ export function AndroidScreenHeader(props: {
   // Inside a page sheet every screen gets the iOS sheet bar: centered title, grabber room.
   const inPageSheet = useInAndroidPageSheet();
   const embedded = props.embedded ?? inPageSheet;
-  const { height: toolbarHeight, ...headerPadding } = useMaterialToolbarLayout(embedded);
+  const { height: toolbarHeight, ...headerPadding } = useAndroidHeaderLayout(embedded);
   const [headerWidth, setHeaderWidth] = useState(0);
   const [sideWidths, setSideWidths] = useState({ leading: 0, trailing: 0 });
   const actions = props.actions ?? [];
@@ -281,7 +282,7 @@ export function AndroidScreenHeader(props: {
                     className="items-center justify-center"
                     style={{ width: size, height: size }}
                   >
-                    <ActivityIndicator colorClassName="accent-header-foreground" />
+                    <AppActivityIndicator colorClassName="accent-header-foreground" />
                   </View>
                 ) : (
                   <AndroidHeaderIconButton

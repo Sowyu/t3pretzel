@@ -1,3 +1,5 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { ChatGptUsageSummary } from "./ChatGptUsageSummary";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { EnvironmentId, USAGE_CONTRACT_VERSION, type UsageProviderKind } from "@t3tools/contracts";
@@ -27,7 +29,7 @@ import {
   makeWindow,
 } from "@t3tools/shared/usageFormat";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Platform, Pressable, RefreshControl, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import Animated, {
   FadeIn,
   ReduceMotion,
@@ -276,7 +278,7 @@ export function UsageRouteScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
         refreshControl={
           showingLimits || canReadDiagnostics ? (
-            <RefreshControl
+            <AppRefreshControl
               refreshing={showingLimits ? limits.refreshing : refreshingUsage}
               onRefresh={showingLimits ? () => void limits.refresh() : refreshWindow}
             />
@@ -430,7 +432,7 @@ function UsageUpdating({
           pointerEvents="none"
           className="absolute right-4 top-4 h-5 max-w-[55%] flex-row items-center gap-1.5"
         >
-          <ActivityIndicator size="small" colorClassName="accent-adaptive-sky-600-400" />
+          <AppActivityIndicator size="small" colorClassName="accent-adaptive-sky-600-400" />
           <Text className="shrink text-sm text-adaptive-sky-600-400" numberOfLines={1}>
             {label}
           </Text>

@@ -1,3 +1,4 @@
+import { AppRefreshControl } from "../../../components/AppRefreshControl";
 import { useOpenPullRequest } from "../../../native/useOpenPullRequest";
 import {
   type GitActionRequestInput,
@@ -18,7 +19,7 @@ import {
 } from "@react-navigation/native";
 import { SymbolView } from "../../../components/AppSymbol";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 
 import { Screen, ScreenStack, ScreenStackHeaderConfig } from "react-native-screens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,8 +30,7 @@ import {
   AndroidSheetHeader,
 } from "../../../components/AndroidScreenHeader";
 import { AndroidAnchoredMenu } from "../../../components/AndroidAnchoredMenu";
-import { MaterialScreenContent } from "../../../components/MaterialScreenContent";
-import { useAdaptiveWorkspaceLayout } from "../../layout/AdaptiveWorkspaceLayout";
+import { ScreenContent } from "../../../components/ScreenContent";
 import { AppText as Text } from "../../../components/AppText";
 import { nativeHeaderScrollEdgeEffects } from "../../../native/StackHeader";
 import { useEnvironmentQuery } from "../../../state/query";
@@ -66,7 +66,6 @@ export function GitOverviewSheet(props: GitOverviewSheetProps) {
 }
 
 function GitOverviewSheetContent(props: GitOverviewSheetProps) {
-  const { layout } = useAdaptiveWorkspaceLayout();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const presentation = props.presentation ?? "sheet";
@@ -279,7 +278,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       }}
       refreshControl={
         Platform.OS === "ios" || isInspector ? (
-          <RefreshControl refreshing={isRefreshing} onRefresh={() => void handleRefresh()} />
+          <AppRefreshControl refreshing={isRefreshing} onRefresh={() => void handleRefresh()} />
         ) : undefined
       }
     >
@@ -557,9 +556,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
         />
       )}
 
-      <MaterialScreenContent insetHorizontal={layout.usesSplitView}>
-        {content}
-      </MaterialScreenContent>
+      <ScreenContent>{content}</ScreenContent>
     </View>
   );
 }

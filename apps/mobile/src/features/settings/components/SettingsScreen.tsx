@@ -6,7 +6,7 @@ import type { ScreenHeaderProps } from "../../../components/ScreenHeader.types";
 import { ScreenHeader } from "../../../components/ScreenHeader";
 import { AndroidHeaderIconButton } from "../../../components/AndroidScreenHeader";
 import { useInAndroidPageSheet } from "../../../components/AndroidPageSheet";
-import { MaterialScreenContent as SettingsScreenContent } from "../../../components/MaterialScreenContent";
+import { ScreenContent as SettingsScreenContent } from "../../../components/ScreenContent";
 
 export { SettingsScreenContent };
 

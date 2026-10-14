@@ -3,11 +3,11 @@ import { BackHandler, Keyboard, type TextInputInstance, View } from "react-nativ
 
 import { AndroidHeaderIconButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
-import { MaterialSearchField } from "../../components/MaterialSearchField";
-import { useMaterialToolbarLayout } from "../../components/useMaterialToolbarLayout";
+import { SearchField } from "../../components/SearchField";
+import { useAndroidHeaderLayout } from "../../components/useAndroidHeaderLayout";
 
 /** Keep Files search in the same header row on compact and expanded layouts. */
-export function MaterialFilesHeader(props: {
+export function AndroidFilesHeader(props: {
   readonly projectName: string;
   readonly searchQuery: string;
   readonly onSearchQueryChange: (query: string) => void;
@@ -15,7 +15,7 @@ export function MaterialFilesHeader(props: {
   readonly onBack?: () => void;
   readonly leading?: ReactNode;
 }) {
-  const { paddingTop, paddingBottom } = useMaterialToolbarLayout();
+  const { paddingTop, paddingBottom } = useAndroidHeaderLayout();
   const searchRef = useRef<TextInputInstance>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const searching = searchOpen || props.searchQuery.length > 0;
@@ -84,7 +84,7 @@ export function MaterialFilesHeader(props: {
               icon="chevron.left"
               onPress={closeSearch}
             />
-            <MaterialSearchField
+            <SearchField
               inputRef={searchRef}
               accessibilityLabel="Search files"
               clearAccessibilityLabel="Clear file search"

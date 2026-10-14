@@ -1,7 +1,7 @@
 import { GlassFill } from "../../components/GlassSurface";
 import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
-import { MaterialSearchField } from "../../components/MaterialSearchField";
+import { SearchField } from "../../components/SearchField";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { shouldCheckoutNewTaskBranch } from "./new-task-context-presentation";
 import type { VcsRef } from "@t3tools/client-runtime/state/vcs";
@@ -18,7 +18,7 @@ import { Alert, Platform, Pressable, ScrollView, type TextInputInstance, View } 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
+import { ScreenContent } from "../../components/ScreenContent";
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
@@ -166,7 +166,7 @@ export function NewTaskEnvironmentPickerRouteScreen() {
           onBack={() => navigation.goBack()}
         />
       ) : null}
-      <MaterialScreenContent>
+      <ScreenContent>
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{
@@ -203,7 +203,7 @@ export function NewTaskEnvironmentPickerRouteScreen() {
             ))}
           </PickerSurface>
         </ScrollView>
-      </MaterialScreenContent>
+      </ScreenContent>
     </View>
   );
 }
@@ -493,7 +493,7 @@ export function BranchPickerScreen(props: {
         />
         {/* Stands in for the iOS navigation bar search field. */}
         <View className="flex-row px-4 pb-3 pt-1">
-          <MaterialSearchField
+          <SearchField
             inputRef={searchInput}
             autoFocus={false}
             accessibilityLabel="Find a branch"
@@ -503,7 +503,7 @@ export function BranchPickerScreen(props: {
             onChangeText={props.onQueryChange}
           />
         </View>
-        <MaterialScreenContent>{branchContent}</MaterialScreenContent>
+        <ScreenContent>{branchContent}</ScreenContent>
       </View>
     );
   }

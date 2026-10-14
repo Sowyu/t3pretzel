@@ -1,9 +1,10 @@
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { PullRequestDetail, PullRequestMergeMethod } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import { ControlPillMenu } from "../../components/ControlPillMenu";
@@ -177,7 +178,7 @@ export function PullRequestMergeControls(props: {
           className="min-h-11 min-w-0 flex-1 flex-row items-center justify-center gap-2 px-3 py-2 active:opacity-70"
         >
           {busy || checkingStack ? (
-            <ActivityIndicator size="small" colorClassName="accent-icon-muted" />
+            <AppActivityIndicator size="small" colorClassName="accent-icon-muted" />
           ) : (
             <SymbolView
               name="arrow.triangle.merge"

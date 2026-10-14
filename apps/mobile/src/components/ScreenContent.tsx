@@ -6,13 +6,11 @@ import { Platform, View } from "react-native";
  * own background, like iOS; the wrapper only keeps the flex layout the
  * screens were built against.
  */
-export function MaterialScreenContent({
+export function ScreenContent({
   children,
   fitToContents = false,
 }: {
   readonly children: ReactNode;
-  /** Kept for call sites; iOS-style panes have no side gutters. */
-  readonly insetHorizontal?: boolean;
   /** Allow native form sheets to measure their content instead of filling a fixed detent. */
   readonly fitToContents?: boolean;
 }) {

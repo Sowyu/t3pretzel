@@ -1,3 +1,4 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import type { ComponentType } from "react";
@@ -5,7 +6,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Platform,
-  RefreshControl,
   ScrollView,
   Text as NativeText,
   useWindowDimensions,
@@ -254,7 +254,7 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
   const listRef = useRef<FlatList<string>>(null);
   const { isPullRefreshing, handlePullToRefresh } = useSourceFileRefresh(props.onRefresh);
   const refreshControl = props.onRefresh ? (
-    <RefreshControl refreshing={isPullRefreshing} onRefresh={() => void handlePullToRefresh()} />
+    <AppRefreshControl refreshing={isPullRefreshing} onRefresh={() => void handlePullToRefresh()} />
   ) : undefined;
 
   useEffect(() => {

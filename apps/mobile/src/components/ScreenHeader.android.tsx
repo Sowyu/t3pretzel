@@ -7,7 +7,7 @@ import {
   type TextInputInstance,
   View,
 } from "react-native";
-import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
+import { useAndroidHeaderLayout } from "./useAndroidHeaderLayout";
 import { NativeStackScreenOptions } from "../native/StackHeader";
 import { AndroidWorkspaceSidebarButton } from "../features/layout/workspace-sidebar-toolbar";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
@@ -17,14 +17,14 @@ import { SymbolView } from "./AppSymbol";
 import { ControlPillMenu } from "./ControlPill";
 import { GlassFill } from "./GlassSurface";
 import { useLiquidGlass } from "./useLiquidGlass";
-import { MaterialSearchField } from "./MaterialSearchField";
+import { SearchField } from "./SearchField";
 import { androidHeaderMenuActions, findHeaderMenuAction } from "./headerMenu.android";
 import type { ScreenHeaderProps } from "./ScreenHeader.types";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
 export function ScreenHeader(props: ScreenHeaderProps) {
   const { search } = props;
-  const { paddingTop, paddingBottom } = useMaterialToolbarLayout();
+  const { paddingTop, paddingBottom } = useAndroidHeaderLayout();
   const { scale, buttonSize } = useAndroidControlSizing();
   const { themeVariables } = useAppearancePreferences();
   const liquid = useLiquidGlass().tier !== "none";
@@ -194,7 +194,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
                   icon="chevron.left"
                   onPress={closeSearch}
                 />
-                <MaterialSearchField
+                <SearchField
                   inputRef={inputRef}
                   accessibilityLabel={search.placeholder}
                   clearAccessibilityLabel={search.clearAccessibilityLabel ?? "Clear search"}

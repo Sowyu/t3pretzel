@@ -2,7 +2,6 @@ import { SymbolView } from "../../components/AppSymbol";
 import { Platform, Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
-import { MaterialFloatingActionButton } from "../../components/MaterialFloatingActionButton";
 import { EmptyState } from "../../components/EmptyState";
 
 export function WorkspaceEmptyDetail(props: {
@@ -24,13 +23,21 @@ export function WorkspaceEmptyDetail(props: {
             detail="Add an environment to load projects and start coding sessions."
             variant="plain"
             action={
-              <MaterialFloatingActionButton
-                label="Add environment"
-                icon="plus"
-                variant="extended"
-                tone="primary"
+              <Pressable
+                accessibilityRole="button"
+                className="mt-2 flex-row items-center gap-2 self-center rounded-full bg-primary px-5 py-3 active:opacity-70"
                 onPress={props.onAddConnection}
-              />
+              >
+                <SymbolView
+                  name="plus"
+                  size={17}
+                  tintColorClassName="accent-primary-foreground"
+                  type="monochrome"
+                />
+                <Text className="text-base font-t3-bold text-primary-foreground">
+                  Add environment
+                </Text>
+              </Pressable>
             }
           />
         </View>

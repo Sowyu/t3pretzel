@@ -8,7 +8,7 @@ import { useAndroidControlSizing } from "./useAndroidControlSizing";
  * Shared Android header geometry, sized like the iOS navigation bar. Embedded
  * (sheet) headers leave room above for the sheet grabber.
  */
-export function useMaterialToolbarLayout(embedded = false) {
+export function useAndroidHeaderLayout(embedded = false) {
   const insets = useSafeAreaInsets();
   const title = useScaledTextRole("title");
   const subtitle = useScaledTextRole("label");
@@ -25,6 +25,6 @@ export function useMaterialToolbarLayout(embedded = false) {
 
 /** Total height of a non-embedded Android screen header, for content under an overlay header. */
 export function useAndroidScreenHeaderHeight() {
-  const { height, paddingTop, paddingBottom } = useMaterialToolbarLayout();
+  const { height, paddingTop, paddingBottom } = useAndroidHeaderLayout();
   return paddingTop + height + paddingBottom;
 }

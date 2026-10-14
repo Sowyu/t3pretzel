@@ -8,7 +8,7 @@ import { Platform, ScrollView, useWindowDimensions, View } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { MaterialScreenContent } from "../../../components/MaterialScreenContent";
+import { ScreenContent } from "../../../components/ScreenContent";
 import { NativeStackScreenOptions } from "../../../native/StackHeader";
 import { AppText as Text } from "../../../components/AppText";
 import { useSelectedThreadGitActions } from "../../../state/use-selected-thread-git-actions";
@@ -129,7 +129,7 @@ export function GitConfirmSheet(props: GitConfirmSheetProps) {
       ) : null}
       <View className="min-h-4 pt-2" />
 
-      <MaterialScreenContent fitToContents>
+      <ScreenContent fitToContents>
         <ScrollView
           nestedScrollEnabled
           className="android:shrink android:grow-0 ios:flex-1"
@@ -166,7 +166,7 @@ export function GitConfirmSheet(props: GitConfirmSheetProps) {
             />
           </View>
         </ScrollView>
-      </MaterialScreenContent>
+      </ScreenContent>
     </View>
   );
 }

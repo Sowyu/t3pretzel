@@ -1,3 +1,4 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
 import { GlassFill } from "../../components/GlassSurface";
 import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { LegendList } from "@legendapp/list/react-native";
@@ -5,7 +6,7 @@ import type { ProjectEntry } from "@t3tools/contracts";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { SymbolView } from "../../components/AppSymbol";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, RefreshControl, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
@@ -263,7 +264,7 @@ export function FileTreeBrowser(props: {
       extraData={extraData}
       contentContainerStyle={{ paddingTop: 8, paddingBottom: 8 }}
       refreshControl={
-        <RefreshControl refreshing={props.isRefreshing} onRefresh={props.onRefresh} />
+        <AppRefreshControl refreshing={props.isRefreshing} onRefresh={props.onRefresh} />
       }
       renderItem={renderItem}
       ListHeaderComponent={

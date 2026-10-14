@@ -3,7 +3,10 @@ import type { FileDiffMetadata } from "@pierre/diffs";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useEffect, useMemo } from "react";
 import { Platform, Pressable, View } from "react-native";
-import { AndroidScreenHeader } from "../../../components/AndroidScreenHeader";
+import {
+  AndroidHeaderIconButton,
+  AndroidScreenHeader,
+} from "../../../components/AndroidScreenHeader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   letterStopNotes,
@@ -15,7 +18,6 @@ import { GuideOutline } from "./GuideOutline";
 import { AppText as Text } from "../../../components/AppText";
 import { ScreenScrollView } from "../../../components/ScreenScrollView";
 import { ControlPillMenu } from "../../../components/ControlPillMenu";
-import { MaterialIconButton } from "../../../components/MaterialIconButton";
 import { useAppearancePreferences } from "../../settings/appearance/AppearancePreferencesProvider";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../../native/StackHeader";
 import { PullRequestCardGroup, PullRequestCardRow } from "../PullRequestControls";
@@ -156,7 +158,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
               onPressAction={() => setCodeWordBreak(!appearance.codeWordBreak)}
             >
               <View pointerEvents="none">
-                <MaterialIconButton icon="ellipsis" accessibilityLabel="Guide options" />
+                <AndroidHeaderIconButton icon="ellipsis" accessibilityLabel="Guide options" />
               </View>
             </ControlPillMenu>
           }

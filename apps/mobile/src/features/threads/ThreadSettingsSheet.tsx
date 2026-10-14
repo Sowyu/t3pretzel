@@ -1,3 +1,4 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
 import { createV5StackNavigator as createNativeStackNavigator } from "../../native/createV5StackNavigator";
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import {
@@ -36,25 +37,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  Alert,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  type TextInputInstance,
-  View,
-} from "react-native";
+import { Alert, Platform, Pressable, ScrollView, type TextInputInstance, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
-import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
+import { AndroidHeaderIconButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
-import { MaterialButton } from "../../components/MaterialButton";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
-import { MaterialSearchField } from "../../components/MaterialSearchField";
+import { SearchField } from "../../components/SearchField";
 import { ProviderIcon } from "../../components/ProviderIcon";
 import { ThemedSwitch } from "../../components/ThemedSwitch";
 import { cn } from "../../lib/cn";
@@ -79,7 +70,7 @@ import { environmentServerConfigsAtom, serverEnvironment } from "../../state/ser
 import { mobilePreferencesAtom } from "../../state/preferences";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useNewTaskFlow } from "./new-task-flow-provider";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
+import { ScreenContent } from "../../components/ScreenContent";
 import {
   createProviderCatalogRefreshRunner,
   providerCatalogRefreshError,
@@ -1107,7 +1098,7 @@ function ThreadSettingsMainContent(props: {
           {Platform.OS === "android" ? (
             // Stands in for the iOS navigation bar search field.
             <View className="flex-row px-4 pb-2 pt-3">
-              <MaterialSearchField
+              <SearchField
                 inputRef={modelSearchInput}
                 autoFocus={false}
                 accessibilityLabel="Find a model"
@@ -1123,7 +1114,7 @@ function ThreadSettingsMainContent(props: {
       recycleItems
       refreshControl={
         session.environmentId ? (
-          <RefreshControl refreshing={isRefreshingProviders} onRefresh={refreshProviders} />
+          <AppRefreshControl refreshing={isRefreshingProviders} onRefresh={refreshProviders} />
         ) : undefined
       }
       onLoad={() => setAnimationsReady(true)}
@@ -1333,17 +1324,24 @@ function ThreadSettingsModelsScreen() {
                 }}
               >
                 {(open) => (
-                  <MaterialIconButton
+                  <AndroidHeaderIconButton
                     accessibilityLabel="Filter models"
                     icon="line.3.horizontal.decrease"
                     selected={hasCustomCatalogFilter}
-                    variant={hasCustomCatalogFilter ? "tonal" : "standard"}
                     onPress={open}
                   />
                 )}
               </AndroidAnchoredMenu>
               {session.pendingModel ? (
-                <MaterialButton label="Save" tone="text" onPress={commitAndClose} />
+                // iOS's text bar button, sharing the header capsule.
+                <Pressable
+                  accessibilityLabel="Save thread settings"
+                  accessibilityRole="button"
+                  onPress={commitAndClose}
+                  className="h-11 justify-center px-3.5"
+                >
+                  <Text className="text-base font-t3-bold text-header-foreground">Save</Text>
+                </Pressable>
               ) : null}
             </View>
           }
@@ -1388,7 +1386,7 @@ function ThreadSettingsModelsScreen() {
               : undefined,
         }}
       />
-      <MaterialScreenContent>
+      <ScreenContent>
         <ThreadSettingsMainContent
           onOpenSubmenu={(submenu) => {
             const title =
@@ -1400,7 +1398,7 @@ function ThreadSettingsModelsScreen() {
             navigation.navigate("ThreadSettingsChoice", { ...submenu, title });
           }}
         />
-      </MaterialScreenContent>
+      </ScreenContent>
       <NativeHeaderToolbar placement="left">
         <NativeHeaderToolbar.Button
           accessibilityLabel="Cancel thread settings"
@@ -1480,12 +1478,12 @@ function ThreadSettingsChoiceScreen() {
           hideBottomBorder
         />
       ) : null}
-      <MaterialScreenContent>
+      <ScreenContent>
         <ThreadSettingsChoiceContent
           submenu={route.params}
           onSelected={() => navigation.goBack()}
         />
-      </MaterialScreenContent>
+      </ScreenContent>
     </>
   );
 }

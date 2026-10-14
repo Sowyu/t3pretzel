@@ -52,13 +52,21 @@ export function alertRequestFromNative(
   };
 }
 
+// ponytail: character count stands in for measuring the label; measure with
+// onTextLayout if a wide-glyph title still truncates.
+const SIDE_BY_SIDE_MAX_TITLE_LENGTH = 11;
+
 /**
  * UIAlertController's layout: two buttons sit side by side with Cancel on
- * the left; three or more stack with Cancel at the bottom.
+ * the left, unless a title would not fit half the alert's width; otherwise
+ * they stack with Cancel at the bottom.
  */
 export function orderAlertButtons(buttons: readonly AndroidAlertButton[]) {
   const cancel = buttons.filter((button) => button.style === "cancel");
   const rest = buttons.filter((button) => button.style !== "cancel");
-  const ordered = buttons.length === 2 ? [...cancel, ...rest] : [...rest, ...cancel];
-  return { ordered, horizontal: buttons.length === 2 };
+  const horizontal =
+    buttons.length === 2 &&
+    buttons.every((button) => button.text.length <= SIDE_BY_SIDE_MAX_TITLE_LENGTH);
+  const ordered = horizontal ? [...cancel, ...rest] : [...rest, ...cancel];
+  return { ordered, horizontal };
 }

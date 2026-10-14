@@ -1,10 +1,11 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { useNavigation } from "@react-navigation/native";
 import { useAtomValue } from "@effect/atom-react";
 import { managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useCallback, useRef, useState } from "react";
-import { Platform, RefreshControl } from "react-native";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -155,7 +156,7 @@ export function SettingsEnvironmentsRouteScreen() {
         }}
         refreshControl={
           relaySession ? (
-            <RefreshControl
+            <AppRefreshControl
               refreshing={isRefreshingCloud}
               onRefresh={() => void refreshCloudEnvironments()}
             />

@@ -4,7 +4,7 @@ import { GlassFill } from "./GlassSurface";
 import { useLiquidGlass } from "./useLiquidGlass";
 import { cn } from "../lib/cn";
 
-export interface MaterialButtonProps {
+export interface AppButtonProps {
   readonly label: string;
   readonly onPress: () => void;
   readonly disabled?: boolean;
@@ -21,7 +21,7 @@ const TONE_CLASS_NAMES = {
   text: ["bg-transparent", "text-primary-text"],
 } as const;
 
-export function MaterialButton(props: MaterialButtonProps) {
+export function AppButton(props: AppButtonProps) {
   const [containerClassName, labelClassName] = TONE_CLASS_NAMES[props.tone ?? "secondary"];
   const disabled = Boolean(props.disabled || props.loading);
   // Android: the plain capsule becomes glass; filled tones keep their color.

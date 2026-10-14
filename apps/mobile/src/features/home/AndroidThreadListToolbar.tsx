@@ -17,14 +17,14 @@ import {
 import { CompactBrandTitle } from "../../components/CompactBrandTitle";
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { ControlPillMenu } from "../../components/ControlPill";
-import { MaterialSearchField } from "../../components/MaterialSearchField";
+import { SearchField } from "../../components/SearchField";
 import { useHardwareKeyboardCommand } from "../keyboard/hardwareKeyboardCommands";
 import { WorkspaceConnectionTitle } from "./WorkspaceConnectionTitle";
 import { useWorkspaceState } from "../../state/workspace";
-import { useMaterialToolbarLayout } from "../../components/useMaterialToolbarLayout";
+import { useAndroidHeaderLayout } from "../../components/useAndroidHeaderLayout";
 
 /** The Home bar for the compact list and the split-view sidebar, including search. */
-export function MaterialThreadListToolbar(props: {
+export function AndroidThreadListToolbar(props: {
   readonly searchQuery: string;
   readonly onSearchQueryChange: (query: string) => void;
   readonly filterActions: MenuAction[];
@@ -44,7 +44,7 @@ export function MaterialThreadListToolbar(props: {
   const homeFocused = useNavigationState((state) => state.routes[state.index]?.name === "Home");
   const listFocused =
     homeFocused && (workspace === null || workspace.state.selectedTab === "threads");
-  const { height: toolbarHeight, ...headerPadding } = useMaterialToolbarLayout();
+  const { height: toolbarHeight, ...headerPadding } = useAndroidHeaderLayout();
   const { state } = useWorkspaceState();
   const { onRequestVisibility, onSearchQueryChange } = props;
   const searchRef = useRef<TextInputInstance>(null);
@@ -86,7 +86,7 @@ export function MaterialThreadListToolbar(props: {
     ? "line.3.horizontal.decrease.circle.fill"
     : "line.3.horizontal.decrease.circle";
   const searchField = (
-    <MaterialSearchField
+    <SearchField
       inputRef={searchRef}
       accessibilityLabel="Search threads"
       clearAccessibilityLabel="Clear search"

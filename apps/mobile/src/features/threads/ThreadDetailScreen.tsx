@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import { useAndroidScreenHeaderHeight } from "../../components/useMaterialToolbarLayout";
+import { useAndroidScreenHeaderHeight } from "../../components/useAndroidHeaderLayout";
 import { GlassBackdropSource } from "../../components/GlassBackdropSource";
 import { useChildThreadInputs, useThreadReportedModelSelection } from "../../state/entities";
 import { UsageLimitRecoveryCard } from "./UsageLimitRecoveryCard";

@@ -39,5 +39,12 @@ describe("Android alert", () => {
     ]);
     expect(three.horizontal).toBe(false);
     expect(three.ordered.map((entry) => entry.text)).toEqual(["Archive", "Delete", "Cancel"]);
+
+    const long = orderAlertButtons([
+      button("Keep editing", "cancel"),
+      button("Discard changes", "destructive"),
+    ]);
+    expect(long.horizontal).toBe(false);
+    expect(long.ordered.map((entry) => entry.text)).toEqual(["Discard changes", "Keep editing"]);
   });
 });

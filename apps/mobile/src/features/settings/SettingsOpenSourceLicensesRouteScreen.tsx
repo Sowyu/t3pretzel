@@ -13,7 +13,7 @@ import { Linking, Platform, Pressable, type TextInputInstance, View } from "reac
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SymbolView } from "../../components/AppSymbol";
-import { MaterialSearchField } from "../../components/MaterialSearchField";
+import { SearchField } from "../../components/SearchField";
 import { AppText as Text } from "../../components/AppText";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
@@ -173,7 +173,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
           Platform.OS !== "ios" ? (
             // Stands in for the iOS navigation bar search field.
             <View className="flex-row px-5 pt-4 pb-5">
-              <MaterialSearchField
+              <SearchField
                 inputRef={searchInput}
                 autoFocus={false}
                 accessibilityLabel="Search open-source licenses"

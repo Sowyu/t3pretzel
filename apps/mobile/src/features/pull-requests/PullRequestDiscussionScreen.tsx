@@ -1,15 +1,16 @@
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { useAtomRefresh } from "@effect/atom-react";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { PullRequestThreadComment } from "@t3tools/contracts";
 import { useRef, useState } from "react";
-import { ActivityIndicator, Platform, ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import { NativeScrollViewMarker as ScrollViewMarker } from "../../native/NativeScrollViewMarker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
-import { MaterialButton } from "../../components/MaterialButton";
+import { AppButton } from "../../components/AppButton";
 import { GlassBackdropSource } from "../../components/GlassBackdropSource";
 import { GlassSurface } from "../../components/GlassSurface";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
@@ -166,7 +167,7 @@ function Discussion({ params }: { params: PullRequestParams & { readonly discuss
                 paddingBottom: canReply ? composerHeight + bottomInset + 24 : 24,
               }}
             >
-              {activity.isPending && !thread ? <ActivityIndicator /> : null}
+              {activity.isPending && !thread ? <AppActivityIndicator /> : null}
               {thread ? (
                 <View className="gap-2 pb-4">
                   <Text selectable className="font-mono text-xs text-foreground-muted">
@@ -177,7 +178,7 @@ function Discussion({ params }: { params: PullRequestParams & { readonly discuss
                     {thread.isResolved ? "Resolved" : "Unresolved"}
                     {thread.isOutdated ? " · Outdated" : ""}
                   </Text>
-                  <MaterialButton
+                  <AppButton
                     label="View file diff"
                     onPress={() =>
                       navigation.navigate("PullRequestFile", { ...params, path: thread.path })
@@ -202,7 +203,7 @@ function Discussion({ params }: { params: PullRequestParams & { readonly discuss
                 </View>
               ))}
               {nextCursor ? (
-                <MaterialButton
+                <AppButton
                   label={busy ? "Loading…" : "Load more replies"}
                   disabled={busy}
                   onPress={() => void more()}
@@ -236,7 +237,7 @@ function Discussion({ params }: { params: PullRequestParams & { readonly discuss
                 className="max-h-36 min-h-12 min-w-0 flex-1 rounded-[24px] border-0 bg-transparent px-4 py-3 text-base text-foreground"
               />
               <View>
-                <MaterialButton
+                <AppButton
                   label={busy ? "Posting…" : "Reply"}
                   tone="contrast"
                   disabled={busy || !body.trim()}

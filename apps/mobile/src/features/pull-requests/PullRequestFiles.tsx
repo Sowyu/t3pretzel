@@ -1,15 +1,15 @@
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { PullRequestSectionHeading } from "./PullRequestSectionHeading";
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import Animated from "react-native-reanimated";
 import { PR_ROW_LAYOUT, PR_ROW_ENTER, PR_ROW_EXIT } from "./pullRequestAnimations";
 import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/AppText";
 import { EmptyState } from "../../components/EmptyState";
 import { ControlPillMenu } from "../../components/ControlPillMenu";
-import { MaterialButton } from "../../components/MaterialButton";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
+import { AppButton } from "../../components/AppButton";
 import { SymbolView } from "../../components/AppSymbol";
 import { PierreEntryIcon } from "../../components/PierreEntryIcon";
 import { composerPullRequests } from "../../state/pull-requests";
@@ -227,11 +227,17 @@ export function usePullRequestFilesContent(props: {
                 ]}
                 onPressAction={filter.toggle}
               >
-                <View pointerEvents="none">
-                  <MaterialIconButton
-                    icon="line.3.horizontal.decrease"
-                    accessibilityLabel="Filter review files"
-                    selected={filter.hideTestFiles}
+                <View
+                  pointerEvents="none"
+                  accessibilityLabel="Filter review files"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: filter.hideTestFiles }}
+                  className="size-11 items-center justify-center"
+                >
+                  <SymbolView
+                    name="line.3.horizontal.decrease"
+                    size={20}
+                    tintColorClassName="accent-foreground"
                   />
                 </View>
               </ControlPillMenu>
@@ -243,11 +249,7 @@ export function usePullRequestFilesContent(props: {
                 }
                 detail="Test files are hidden from this review."
                 action={
-                  <MaterialButton
-                    label="Show test files"
-                    tone="contrast"
-                    onPress={filter.showAll}
-                  />
+                  <AppButton label="Show test files" tone="contrast" onPress={filter.showAll} />
                 }
                 variant="plain"
               />
@@ -267,7 +269,7 @@ export function usePullRequestFilesContent(props: {
             className="min-h-11 items-center justify-center rounded-xl bg-grouped-card px-4 py-3"
           >
             {result.isPending ? (
-              <ActivityIndicator />
+              <AppActivityIndicator />
             ) : (
               <Text className="text-sm font-t3-medium">
                 {result.error ? "Retry loading files" : "Load more files"}

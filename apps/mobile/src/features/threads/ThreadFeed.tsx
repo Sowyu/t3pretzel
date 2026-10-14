@@ -79,7 +79,6 @@ import {
   type RefObject,
 } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Platform,

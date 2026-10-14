@@ -1,3 +1,5 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { pullRequestTabOffset } from "./pullRequestTabScroll";
 import { guideFocusedRows, type GuideDiffFocus } from "./guide/guideDiffFocus";
 import { PullRequestGuideContent } from "./guide/PullRequestGuideScreen";
@@ -20,8 +22,7 @@ import {
 import { openOnProviderLabel } from "./pullRequestActions";
 import * as Clipboard from "expo-clipboard";
 import { ControlPillMenu } from "../../components/ControlPillMenu";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
-import { MaterialButton } from "../../components/MaterialButton";
+import { AppButton } from "../../components/AppButton";
 import { usePullRequestReviewDraft } from "./usePullRequestReviewDraft";
 import { usePullRequestFilesViewed } from "./usePullRequestFilesViewed";
 import { usePullRequestPermissions } from "./usePullRequestPermissions";
@@ -42,11 +43,9 @@ import { PullRequestOverviewLoading } from "./PullRequestOverviewLoading";
 import { pullRequestStatus } from "./pullRequestStatus";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Linking,
   Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   type ScrollViewProps,
   StyleSheet,
@@ -56,7 +55,7 @@ import { NativeScrollViewMarker as ScrollViewMarker } from "../../native/NativeS
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
-import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
+import { AndroidHeaderIconButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { GlassBackdropSource } from "../../components/GlassBackdropSource";
 import { useAndroidControlSizing } from "../../components/useAndroidControlSizing";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
@@ -497,7 +496,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                     }
                     contentInsetStartAdjustment={Platform.OS === "ios" ? insets.top : 0}
                     refreshControl={
-                      <RefreshControl
+                      <AppRefreshControl
                         refreshing={section === tab && pullRefresh.refreshing}
                         onRefresh={refresh}
                       />
@@ -966,7 +965,7 @@ export function PullRequestFileRouteScreen({
               }}
             >
               <View pointerEvents="none">
-                <MaterialIconButton icon="ellipsis" accessibilityLabel="Diff options" />
+                <AndroidHeaderIconButton icon="ellipsis" accessibilityLabel="Diff options" />
               </View>
             </ControlPillMenu>
           }
@@ -1045,7 +1044,7 @@ export function PullRequestFileRouteScreen({
           <Text className="min-w-0 flex-1 text-xs text-foreground-muted">
             The branch changed. Reload before adding line comments.
           </Text>
-          <MaterialButton
+          <AppButton
             label="Reload changes"
             onPress={() => {
               result.refresh();
@@ -1146,7 +1145,7 @@ export function PullRequestFileRouteScreen({
               title="Only test files changed"
               detail="Test files are hidden from this review."
               action={
-                <MaterialButton label="Show test files" tone="contrast" onPress={filter.showAll} />
+                <AppButton label="Show test files" tone="contrast" onPress={filter.showAll} />
               }
               variant="plain"
             />
@@ -1160,7 +1159,7 @@ export function PullRequestFileRouteScreen({
         ) : null}
         {result.nextCursor && result.isPending && data.rows.length && !seekingFile ? (
           <View className="flex-row items-center justify-center gap-2 py-2">
-            <ActivityIndicator size="small" />
+            <AppActivityIndicator size="small" />
             <Text className="text-xs text-foreground-muted">Loading more files…</Text>
           </View>
         ) : null}

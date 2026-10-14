@@ -6,8 +6,8 @@ import {
   AndroidHeaderIconButton,
 } from "../../components/AndroidScreenHeader";
 import { CompactBrandTitle } from "../../components/CompactBrandTitle";
-import { MaterialSearchField } from "../../components/MaterialSearchField";
-import { useMaterialToolbarLayout } from "../../components/useMaterialToolbarLayout";
+import { SearchField } from "../../components/SearchField";
+import { useAndroidHeaderLayout } from "../../components/useAndroidHeaderLayout";
 import { WorkspaceConnectionTitle } from "../home/WorkspaceConnectionTitle";
 import { useHardwareKeyboardCommand } from "../keyboard/hardwareKeyboardCommands";
 import { useWorkspaceTabs } from "../workspace/WorkspaceTabsContext";
@@ -24,7 +24,7 @@ export function PullRequestListToolbar(props: { readonly onRequestVisibility?: (
   const homeFocused = useNavigationState((state) => state.routes[state.index]?.name === "Home");
   const listFocused = homeFocused && workspace.state.selectedTab === "pullRequests";
   const { onRequestVisibility } = props;
-  const { height: toolbarHeight, ...headerPadding } = useMaterialToolbarLayout();
+  const { height: toolbarHeight, ...headerPadding } = useAndroidHeaderLayout();
   const tab = workspace.state.tabs.pullRequests;
   const input = useRef<TextInputInstance>(null);
   const searching = tab.searchMode !== "resting";
@@ -97,7 +97,7 @@ export function PullRequestListToolbar(props: { readonly onRequestVisibility?: (
       </View>
       {searching ? (
         <View className="flex-row items-center gap-2 pt-2">
-          <MaterialSearchField
+          <SearchField
             inputRef={input}
             autoFocus={tab.searchMode === "active"}
             accessibilityLabel="Search pull requests"

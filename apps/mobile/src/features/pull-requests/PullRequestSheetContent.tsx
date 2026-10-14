@@ -5,7 +5,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/AppText";
 import { AndroidHeaderIconButton, AndroidSheetHeader } from "../../components/AndroidScreenHeader";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
+import { ScreenContent } from "../../components/ScreenContent";
 import { ControlPill } from "../../components/ControlPill";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 
@@ -65,7 +65,7 @@ export function PullRequestSheetContent(props: {
           <View className="w-11" />
         </View>
       )}
-      <MaterialScreenContent fitToContents={fitToContents}>
+      <ScreenContent fitToContents={fitToContents}>
         {props.scrollable === false ? (
           <View className="flex-1" pointerEvents={props.busy ? "none" : "auto"}>
             {props.children}
@@ -90,7 +90,7 @@ export function PullRequestSheetContent(props: {
         )}
 
         {!android || props.scrollable === false ? footer : null}
-      </MaterialScreenContent>
+      </ScreenContent>
     </>
   );
   return (

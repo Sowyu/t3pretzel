@@ -6,7 +6,7 @@ import { GlassFill } from "./GlassSurface";
 import { useLiquidGlass } from "./useLiquidGlass";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 
-export function MaterialSearchField({
+export function SearchField({
   inputRef,
   accessibilityLabel,
   clearAccessibilityLabel,

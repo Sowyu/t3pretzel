@@ -1,8 +1,9 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { resolveMobileMarkdownMediaSource } from "../../lib/markdownMediaSource";
 import { getBrowseDirectoryPath } from "@t3tools/client-runtime/state/projects";
 import { useCallback, useMemo, useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { useFontFamily } from "../../lib/useFontFamily";
@@ -220,7 +221,7 @@ export function FileMarkdownPreview(props: {
       contentContainerStyle={{ padding: 18 }}
       refreshControl={
         props.onRefresh ? (
-          <RefreshControl
+          <AppRefreshControl
             refreshing={isPullRefreshing}
             onRefresh={() => void handlePullToRefresh()}
           />

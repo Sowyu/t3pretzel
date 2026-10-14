@@ -1,3 +1,4 @@
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { usePullRequestConnected } from "./usePullRequestConnected";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
@@ -5,7 +6,6 @@ import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime"
 import type { PullRequestReviewerCandidate } from "@t3tools/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -19,8 +19,8 @@ import { ScrollViewMarker } from "react-native-screens";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { EmptyState } from "../../components/EmptyState";
-import { MaterialButton } from "../../components/MaterialButton";
-import { MaterialSearchField } from "../../components/MaterialSearchField";
+import { AppButton } from "../../components/AppButton";
+import { SearchField } from "../../components/SearchField";
 import { SymbolView } from "../../components/AppSymbol";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { useNativeLayoutMetrics } from "../../native/native-layout-metrics";
@@ -192,7 +192,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
               {Platform.OS === "android" ? (
                 // Stands in for the iOS navigation bar search field.
                 <View className="flex-row">
-                  <MaterialSearchField
+                  <SearchField
                     inputRef={searchInput}
                     autoFocus={false}
                     accessibilityLabel="Search reviewers"
@@ -237,7 +237,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                   </Text>
                 </View>
                 {pending === id ? (
-                  <ActivityIndicator />
+                  <AppActivityIndicator />
                 ) : item.isRequested ? (
                   <View className="flex-row items-center gap-1.5">
                     <Text className="text-xs text-foreground-muted">Requested</Text>
@@ -251,7 +251,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
           }}
           ListEmptyComponent={
             result.isPending && !result.data ? (
-              <ActivityIndicator className="my-8" />
+              <AppActivityIndicator className="my-8" />
             ) : (
               <View className="px-4 py-6">
                 <EmptyState
@@ -265,7 +265,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                   detail={result.error ?? "Search people and teams with access to this repository."}
                   variant="plain"
                 />
-                {result.error ? <MaterialButton label="Retry" onPress={result.refresh} /> : null}
+                {result.error ? <AppButton label="Retry" onPress={result.refresh} /> : null}
               </View>
             )
           }
@@ -287,7 +287,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
         >
           {!pr ? (
             detail.isPending ? (
-              <ActivityIndicator />
+              <AppActivityIndicator />
             ) : (
               <Text className="text-danger-foreground">
                 {detail.error ?? "Couldn't load this pull request."}
@@ -308,13 +308,13 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                 autoCorrect={false}
                 className="min-h-12 rounded-xl bg-grouped-card px-3 text-base"
               />
-              <MaterialButton
+              <AppButton
                 label="Request review"
                 fullWidth
                 disabled={!allowed || !query.trim() || pending !== null}
                 onPress={() => void update({ id: query.trim(), kind: "user", isRequested: false })}
               />
-              <MaterialButton
+              <AppButton
                 label="Remove review request"
                 fullWidth
                 tone="text"

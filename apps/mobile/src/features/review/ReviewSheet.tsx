@@ -1,10 +1,11 @@
+import { AppRefreshControl } from "../../components/AppRefreshControl";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { nativeHeaderScrollEdgeEffects } from "../../native/StackHeader";
 import { ScreenHeader } from "../../components/ScreenHeader";
-import { useAndroidScreenHeaderHeight } from "../../components/useMaterialToolbarLayout";
+import { useAndroidScreenHeaderHeight } from "../../components/useAndroidHeaderLayout";
 import type { ScreenHeaderMenuItem } from "../../components/ScreenHeader.types";
 import type { ReviewSectionItem } from "./reviewModel";
 import { useReviewHeaderPresentation } from "./useReviewHeaderPresentation";
@@ -24,7 +25,6 @@ import {
   FlatList,
   Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   type NativeSyntheticEvent,
   StyleSheet,
@@ -36,7 +36,7 @@ import { useNativeColumnLayoutMetrics } from "../../native/native-layout-metrics
 import { AppText as Text } from "../../components/AppText";
 import { SymbolView } from "../../components/AppSymbol";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
+import { ScreenContent } from "../../components/ScreenContent";
 import { environmentCatalog } from "../../connection/catalog";
 import { useEnvironmentPresentation } from "../../state/presentation";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -433,7 +433,7 @@ function ReviewFileNavigator({
           </View>
         </View>
       )}
-      <MaterialScreenContent insetHorizontal>{fileList}</MaterialScreenContent>
+      <ScreenContent>{fileList}</ScreenContent>
     </View>
   );
 }
@@ -729,7 +729,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
         }
       />
 
-      <MaterialScreenContent>
+      <ScreenContent>
         <View className="flex-1 bg-sheet android:bg-sheet-solid">
           {showConnectionNotice ? (
             <View className="flex-1" style={{ paddingTop: topContentInset }}>
@@ -816,7 +816,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
                 // the raw fallback (and empty states) need an explicit control —
                 // iOS has no other refresh affordance here (the explicit
                 // "Refresh current diff" menu is Android-only).
-                <RefreshControl
+                <AppRefreshControl
                   progressViewOffset={Platform.OS === "android" ? topContentInset : undefined}
                   refreshing={isPullRefreshing || isSelectedSectionPending || areFilePatchesPending}
                   onRefresh={() => void handlePullToRefresh()}
@@ -879,7 +879,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
             onClear={commentSelection.clearSelection}
           />
         </View>
-      </MaterialScreenContent>
+      </ScreenContent>
     </>
   );
 }

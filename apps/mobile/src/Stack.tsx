@@ -174,7 +174,7 @@ const GLASS_HEADER_OPTIONS: AppScreenOptions = {
   unstable_navigationItemStyle: NATIVE_LIQUID_GLASS_SUPPORTED ? "editor" : undefined,
 };
 
-// Android PR screens render their own Material toolbar.
+// Android PR screens render their own header.
 const PULL_REQUEST_HEADER_OPTIONS: AppScreenOptions = {
   ...GLASS_HEADER_OPTIONS,
   headerShown: Platform.OS !== "android",
@@ -496,7 +496,7 @@ const NewTaskSheetStack = createNativeStackNavigator({
     // UIKit's default push adds a dimming shadow and independently transitions
     // the navigation bar. Both read as mismatched sheet backgrounds here.
     // simple_push retains native push/pop gestures without either artifact.
-    animation: Platform.OS === "ios" ? "simple_push" : undefined,
+    animation: Platform.OS === "ios" ? "simple_push" : "ios_from_right",
     animationDuration: Platform.OS === "ios" ? 350 : undefined,
   },
   screens: {
@@ -1017,8 +1017,8 @@ const RootStackConfig = createWorkspaceStackNavigator({
       // draft state via NewTaskFlowProvider. The expo-router era mounted it in
       // app/new/_layout.tsx; this layout wrapper is the native-stack equivalent.
       // A screen's layout replaces the navigator's screenLayout.
-      layout: ({ children, route }) => (
-        <GuardedScreenLayout route={route}>
+      layout: ({ children, route, options }) => (
+        <GuardedScreenLayout route={route} options={options}>
           <NewTaskFlowProvider>
             <View className="flex-1 bg-sheet-solid">{children}</View>
           </NewTaskFlowProvider>
@@ -1103,8 +1103,9 @@ export const RootStack = RootStackConfig.with(function AdaptiveRootStack({ Navig
           return {};
         }
 
-        // Compact Android presents Settings as the iOS page sheet (AndroidPageSheet).
-        if (Platform.OS === "android" && route.name === "SettingsSheet" && !usesSplitView) {
+        // Compact Android presents both flows as the iOS page sheet (AndroidPageSheet),
+        // where compact iOS uses a 0.92 form sheet.
+        if (Platform.OS === "android" && !usesSplitView) {
           return ANDROID_PAGE_SHEET_OPTIONS;
         }
 
