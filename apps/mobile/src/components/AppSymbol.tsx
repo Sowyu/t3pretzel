@@ -3,70 +3,13 @@ import type { Icon } from "@tabler/icons-react-native/types";
  * Keep these as per-icon exports. Importing the package root eagerly registers
  * the entire Tabler icon set in Metro.
  */
-import IconAdjustmentsHorizontal from "@tabler/icons-react-native/IconAdjustmentsHorizontal";
 import IconAlignLeft from "@tabler/icons-react-native/IconAlignLeft";
-import IconAlertCircle from "@tabler/icons-react-native/IconAlertCircle";
-import IconAlertTriangle from "@tabler/icons-react-native/IconAlertTriangle";
-import IconApps from "@tabler/icons-react-native/IconApps";
-import IconArchive from "@tabler/icons-react-native/IconArchive";
-import IconArchiveFilled from "@tabler/icons-react-native/IconArchiveFilled";
-import IconArrowBackUp from "@tabler/icons-react-native/IconArrowBackUp";
-import IconArrowDown from "@tabler/icons-react-native/IconArrowDown";
-import IconArrowForwardUp from "@tabler/icons-react-native/IconArrowForwardUp";
-import IconArrowLeft from "@tabler/icons-react-native/IconArrowLeft";
-import IconArrowRight from "@tabler/icons-react-native/IconArrowRight";
-import IconArrowDownCircle from "@tabler/icons-react-native/IconArrowDownCircle";
-import IconArrowRightCircle from "@tabler/icons-react-native/IconArrowRightCircle";
-import IconArrowUp from "@tabler/icons-react-native/IconArrowUp";
-import IconArrowUpCircle from "@tabler/icons-react-native/IconArrowUpCircle";
 import IconArrowUpRight from "@tabler/icons-react-native/IconArrowUpRight";
 import IconArrowUpRightCircle from "@tabler/icons-react-native/IconArrowUpRightCircle";
-import IconArrowsLeftRight from "@tabler/icons-react-native/IconArrowsLeftRight";
-import IconArrowsDiagonal2 from "@tabler/icons-react-native/IconArrowsDiagonal2";
-import IconArrowsDiagonalMinimize2 from "@tabler/icons-react-native/IconArrowsDiagonalMinimize2";
-import IconBellRinging from "@tabler/icons-react-native/IconBellRinging";
-import IconBolt from "@tabler/icons-react-native/IconBolt";
-import IconCube from "@tabler/icons-react-native/IconCube";
 import IconBrain from "@tabler/icons-react-native/IconBrain";
-import IconCamera from "@tabler/icons-react-native/IconCamera";
-import IconCar from "@tabler/icons-react-native/IconCar";
-import IconChartBar from "@tabler/icons-react-native/IconChartBar";
-import IconCheck from "@tabler/icons-react-native/IconCheck";
-import IconCloud from "@tabler/icons-react-native/IconCloud";
-import IconChevronDown from "@tabler/icons-react-native/IconChevronDown";
-import IconChevronLeft from "@tabler/icons-react-native/IconChevronLeft";
-import IconChevronRight from "@tabler/icons-react-native/IconChevronRight";
-import IconChevronUp from "@tabler/icons-react-native/IconChevronUp";
-import IconCircle from "@tabler/icons-react-native/IconCircle";
-import IconCircleCheck from "@tabler/icons-react-native/IconCircleCheck";
-import IconCircleCheckFilled from "@tabler/icons-react-native/IconCircleCheckFilled";
 import IconCircleDashed from "@tabler/icons-react-native/IconCircleDashed";
-import IconCircleDot from "@tabler/icons-react-native/IconCircleDot";
-import IconCircleXFilled from "@tabler/icons-react-native/IconCircleXFilled";
-import IconTicket from "@tabler/icons-react-native/IconTicket";
-import IconClock from "@tabler/icons-react-native/IconClock";
-import IconCode from "@tabler/icons-react-native/IconCode";
-import IconCopy from "@tabler/icons-react-native/IconCopy";
-import IconDatabase from "@tabler/icons-react-native/IconDatabase";
-import IconDeviceDesktop from "@tabler/icons-react-native/IconDeviceDesktop";
-import IconDeviceLaptop from "@tabler/icons-react-native/IconDeviceLaptop";
-import IconDeviceMobile from "@tabler/icons-react-native/IconDeviceMobile";
-import IconDots from "@tabler/icons-react-native/IconDots";
 import IconPlusMinus from "@tabler/icons-react-native/IconPlusMinus";
-import IconDotsVertical from "@tabler/icons-react-native/IconDotsVertical";
-import IconDotsCircleHorizontal from "@tabler/icons-react-native/IconDotsCircleHorizontal";
-import IconEdit from "@tabler/icons-react-native/IconEdit";
-import IconExternalLink from "@tabler/icons-react-native/IconExternalLink";
-import IconEyeOff from "@tabler/icons-react-native/IconEyeOff";
-import IconEye from "@tabler/icons-react-native/IconEye";
-import IconFileText from "@tabler/icons-react-native/IconFileText";
 import IconFileDiff from "@tabler/icons-react-native/IconFileDiff";
-import IconFilter from "@tabler/icons-react-native/IconFilter";
-import IconFilterFilled from "@tabler/icons-react-native/IconFilterFilled";
-import IconFolder from "@tabler/icons-react-native/IconFolder";
-import IconFolderFilled from "@tabler/icons-react-native/IconFolderFilled";
-import IconFolderOpen from "@tabler/icons-react-native/IconFolderOpen";
-import IconHeadphones from "@tabler/icons-react-native/IconHeadphones";
 import IconFolderPlus from "@tabler/icons-react-native/IconFolderPlus";
 import IconGitPullRequestClosed from "@tabler/icons-react-native/IconGitPullRequestClosed";
 import IconGitPullRequestDraft from "@tabler/icons-react-native/IconGitPullRequestDraft";
@@ -74,72 +17,33 @@ import IconGitCommit from "@tabler/icons-react-native/IconGitCommit";
 import IconGitBranch from "@tabler/icons-react-native/IconGitBranch";
 import IconGitMerge from "@tabler/icons-react-native/IconGitMerge";
 import IconGitPullRequest from "@tabler/icons-react-native/IconGitPullRequest";
-import IconHammer from "@tabler/icons-react-native/IconHammer";
-import IconHome from "@tabler/icons-react-native/IconHome";
-import IconInfoCircle from "@tabler/icons-react-native/IconInfoCircle";
 import IconKeyboard from "@tabler/icons-react-native/IconKeyboard";
 import IconKeyboardHide from "@tabler/icons-react-native/IconKeyboardHide";
-import IconLock from "@tabler/icons-react-native/IconLock";
 import IconLayoutColumns from "@tabler/icons-react-native/IconLayoutColumns";
 import IconLayoutSidebar from "@tabler/icons-react-native/IconLayoutSidebar";
 import IconLayoutSidebarRight from "@tabler/icons-react-native/IconLayoutSidebarRight";
 import IconLetterSpacing from "@tabler/icons-react-native/IconLetterSpacing";
-import IconMicrophone from "@tabler/icons-react-native/IconMicrophone";
-import IconLink from "@tabler/icons-react-native/IconLink";
-import IconListNumbers from "@tabler/icons-react-native/IconListNumbers";
-import IconMenu2 from "@tabler/icons-react-native/IconMenu2";
 import IconMessageCircleQuestion from "@tabler/icons-react-native/IconMessageCircleQuestion";
-import IconMessage from "@tabler/icons-react-native/IconMessage";
-import IconMessageFilled from "@tabler/icons-react-native/IconMessageFilled";
-import IconMessageCircle from "@tabler/icons-react-native/IconMessageCircle";
 import IconMessageCirclePlus from "@tabler/icons-react-native/IconMessageCirclePlus";
-import IconMessages from "@tabler/icons-react-native/IconMessages";
-import IconMinus from "@tabler/icons-react-native/IconMinus";
-import IconMoon from "@tabler/icons-react-native/IconMoon";
-import IconNetwork from "@tabler/icons-react-native/IconNetwork";
-import IconPalette from "@tabler/icons-react-native/IconPalette";
-import IconPencil from "@tabler/icons-react-native/IconPencil";
 import IconPlug from "@tabler/icons-react-native/IconPlug";
-import IconPhoto from "@tabler/icons-react-native/IconPhoto";
-import IconPin from "@tabler/icons-react-native/IconPin";
 import IconPinnedOff from "@tabler/icons-react-native/IconPinnedOff";
-import IconPlayerPlay from "@tabler/icons-react-native/IconPlayerPlay";
-import IconPlayerStopFilled from "@tabler/icons-react-native/IconPlayerStopFilled";
-import IconPlus from "@tabler/icons-react-native/IconPlus";
-import IconQrcode from "@tabler/icons-react-native/IconQrcode";
-import IconRefresh from "@tabler/icons-react-native/IconRefresh";
-import IconSearch from "@tabler/icons-react-native/IconSearch";
-import IconServer from "@tabler/icons-react-native/IconServer";
-import IconShare2 from "@tabler/icons-react-native/IconShare2";
-import IconSettings from "@tabler/icons-react-native/IconSettings";
-import IconSparkles from "@tabler/icons-react-native/IconSparkles";
-import IconStack2 from "@tabler/icons-react-native/IconStack2";
-import IconStar from "@tabler/icons-react-native/IconStar";
-import IconStarFilled from "@tabler/icons-react-native/IconStarFilled";
 import IconStethoscope from "@tabler/icons-react-native/IconStethoscope";
-import IconSun from "@tabler/icons-react-native/IconSun";
 import IconShieldExclamation from "@tabler/icons-react-native/IconShieldExclamation";
 import IconTarget from "@tabler/icons-react-native/IconTarget";
-import IconTerminal2 from "@tabler/icons-react-native/IconTerminal2";
 import IconTextDecrease from "@tabler/icons-react-native/IconTextDecrease";
 import IconTextIncrease from "@tabler/icons-react-native/IconTextIncrease";
-import IconTool from "@tabler/icons-react-native/IconTool";
-import IconTrash from "@tabler/icons-react-native/IconTrash";
-import IconInbox from "@tabler/icons-react-native/IconInbox";
-import IconTypography from "@tabler/icons-react-native/IconTypography";
-import IconUpload from "@tabler/icons-react-native/IconUpload";
-import IconUserCircle from "@tabler/icons-react-native/IconUserCircle";
 import IconUserCheck from "@tabler/icons-react-native/IconUserCheck";
-import IconUserX from "@tabler/icons-react-native/IconUserX";
 import IconUserQuestion from "@tabler/icons-react-native/IconUserQuestion";
-import IconUserPlus from "@tabler/icons-react-native/IconUserPlus";
-import IconUsers from "@tabler/icons-react-native/IconUsers";
-import IconWifi from "@tabler/icons-react-native/IconWifi";
 import IconWifiOff from "@tabler/icons-react-native/IconWifiOff";
-import IconWorld from "@tabler/icons-react-native/IconWorld";
-import IconX from "@tabler/icons-react-native/IconX";
 import type { AndroidSymbol, SFSymbol, SymbolViewProps } from "expo-symbols";
+import Svg, { Circle, Ellipse, Path, Rect } from "react-native-svg";
 import { withUniwind } from "uniwind";
+import { IONICONS, type IoniconElement, type IoniconName } from "./ionicons";
+
+// Android draws Ionicons, the closest open set to SF Symbols (outline for
+// regular names, filled for `.fill`). Tabler fills the gaps Ionicons has no
+// glyph for, and draws the git icons on both platforms like AppSymbol.ios.tsx.
+type AndroidIcon = IoniconName | Icon;
 
 const ANDROID_ICON_BY_SF_SYMBOL = {
   plusminus: IconPlusMinus,
@@ -147,153 +51,153 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "git.pull-request.draft": IconGitPullRequestDraft,
   "git.commit": IconGitCommit,
   "arrow.branch": IconGitBranch,
-  "arrow.left": IconArrowLeft,
-  "arrow.right": IconArrowRight,
-  "arrow.left.arrow.right": IconArrowsLeftRight,
-  "arrow.clockwise": IconRefresh,
-  "arrow.down": IconArrowDown,
-  "arrow.down.circle": IconArrowDownCircle,
-  "arrow.right.circle": IconArrowRightCircle,
+  "arrow.left": "arrow-back-outline",
+  "arrow.right": "arrow-forward-outline",
+  "arrow.left.arrow.right": "swap-horizontal-outline",
+  "arrow.clockwise": "refresh-outline",
+  "arrow.down": "arrow-down-outline",
+  "arrow.down.circle": "arrow-down-circle-outline",
+  "arrow.right.circle": "arrow-forward-circle-outline",
   "arrow.triangle.branch": IconGitBranch,
   "arrow.triangle.merge": IconGitMerge,
   "arrow.triangle.pull": IconGitPullRequest,
-  "square.3.layers.3d": IconStack2,
-  "arrow.turn.left.up": IconArrowBackUp,
-  "arrow.up": IconArrowUp,
-  "arrow.up.circle": IconArrowUpCircle,
-  "arrow.up.left.and.arrow.down.right": IconArrowsDiagonal2,
-  "arrow.down.right.and.arrow.up.left": IconArrowsDiagonalMinimize2,
+  "square.3.layers.3d": "layers-outline",
+  "arrow.turn.left.up": "return-up-back-outline",
+  "arrow.up": "arrow-up-outline",
+  "arrow.up.circle": "arrow-up-circle-outline",
+  "arrow.up.left.and.arrow.down.right": "expand-outline",
+  "arrow.down.right.and.arrow.up.left": "contract-outline",
   "arrow.up.right": IconArrowUpRight,
   "arrow.up.right.circle": IconArrowUpRightCircle,
-  "arrow.uturn.backward": IconArrowBackUp,
-  "arrow.uturn.forward": IconArrowForwardUp,
-  archivebox: IconArchive,
-  "archivebox.fill": IconArchiveFilled,
-  "bell.badge": IconBellRinging,
-  "bolt.circle": IconBolt,
-  "bolt.horizontal.circle": IconBolt,
+  "arrow.uturn.backward": "arrow-undo-outline",
+  "arrow.uturn.forward": "arrow-redo-outline",
+  archivebox: "archive-outline",
+  "archivebox.fill": "archive",
+  "bell.badge": "notifications-outline",
+  "bolt.circle": "flash-outline",
+  "bolt.horizontal.circle": "flash-outline",
   brain: IconBrain,
   "cable.connector": IconPlug,
-  camera: IconCamera,
-  car: IconCar,
-  "chart.bar.xaxis": IconChartBar,
-  checkmark: IconCheck,
-  "checkmark.circle": IconCircleCheck,
-  "checkmark.circle.fill": IconCircleCheckFilled,
-  circle: IconCircle,
+  camera: "camera-outline",
+  car: "car-outline",
+  "chart.bar.xaxis": "stats-chart-outline",
+  checkmark: "checkmark-outline",
+  "checkmark.circle": "checkmark-circle-outline",
+  "checkmark.circle.fill": "checkmark-circle",
+  circle: "ellipse-outline",
   "circle.dashed": IconCircleDashed,
-  "circle.inset.filled": IconCircleDot,
-  clock: IconClock,
-  timer: IconClock,
-  ticket: IconTicket,
-  cloud: IconCloud,
-  cube: IconCube,
-  "chevron.down": IconChevronDown,
-  "chevron.left": IconChevronLeft,
-  "chevron.left.forwardslash.chevron.right": IconCode,
-  "chevron.right": IconChevronRight,
-  "chevron.up": IconChevronUp,
-  desktopcomputer: IconDeviceDesktop,
-  doc: IconFileText,
-  "doc.on.doc": IconCopy,
-  "doc.text": IconFileText,
+  "circle.inset.filled": "radio-button-on-outline",
+  clock: "time-outline",
+  timer: "timer-outline",
+  ticket: "ticket-outline",
+  cloud: "cloud-outline",
+  cube: "cube-outline",
+  "chevron.down": "chevron-down-outline",
+  "chevron.left": "chevron-back-outline",
+  "chevron.left.forwardslash.chevron.right": "code-slash-outline",
+  "chevron.right": "chevron-forward-outline",
+  "chevron.up": "chevron-up-outline",
+  desktopcomputer: "desktop-outline",
+  doc: "document-outline",
+  "doc.on.doc": "copy-outline",
+  "doc.text": "document-text-outline",
   "file.diff": IconFileDiff,
-  ellipsis: IconDots,
-  moon: IconMoon,
-  "ellipsis.circle": IconDotsCircleHorizontal,
-  "exclamationmark.triangle": IconAlertTriangle,
-  "exclamationmark.circle": IconAlertCircle,
-  eye: IconEye,
-  "eye.slash": IconEyeOff,
-  folder: IconFolder,
+  ellipsis: "ellipsis-horizontal",
+  moon: "moon-outline",
+  "ellipsis.circle": "ellipsis-horizontal-circle-outline",
+  "exclamationmark.triangle": "warning-outline",
+  "exclamationmark.circle": "alert-circle-outline",
+  eye: "eye-outline",
+  "eye.slash": "eye-off-outline",
+  folder: "folder-outline",
   "folder.badge.plus": IconFolderPlus,
-  "folder.fill": IconFolderFilled,
-  gearshape: IconSettings,
-  globe: IconWorld,
-  hammer: IconHammer,
-  headphones: IconHeadphones,
-  house: IconHome,
-  "info.circle": IconInfoCircle,
-  internaldrive: IconDatabase,
-  iphone: IconDeviceMobile,
+  "folder.fill": "folder",
+  gearshape: "settings-outline",
+  globe: "globe-outline",
+  hammer: "hammer-outline",
+  headphones: "headset-outline",
+  house: "home-outline",
+  "info.circle": "information-circle-outline",
+  internaldrive: "server-outline",
+  iphone: "phone-portrait-outline",
   keyboard: IconKeyboard,
-  laptopcomputer: IconDeviceLaptop,
-  link: IconLink,
-  "list.number": IconListNumbers,
-  "line.3.horizontal": IconMenu2,
-  "line.3.horizontal.decrease": IconFilter,
-  "line.3.horizontal.decrease.circle": IconFilter,
-  "line.3.horizontal.decrease.circle.fill": IconFilterFilled,
+  laptopcomputer: "laptop-outline",
+  link: "link-outline",
+  "list.number": "list-outline",
+  "line.3.horizontal": "menu-outline",
+  "line.3.horizontal.decrease": "filter-outline",
+  "line.3.horizontal.decrease.circle": "filter-circle-outline",
+  "line.3.horizontal.decrease.circle.fill": "filter-circle",
   // Tabler has no Apple desktops; the closest silhouettes stand in on Android.
-  macmini: IconServer,
-  macstudio: IconDeviceDesktop,
-  magnifyingglass: IconSearch,
-  mic: IconMicrophone,
-  paintbrush: IconPalette,
-  pencil: IconPencil,
-  "person.crop.circle": IconUserCircle,
-  "person.2": IconUsers,
+  macmini: "server-outline",
+  macstudio: "desktop-outline",
+  magnifyingglass: "search-outline",
+  mic: "mic-outline",
+  paintbrush: "brush-outline",
+  pencil: "pencil-outline",
+  "person.crop.circle": "person-circle-outline",
+  "person.2": "people-outline",
   "person.fill.checkmark": IconUserCheck,
-  "person.fill.xmark": IconUserX,
+  "person.fill.xmark": "person-remove",
   "person.badge.clock": IconUserQuestion,
-  "person.badge.plus": IconUserPlus,
-  photo: IconPhoto,
-  pin: IconPin,
+  "person.badge.plus": "person-add-outline",
+  photo: "image-outline",
+  pin: "pin-outline",
   "pin.slash": IconPinnedOff,
-  play: IconPlayerPlay,
-  plus: IconPlus,
-  minus: IconMinus,
-  "qrcode.viewfinder": IconQrcode,
-  "point.3.connected.trianglepath.dotted": IconNetwork,
-  "point.topleft.down.curvedto.point.bottomright.up": IconGitMerge,
-  safari: IconExternalLink,
-  "server.rack": IconServer,
+  play: "play-outline",
+  plus: "add-outline",
+  minus: "remove-outline",
+  "qrcode.viewfinder": "qr-code-outline",
+  "point.3.connected.trianglepath.dotted": "share-social-outline",
+  "point.topleft.down.curvedto.point.bottomright.up": "git-merge-outline",
+  safari: "compass-outline",
+  "server.rack": "server-outline",
   stethoscope: IconStethoscope,
   "sidebar.left": IconLayoutSidebar,
   "sidebar.right": IconLayoutSidebarRight,
-  "slider.horizontal.3": IconAdjustmentsHorizontal,
-  "square.and.arrow.up": IconShare2,
-  "square.and.pencil": IconEdit,
-  "square.on.square": IconCopy,
-  "square.grid.2x2": IconApps,
+  "slider.horizontal.3": "options-outline",
+  "square.and.arrow.up": "share-outline",
+  "square.and.pencil": "create-outline",
+  "square.on.square": "copy-outline",
+  "square.grid.2x2": "grid-outline",
   "square.split.2x1": IconLayoutColumns,
-  star: IconStar,
-  "star.fill": IconStarFilled,
-  "sun.max": IconSun,
-  "stop.fill": IconPlayerStopFilled,
+  star: "star-outline",
+  "star.fill": "star",
+  "sun.max": "sunny-outline",
+  "stop.fill": "stop",
   target: IconTarget,
-  terminal: IconTerminal2,
+  terminal: "terminal-outline",
   "text.alignleft": IconAlignLeft,
-  "text.bubble": IconMessage,
-  "text.bubble.fill": IconMessageFilled,
+  "text.bubble": "chatbubble-ellipses-outline",
+  "text.bubble.fill": "chatbubble-ellipses",
   "questionmark.bubble": IconMessageCircleQuestion,
   "exclamationmark.shield": IconShieldExclamation,
-  "bubble.left.and.bubble.right": IconMessages,
-  "bubble.left": IconMessageCircle,
-  sparkles: IconSparkles,
+  "bubble.left.and.bubble.right": "chatbubbles-outline",
+  "bubble.left": "chatbubble-outline",
+  sparkles: "sparkles-outline",
   "plus.bubble": IconMessageCirclePlus,
   "text.word.spacing": IconLetterSpacing,
-  "textformat.size": IconTypography,
+  "textformat.size": "text-outline",
   "textformat.size.larger": IconTextIncrease,
   "textformat.size.smaller": IconTextDecrease,
-  "tray.and.arrow.up": IconUpload,
-  "tray.and.arrow.down": IconInbox,
-  "tray.full": IconStack2,
-  trash: IconTrash,
-  wifi: IconWifi,
+  "tray.and.arrow.up": "push-outline",
+  "tray.and.arrow.down": "download-outline",
+  "tray.full": "file-tray-full-outline",
+  trash: "trash-outline",
+  wifi: "wifi-outline",
   "wifi.slash": IconWifiOff,
-  xmark: IconX,
-  "xmark.circle.fill": IconCircleXFilled,
+  xmark: "close-outline",
+  "xmark.circle.fill": "close-circle",
 } satisfies Partial<
   Record<
     SFSymbol | "git.pull-request.closed" | "git.pull-request.draft" | "git.commit" | "file.diff",
-    Icon
+    AndroidIcon
   >
 >;
 const SF_ICON_LOOKUP: Partial<
   Record<
     SFSymbol | "git.pull-request.closed" | "git.pull-request.draft" | "git.commit" | "file.diff",
-    Icon
+    AndroidIcon
   >
 > = ANDROID_ICON_BY_SF_SYMBOL;
 
@@ -302,34 +206,34 @@ const SF_ICON_LOOKUP: Partial<
 // android key keeps working through this wrapper — it wins over the SF map
 // when both match (e.g. folder vs folder_open for expanded project groups).
 const ANDROID_ICON_BY_MATERIAL_NAME = {
-  auto_awesome: IconSparkles,
-  bolt: IconBolt,
-  build: IconTool,
-  chat: IconMessage,
-  chat_bubble: IconMessage,
-  check: IconCheck,
-  close: IconX,
-  construction: IconHammer,
-  content_copy: IconCopy,
-  desktop_windows: IconDeviceDesktop,
-  edit: IconEdit,
-  error: IconAlertCircle,
-  folder: IconFolder,
-  folder_open: IconFolderOpen,
+  auto_awesome: "sparkles-outline",
+  bolt: "flash-outline",
+  build: "build-outline",
+  chat: "chatbubble-outline",
+  chat_bubble: "chatbubble-outline",
+  check: "checkmark-outline",
+  close: "close-outline",
+  construction: "hammer-outline",
+  content_copy: "copy-outline",
+  desktop_windows: "desktop-outline",
+  edit: "create-outline",
+  error: "alert-circle-outline",
+  folder: "folder-outline",
+  folder_open: "folder-open-outline",
   keyboard: IconKeyboard,
-  keyboard_arrow_down: IconChevronDown,
-  keyboard_arrow_up: IconChevronUp,
+  keyboard_arrow_down: "chevron-down-outline",
+  keyboard_arrow_up: "chevron-up-outline",
   keyboard_hide: IconKeyboardHide,
-  lock: IconLock,
-  more_vert: IconDotsVertical,
+  lock: "lock-closed-outline",
+  more_vert: "ellipsis-vertical",
   merge: IconGitMerge,
   psychology: IconBrain,
-  public: IconWorld,
-  remove: IconMinus,
-  smartphone: IconDeviceMobile,
-  terminal: IconTerminal2,
-  visibility: IconEye,
-} satisfies Partial<Record<AndroidSymbol, Icon>>;
+  public: "globe-outline",
+  remove: "remove-outline",
+  smartphone: "phone-portrait-outline",
+  terminal: "terminal-outline",
+  visibility: "eye-outline",
+} satisfies Partial<Record<AndroidSymbol, AndroidIcon>>;
 
 export type { SFSymbol } from "expo-symbols";
 export type AppSymbolName =
@@ -345,43 +249,106 @@ export function isAppSymbolName(name: string): name is Extract<AppSymbolName, st
   return Object.prototype.hasOwnProperty.call(ANDROID_ICON_BY_SF_SYMBOL, name);
 }
 
-// Tabler strokes stand in for SF Symbol weights so Android icons get lighter
-// or heavier where iOS does.
-function strokeWidthForWeight(weight: SymbolViewProps["weight"]) {
+// Scales stroke widths so Android icons get lighter or heavier where SF
+// Symbols do. 1 is SF regular: Ionicons strokes 32 on 512, Tabler 1.75 on 24.
+function strokeScaleForWeight(weight: SymbolViewProps["weight"]) {
   switch (typeof weight === "object" ? weight.ios : weight) {
     case "ultraLight":
     case "thin":
     case "light":
-      return 1.5;
+      return 0.85;
     case "medium":
-      return 2;
+      return 1.15;
     case "semibold":
     case "bold":
     case "heavy":
     case "black":
-      return 2.25;
+      return 1.3;
     default:
-      return 1.75;
+      return 1;
+  }
+}
+
+function IoniconElementView(props: {
+  readonly element: IoniconElement;
+  readonly color: SymbolViewProps["tintColor"];
+  readonly strokeScale: number;
+}) {
+  const { element: el, color } = props;
+  const paint = el.w
+    ? {
+        fill: el.fill ? color : "none",
+        stroke: color,
+        strokeWidth: el.w * props.strokeScale,
+        strokeLinecap: el.cap as "round" | "butt" | "square" | undefined,
+        strokeLinejoin: el.join as "round" | "miter" | "bevel" | undefined,
+      }
+    : { fill: color, fillRule: el.evenOdd ? ("evenodd" as const) : undefined };
+  switch (el.t) {
+    case "path":
+      return <Path d={el.d} {...paint} />;
+    case "circle":
+      return <Circle cx={el.cx} cy={el.cy} r={el.r} {...paint} />;
+    case "ellipse":
+      return <Ellipse cx={el.cx} cy={el.cy} rx={el.rx} ry={el.ry} {...paint} />;
+    case "rect":
+      return (
+        <Rect
+          x={el.x}
+          y={el.y}
+          width={el.width}
+          height={el.height}
+          rx={el.rx}
+          ry={el.ry}
+          {...paint}
+        />
+      );
   }
 }
 
 function AppSymbolView(props: AppSymbolViewProps) {
   const materialName = typeof props.name === "string" ? undefined : props.name.android;
   const sfSymbol = typeof props.name === "string" ? props.name : props.name.ios;
-  const AndroidIcon =
+  const androidIcon =
     (materialName ? ANDROID_ICON_BY_MATERIAL_NAME[materialName] : undefined) ??
     (sfSymbol ? SF_ICON_LOOKUP[sfSymbol] : undefined);
 
-  if (!AndroidIcon) {
+  if (!androidIcon) {
     return props.fallback ?? null;
   }
 
+  const strokeScale = strokeScaleForWeight(props.weight);
+  const color = props.tintColor ?? "black";
+  if (typeof androidIcon === "string") {
+    const size = props.size ?? 24;
+    return (
+      <Svg
+        accessibilityLabel={props.accessibilityLabel}
+        height={size}
+        style={props.style}
+        testID={props.testID}
+        viewBox="0 0 512 512"
+        width={size}
+      >
+        {IONICONS[androidIcon].map((element: IoniconElement) => (
+          <IoniconElementView
+            key={element.d ?? JSON.stringify(element)}
+            color={color}
+            element={element}
+            strokeScale={strokeScale}
+          />
+        ))}
+      </Svg>
+    );
+  }
+
+  const TablerIcon = androidIcon;
   return (
-    <AndroidIcon
+    <TablerIcon
       accessibilityLabel={props.accessibilityLabel}
       color={props.tintColor}
       size={props.size}
-      strokeWidth={strokeWidthForWeight(props.weight)}
+      strokeWidth={1.75 * strokeScale}
       style={props.style}
       testID={props.testID}
     />
@@ -389,7 +356,7 @@ function AppSymbolView(props: AppSymbolViewProps) {
 }
 
 /**
- * expo-symbols and the Android Tabler fallback both expose tint as a native
+ * expo-symbols and the Android icon fallback both expose tint as a native
  * prop rather than a React Native style. Keep that third-party boundary here
  * so callers can use Uniwind's `tintColorClassName` instead of subscribing to
  * theme variables in every parent component.

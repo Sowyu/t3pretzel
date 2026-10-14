@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { AppText } from "../../components/AppText";
 import { SegmentedControl } from "../../components/SegmentedControl";
+import { IosStatusBarOverlay } from "../../components/IosStatusBar";
 
 export function CustomSnoozeSheet(props: {
   readonly onClose: () => void;
@@ -176,6 +177,7 @@ export function CustomSnoozeSheet(props: {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <IosStatusBarOverlay />
     </Modal>
   );
 }

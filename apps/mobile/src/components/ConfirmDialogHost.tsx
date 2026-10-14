@@ -5,6 +5,7 @@ import { cn } from "../lib/cn";
 import { AppText } from "./AppText";
 import { AndroidAlert, type AndroidAlertRequest, alertRequestFromNative } from "./AndroidAlert";
 import type { ConfirmDialogRequest, TextInputDialogRequest } from "./ConfirmDialog.types";
+import { IosStatusBarOverlay } from "./IosStatusBar";
 
 export type { ConfirmDialogRequest, TextInputDialogRequest } from "./ConfirmDialog.types";
 
@@ -134,6 +135,7 @@ export function ConfirmDialogHost() {
           </View>
         </View>
       )}
+      <IosStatusBarOverlay />
     </Modal>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from "@t3tools/contracts";
 import type { MenuAction } from "@react-native-menu/menu";
 import { DateTimePicker } from "@expo/ui/community/datetime-picker";
+import { TimeWheel } from "../../components/TimeWheel";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -894,7 +895,17 @@ function TaskForm({
                 type="monochrome"
               />
             </Pressable>
-            {timePickerOpen ? (
+            {timePickerOpen && Platform.OS === "android" ? (
+              <TimeWheel
+                accessibilityLabel="Time"
+                hours={timePickerValue(draft.schedule.timeOfDay).getHours()}
+                minutes={timePickerValue(draft.schedule.timeOfDay).getMinutes()}
+                onChange={(hours, minutes) => {
+                  const timeOfDay = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+                  setDraft({ ...draft, schedule: { ...draft.schedule, timeOfDay } });
+                }}
+              />
+            ) : timePickerOpen ? (
               <DateTimePicker
                 value={timePickerValue(draft.schedule.timeOfDay)}
                 mode="time"

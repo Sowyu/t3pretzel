@@ -7,8 +7,6 @@ import { Pressable, View } from "react-native";
 
 import { AndroidAnchoredMenu } from "../../../components/AndroidAnchoredMenu";
 import { AppText } from "../../../components/AppText";
-import { GlassFill } from "../../../components/GlassSurface";
-import { useLiquidGlass } from "../../../components/useLiquidGlass";
 import { WheelPicker } from "../../../components/WheelPicker";
 import { cn } from "../../../lib/cn";
 import type { AutoSettleDaysFieldProps } from "./AutoSettleDaysField";
@@ -19,12 +17,11 @@ const days = Array.from(
 ).map((value) => ({ value, label: `${value} ${value === 1 ? "day" : "days"}` }));
 
 /**
- * The iOS bordered button and popover: a capsule showing the count that opens
- * a 240dp card with a day wheel and Cancel/Done. The value commits on Done.
+ * The iOS row value and popover: the count in accent text that opens a 240dp
+ * card with a day wheel and Cancel/Done. The value commits on Done.
  */
 export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
   const [draft, setDraft] = useState(props.value);
-  const liquid = useLiquidGlass().tier !== "none";
   return (
     <AndroidAnchoredMenu
       actions={[]}
@@ -67,13 +64,12 @@ export function AutoSettleDaysField(props: AutoSettleDaysFieldProps) {
             setDraft(props.value);
             open();
           }}
+          hitSlop={8}
           className={cn(
-            "min-h-11 min-w-16 items-center justify-center rounded-full px-4",
-            !liquid && "bg-subtle active:opacity-50",
+            "min-h-11 min-w-11 items-end justify-center active:opacity-50",
             props.disabled && "opacity-45",
           )}
         >
-          {liquid ? <GlassFill interactive={!props.disabled} /> : null}
           <AppText
             className="text-base text-primary-text"
             style={{ fontVariant: ["tabular-nums"] }}

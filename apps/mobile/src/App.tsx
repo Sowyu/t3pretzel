@@ -22,6 +22,7 @@ import { RootStack } from "./Stack";
 import { appAtomRegistry } from "./state/atom-registry";
 import { GlassBackdropSource } from "./components/GlassBackdropSource";
 import { OverlayPortalHost } from "./components/OverlayPortal";
+import { IosStatusBar, IosStatusBarInsets } from "./components/IosStatusBar";
 import { shouldHandleAppLink } from "./lib/appLinking";
 import { useMobileNavigationTheme } from "./lib/useMobileNavigationTheme";
 import { useUiRuntimeMemoryWarningGc } from "./lib/useUiRuntimeMemoryWarningGc";
@@ -85,29 +86,35 @@ function AppContent() {
       <GestureHandlerRootView className="flex-1">
         <KeyboardProvider statusBarTranslucent>
           <SafeAreaProvider>
-            <VoiceInputProvider>
-              <StatusBar barStyle={themeAppearance === "dark" ? "light-content" : "dark-content"} />
-              {/* The navigation theme drives the NATIVE header appearance: native-stack
+            <IosStatusBarInsets>
+              <VoiceInputProvider>
+                <StatusBar
+                  barStyle={themeAppearance === "dark" ? "light-content" : "dark-content"}
+                />
+                {/* The navigation theme drives the NATIVE header appearance: native-stack
                 forwards `dark` as the nav bar's overrideUserInterfaceStyle. Without
                 this, React Navigation defaults to its light theme and every native
                 header (glass buttons, title, materials) is forced light even when
                 the system is in dark mode. */}
-              {/* Android menus in the overlay portal sample everything under them. */}
-              <GlassBackdropSource style={{ flex: 1 }}>
-                <GlobalVoiceInputControl>
-                  <NativeLayoutMetricsProvider>
-                    <IncomingShareProvider>
-                      <Navigation linking={appLinking} theme={navigationTheme} />
-                    </IncomingShareProvider>
-                    <ConfirmDialogHost />
-                    <ThreadArrangementHost />
-                  </NativeLayoutMetricsProvider>
-                </GlobalVoiceInputControl>
-              </GlassBackdropSource>
-              {/* Anchored-menu overlays render here — in-window, so the
+                {/* Android menus in the overlay portal sample everything under them. */}
+                <GlassBackdropSource style={{ flex: 1 }}>
+                  <GlobalVoiceInputControl>
+                    <NativeLayoutMetricsProvider>
+                      <IncomingShareProvider>
+                        <Navigation linking={appLinking} theme={navigationTheme} />
+                      </IncomingShareProvider>
+                      <ConfirmDialogHost />
+                      <ThreadArrangementHost />
+                    </NativeLayoutMetricsProvider>
+                  </GlobalVoiceInputControl>
+                </GlassBackdropSource>
+                {/* Anchored-menu overlays render here — in-window, so the
                 keyboard stays up while a dropdown is open. */}
-              <OverlayPortalHost />
-            </VoiceInputProvider>
+                <OverlayPortalHost />
+                {/* Android: the drawn iOS status bar, over every in-window surface. */}
+                <IosStatusBar />
+              </VoiceInputProvider>
+            </IosStatusBarInsets>
           </SafeAreaProvider>
         </KeyboardProvider>
       </GestureHandlerRootView>

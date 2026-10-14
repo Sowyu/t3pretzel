@@ -38,6 +38,7 @@ import {
 } from "./commandPaletteItems";
 import { parseActiveThreadPath, type HardwareKeyboardCommand } from "./hardwareKeyboardCommands";
 import { threadJumpIndex } from "./threadKeyboardShortcuts";
+import { IosStatusBarOverlay } from "../../components/IosStatusBar";
 
 const PALETTE_COMMANDS: ReadonlyArray<HardwareKeyboardCommand> = [
   "commandPalette",
@@ -506,6 +507,7 @@ export function CommandPalette(props: {
           </KeyboardAvoidingView>
         </T3KeyboardCommands>
       </GestureHandlerRootView>
+      <IosStatusBarOverlay />
     </Modal>
   );
 }

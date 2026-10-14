@@ -144,6 +144,22 @@
       ]
     },
     {
+      "bundles": ["android", "mobile"],
+      "license": "MIT",
+      "name": "Ionicons",
+      "sourceUrl": "https://github.com/ionic-team/ionicons",
+      "version": "8.1.0",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "preamble": [
+            "The Android icon paths in apps/mobile/src/components/ionicons.ts are copied from Ionicons:\nhttps://github.com/ionic-team/ionicons"
+          ],
+          "copyrights": ["Copyright (c) 2015-present Ionic (http://ionic.io/)"]
+        }
+      ]
+    },
+    {
       "bundles": ["mobile"],
       "license": "MIT",
       "name": "react-native-uitextview",

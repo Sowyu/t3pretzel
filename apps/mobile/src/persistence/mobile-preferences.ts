@@ -101,6 +101,8 @@ export interface Preferences {
   readonly turnNotificationsEnabled?: boolean;
   /** Android only. Real Liquid Glass on glass surfaces. Unset means on. */
   readonly liquidGlassEnabled?: boolean;
+  /** Android only. Draw the iOS status bar instead of the system one. Unset means on. */
+  readonly iosStatusBarEnabled?: boolean;
 }
 
 export class MobilePreferencesLoadError extends Schema.TaggedError<MobilePreferencesLoadError>()(
@@ -172,6 +174,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     backgroundRefreshEnabled?: boolean;
     turnNotificationsEnabled?: boolean;
     liquidGlassEnabled?: boolean;
+    iosStatusBarEnabled?: boolean;
   } = {};
 
   if (typeof parsed.pullRequestHideTestFiles === "boolean") {
@@ -300,6 +303,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
   }
   if (typeof parsed.liquidGlassEnabled === "boolean") {
     preferences.liquidGlassEnabled = parsed.liquidGlassEnabled;
+  }
+  if (typeof parsed.iosStatusBarEnabled === "boolean") {
+    preferences.iosStatusBarEnabled = parsed.iosStatusBarEnabled;
   }
   return preferences;
 }

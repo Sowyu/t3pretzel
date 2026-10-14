@@ -5,6 +5,7 @@ import { openAttachmentInViewer } from "../lib/attachmentDownload";
 import type { ResolvedFilePreviewSource } from "./FilePreviewModal.types";
 import { MediaImagePreview } from "./MediaImagePreview";
 import { AppText as Text } from "./AppText";
+import { IosStatusBarOverlay } from "./IosStatusBar";
 
 function DocumentPreview(props: {
   readonly source: ResolvedFilePreviewSource;
@@ -60,6 +61,7 @@ function DocumentPreview(props: {
           </Pressable>
         </View>
       </View>
+      <IosStatusBarOverlay />
     </Modal>
   );
 }

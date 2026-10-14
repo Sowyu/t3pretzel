@@ -10,6 +10,7 @@ import {
   type AndroidAlertButton,
   type AndroidAlertRequest,
 } from "../lib/android-alert";
+import { IosStatusBarOverlay } from "./IosStatusBar";
 
 export { alertRequestFromNative, type AndroidAlertRequest } from "../lib/android-alert";
 
@@ -157,6 +158,7 @@ export function AndroidAlert(props: { readonly request: AndroidAlertRequest }) {
           </View>
         </Animated.View>
       </View>
+      <IosStatusBarOverlay />
     </Modal>
   );
 }
