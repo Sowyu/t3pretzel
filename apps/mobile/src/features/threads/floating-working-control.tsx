@@ -354,7 +354,7 @@ function CompactingLabel(props: { readonly onLayout: (event: LayoutChangeEvent) 
       <SymbolView
         name="arrow.down.right.and.arrow.up.left"
         size={13}
-        tintColorClassName="foreground"
+        tintColorClassName="accent-foreground"
         type="monochrome"
       />
       <Text className="font-t3-medium text-xs text-foreground">Compacting…</Text>
@@ -396,7 +396,7 @@ function FloatingStatusLabel(props: {
         onLayout={props.onLayout}
         onPress={props.status.onPress}
       >
-        <SymbolView name="text.bubble" size={13} tintColorClassName="foreground" />
+        <SymbolView name="text.bubble" size={13} tintColorClassName="accent-foreground" />
         <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
           {props.status.label}
         </Text>
@@ -440,7 +440,7 @@ function FloatingStatusLabel(props: {
         <SymbolView
           name={props.status.waiting ? { ios: "bolt", android: "bolt" } : "terminal"}
           size={13}
-          tintColorClassName="foreground"
+          tintColorClassName="accent-foreground"
           type="monochrome"
         />
         <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
@@ -457,7 +457,12 @@ function FloatingStatusLabel(props: {
         className="gap-2"
         onLayout={props.onLayout}
       >
-        <SymbolView name="target" size={13} tintColorClassName="foreground" type="monochrome" />
+        <SymbolView
+          name="target"
+          size={13}
+          tintColorClassName="accent-foreground"
+          type="monochrome"
+        />
         <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
           {props.status.label}
         </Text>
@@ -475,7 +480,7 @@ function FloatingStatusLabel(props: {
         <SymbolView
           name="arrow.triangle.branch"
           size={13}
-          tintColorClassName="foreground"
+          tintColorClassName="accent-foreground"
           type="monochrome"
         />
         <ShimmeringWorkContent

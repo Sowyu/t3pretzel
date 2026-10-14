@@ -154,6 +154,18 @@ export function AndroidPageSheet(props: { readonly children: ReactNode }) {
               {props.children}
             </SafeAreaInsetsContext>
           </InPageSheetContext>
+          {/* The lit top edge of the card. */}
+          <View
+            pointerEvents="none"
+            className="absolute inset-0"
+            style={{
+              borderRadius: CORNER_RADIUS,
+              boxShadow:
+                themeAppearance === "dark"
+                  ? "inset 0 1px 0 rgba(255, 255, 255, 0.12)"
+                  : "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+            }}
+          />
           <View
             pointerEvents="none"
             importantForAccessibility="no-hide-descendants"
