@@ -6,7 +6,7 @@ import type { ScreenHeaderAction } from "../../components/ScreenHeader.types";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import type { ThreadInspectorMode } from "./thread-inspector-content-stack";
 import { useThreadHeaderOptions } from "./useThreadHeaderOptions";
-import { useThreadGitMenuDefinition } from "./ThreadGitControls";
+import { useThreadGitMenuDefinition, useThreadTerminalMenuDefinition } from "./ThreadGitControls";
 import { useWorkspaceListNavigation } from "../workspace/useAndroidWorkspaceNavigation";
 
 export function ThreadHeader(
@@ -22,7 +22,7 @@ export function ThreadHeader(
 ) {
   const returnToList = useWorkspaceListNavigation("threads");
   const { layout, panes, toggleAuxiliaryPane } = useAdaptiveWorkspaceLayout();
-  const { onOpenTerminal, onMergeBack } = props.gitControls;
+  const { onMergeBack } = props.gitControls;
   const native = useThreadHeaderOptions(props);
   // iOS builds this menu into its native header items; Android shows the same
   // branch status, quick action and review entry from its header menu.
@@ -30,7 +30,17 @@ export function ThreadHeader(
     ...props.gitControls,
     onOpenGitInspector: props.onOpenGitInspector,
   });
-  const androidGitMenus = Platform.OS === "android" && gitMenu ? [gitMenu] : undefined;
+  // iOS's terminal button is a menu: project scripts, open sessions, a new shell.
+  const terminalMenu = useThreadTerminalMenuDefinition(props.gitControls);
+  const showTerminalMenu = props.hasWorkspaceRoot && props.gitControls.canOpenTerminal;
+  const androidGitMenus = useMemo(
+    () =>
+      Platform.OS === "android"
+        ? [...(showTerminalMenu ? [terminalMenu] : []), ...(gitMenu ? [gitMenu] : [])]
+        : undefined,
+    [showTerminalMenu, terminalMenu, gitMenu],
+  );
+  const hasGitMenu = Platform.OS === "android" && gitMenu !== null;
   const androidHeaderActions = useMemo<ReadonlyArray<ScreenHeaderAction>>(() => {
     const actions: ScreenHeaderAction[] = [];
     if (props.onReturnToThread) {
@@ -40,14 +50,7 @@ export function ThreadHeader(
         onPress: props.onReturnToThread,
       });
     }
-    // Same order as the iOS capsule: terminal, files, git.
-    if (props.hasWorkspaceRoot && props.gitControls.canOpenTerminal) {
-      actions.push({
-        accessibilityLabel: "Open terminal",
-        icon: "terminal",
-        onPress: () => onOpenTerminal(null),
-      });
-    }
+    // Same order as the iOS capsule: terminal (a menu placed first), files, git.
     if (props.hasThreadCwd) {
       const filesVisible = props.inspectorMode === "files" && panes.auxiliaryPaneVisible;
       actions.push({
@@ -57,7 +60,7 @@ export function ThreadHeader(
         onPress: filesVisible ? toggleAuxiliaryPane : props.onOpenFilesInspector,
       });
     }
-    if (!androidGitMenus) {
+    if (!hasGitMenu) {
       actions.push({
         accessibilityLabel: "Open git controls",
         icon: "point.topleft.down.curvedto.point.bottomright.up",
@@ -76,15 +79,12 @@ export function ThreadHeader(
     props.inspectorMode,
     panes.auxiliaryPaneVisible,
     props.onOpenFilesInspector,
-    onOpenTerminal,
     onMergeBack,
     props.onOpenGitInspector,
     toggleAuxiliaryPane,
     props.onReturnToThread,
     props.hasThreadCwd,
-    props.hasWorkspaceRoot,
-    props.gitControls.canOpenTerminal,
-    androidGitMenus,
+    hasGitMenu,
   ]);
 
   return (
@@ -111,7 +111,7 @@ export function ThreadHeader(
         }
         onBack={layout.usesSplitView ? undefined : returnToList}
         actions={androidHeaderActions}
-        menus={androidGitMenus}
+        menus={androidGitMenus?.length ? androidGitMenus : undefined}
         hideBottomBorder
       />
       {native.fallback}

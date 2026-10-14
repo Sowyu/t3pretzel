@@ -1,7 +1,8 @@
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
-import { Platform, View } from "react-native";
+import { Platform, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
+import { cn } from "../lib/cn";
 import { AppText as Text } from "./AppText";
 
 // Android grouped cards float a little: a soft drop shadow, a tight contact
@@ -34,8 +35,6 @@ export function ListSection(props: {
   readonly children: ReactNode;
   readonly footer?: string;
 }) {
-  const { themeAppearance } = useAppearancePreferences();
-  const depth = Platform.OS === "android" ? themeAppearance : null;
   return (
     <View className="gap-2">
       {props.title ? (
@@ -49,23 +48,50 @@ export function ListSection(props: {
           {props.trailing}
         </View>
       ) : null}
-      <View
-        className="rounded-[24px] border-continuous"
-        style={depth ? { boxShadow: CARD_DEPTH[depth] } : undefined}
-      >
-        <View className="overflow-hidden rounded-[24px] border-continuous bg-grouped-card">
-          {props.children}
-        </View>
-        {depth ? (
-          <View
-            pointerEvents="none"
-            className="absolute inset-0 rounded-[24px] border-continuous"
-            style={{ boxShadow: CARD_EDGE[depth] }}
-          />
-        ) : null}
-      </View>
+      <GroupedCard>{props.children}</GroupedCard>
       {props.footer ? (
         <Text className="px-4 text-sm text-foreground-muted">{props.footer}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * The inset-grouped card surface. Every grouped card uses it, so on Android
+ * all of them float the same way; iOS stays flat. `className` styles the
+ * card's content (padding, gap, alignment); `outerClassName` places the card
+ * (margins, flex sizing).
+ */
+export function GroupedCard(props: {
+  readonly children: ReactNode;
+  readonly className?: string;
+  readonly outerClassName?: string;
+  readonly style?: StyleProp<ViewStyle>;
+  /** Corner radius in dp; iOS inset-grouped cards use 24. */
+  readonly radius?: number;
+}) {
+  const { themeAppearance } = useAppearancePreferences();
+  const depth = Platform.OS === "android" ? themeAppearance : null;
+  const borderRadius = props.radius ?? 24;
+  return (
+    <View
+      collapsable={false}
+      className={cn("border-continuous", props.outerClassName)}
+      style={[{ borderRadius }, depth ? { boxShadow: CARD_DEPTH[depth] } : undefined]}
+    >
+      <View
+        collapsable={false}
+        className={cn("overflow-hidden border-continuous bg-grouped-card", props.className)}
+        style={[{ borderRadius }, props.style]}
+      >
+        {props.children}
+      </View>
+      {depth ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-0 border-continuous"
+          style={{ borderRadius, boxShadow: CARD_EDGE[depth] }}
+        />
       ) : null}
     </View>
   );

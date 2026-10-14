@@ -51,8 +51,18 @@ class T3LiquidGlassModule : Module() {
       Prop("edgeFadeStart") { view: LiquidGlassView, value: Double ->
         view.edgeFadeStart = value.toFloat()
       }
+      Prop("tabRaised") { view: LiquidGlassView, value: Boolean ->
+        view.tabRaised = value
+      }
       Prop("tabInset") { view: LiquidGlassView, value: Double ->
         view.tabInsetDp = value.toFloat()
+      }
+    }
+
+    View(ViewMirrorView::class) {
+      Name("T3ViewMirror")
+      Prop("sourceTag") { view: ViewMirrorView, value: Int ->
+        view.sourceTag = value
       }
     }
 

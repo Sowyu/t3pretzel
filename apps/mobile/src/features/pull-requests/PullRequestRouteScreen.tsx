@@ -385,41 +385,50 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
         />
         {Platform.OS === "android" ? (
           <AndroidScreenHeader
-            title={`#${params.number}${connected ? "" : " · Offline"}`}
-            subtitle={params.repository}
+            title={`#${params.number}`}
+            subtitle={connected ? params.repository : `${params.repository} · Offline`}
             onBack={layout.usesSplitView ? undefined : returnToList}
             leading={layout.usesSplitView ? <AndroidWorkspaceSidebarButton /> : undefined}
-            actions={[
-              ...(permissions.verdicts.length
-                ? [
-                    {
-                      accessibilityLabel: "Submit review",
-                      icon: "text.bubble" as const,
-                      onPress: () =>
-                        navigation.navigate("PullRequestReview", { ...params, mode: "review" }),
-                    },
-                  ]
-                : []),
-              ...(permissions.canComment
-                ? [
-                    {
-                      accessibilityLabel: "Add comment",
-                      icon: "plus.bubble" as const,
-                      onPress: () =>
-                        navigation.navigate("PullRequestReview", { ...params, mode: "comment" }),
-                    },
-                  ]
-                : []),
-              ...(pr
-                ? [
-                    {
-                      accessibilityLabel: openOnProviderLabel(pr.provider),
-                      icon: "arrow.up.right" as const,
-                      onPress: () => void Linking.openURL(pr.url),
-                    },
-                  ]
-                : []),
-            ]}
+            trailing={
+              // iOS's one "…" menu, not a row of icons.
+              <ControlPillMenu
+                title="Pull request"
+                actions={[
+                  ...(permissions.verdicts.length
+                    ? [{ id: "review", title: "Submit review", image: "text.bubble" }]
+                    : []),
+                  ...(permissions.canComment
+                    ? [{ id: "comment", title: "Add comment", image: "plus.bubble" }]
+                    : []),
+                  ...(pr
+                    ? [
+                        {
+                          id: "open",
+                          title: openOnProviderLabel(pr.provider),
+                          image: "arrow.up.right",
+                        },
+                      ]
+                    : []),
+                ]}
+                onPressAction={({ nativeEvent }) => {
+                  if (nativeEvent.event === "open") {
+                    if (pr) void Linking.openURL(pr.url);
+                  } else if (nativeEvent.event === "review" || nativeEvent.event === "comment") {
+                    navigation.navigate("PullRequestReview", {
+                      ...params,
+                      mode: nativeEvent.event,
+                    });
+                  }
+                }}
+              >
+                <View pointerEvents="none">
+                  <AndroidHeaderIconButton
+                    icon="ellipsis"
+                    accessibilityLabel="Pull request actions"
+                  />
+                </View>
+              </ControlPillMenu>
+            }
           />
         ) : null}
         <NativeHeaderToolbar placement="right">
@@ -908,18 +917,20 @@ export function PullRequestFileRouteScreen({
   const title = commit ? "Commit changes" : "Changes";
   const seekingFile = !targetFile && result.nextCursor !== null;
   const loadingDiff = (result.isPending && !data.rows.length) || (seekingFile && !result.error);
+  const subtitle = `${commit ? commit.slice(0, 7) : `#${route.params.number}`} · ${data.files.length} ${data.files.length === 1 ? "file" : "files"}${filter.hideTestFiles && filter.hiddenCount ? ` · ${filter.hiddenCount} ${filter.hiddenCount === 1 ? "test" : "tests"} hidden` : ""}`;
   return (
     <View className="flex-1 bg-screen">
       <NativeStackScreenOptions
         options={{
           title,
           headerTitle: title,
-          unstable_headerSubtitle: `${commit ? commit.slice(0, 7) : `#${route.params.number}`} · ${data.files.length} ${data.files.length === 1 ? "file" : "files"}${filter.hideTestFiles && filter.hiddenCount ? ` · ${filter.hiddenCount} ${filter.hiddenCount === 1 ? "test" : "tests"} hidden` : ""}`,
+          unstable_headerSubtitle: subtitle,
         }}
       />
       {Platform.OS === "android" ? (
         <AndroidScreenHeader
           title={title}
+          subtitle={subtitle}
           onBack={() => navigation.goBack()}
           trailing={
             <ControlPillMenu

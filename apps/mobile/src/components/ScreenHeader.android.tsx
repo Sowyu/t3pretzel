@@ -45,7 +45,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
     });
     return () => subscription.remove();
   }, [closeSearch, searching, search?.mode]);
-  const menuView = props.menus?.map((menu) => (
+  const renderMenu = (menu: NonNullable<ScreenHeaderProps["menus"]>[number]) => (
     <ControlPillMenu
       key={menu.title}
       actions={androidHeaderMenuActions(menu.items)}
@@ -58,7 +58,9 @@ export function ScreenHeader(props: ScreenHeaderProps) {
     >
       <ScreenHeaderButton accessibilityLabel={menu.title} icon={menu.icon} />
     </ControlPillMenu>
-  ));
+  );
+  const menuView = props.menus?.filter((menu) => !menu.beforeActions).map(renderMenu);
+  const leadingMenuView = props.menus?.filter((menu) => menu.beforeActions).map(renderMenu);
   // headerTransparent means the same as on iOS: content scrolls under the bar.
   // Android draws the bar itself, so these never reach the native stack.
   const { headerTransparent, headerStyle, ...navigationOptions } = props.options ?? {};
@@ -126,8 +128,11 @@ export function ScreenHeader(props: ScreenHeaderProps) {
                 style={{ paddingVertical: 7 * scale }}
               />
             </View>
-            {menuView?.length ? (
-              <AndroidHeaderButtonGroup>{menuView}</AndroidHeaderButtonGroup>
+            {props.menus?.length ? (
+              <AndroidHeaderButtonGroup>
+                {leadingMenuView}
+                {menuView}
+              </AndroidHeaderButtonGroup>
             ) : null}
           </View>
         </View>
@@ -142,6 +147,7 @@ export function ScreenHeader(props: ScreenHeaderProps) {
       leading={props.sidebar !== false ? <AndroidWorkspaceSidebarButton /> : undefined}
       hideBottomBorder={props.hideBottomBorder}
       overlay={overlay}
+      capsuleLeading={leadingMenuView?.length ? leadingMenuView : undefined}
       actions={
         search
           ? [

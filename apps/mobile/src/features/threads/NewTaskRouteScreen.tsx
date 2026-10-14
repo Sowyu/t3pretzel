@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { GlassFill } from "../../components/GlassSurface";
 import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
@@ -319,7 +320,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
           }}
         >
           {canStartScratch && listScopes.length > 0 ? (
-            <View collapsable={false} className="overflow-hidden rounded-[24px] bg-grouped-card">
+            <GroupedCard>
               <RowPressable
                 accessibilityRole="button"
                 accessibilityLabel="No project"
@@ -348,13 +349,10 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   type="monochrome"
                 />
               </RowPressable>
-            </View>
+            </GroupedCard>
           ) : null}
           {listScopes.length === 0 ? (
-            <View
-              collapsable={false}
-              className="items-center gap-3 rounded-[24px] bg-grouped-card px-6 py-8"
-            >
+            <GroupedCard className="items-center gap-3 px-6 py-8">
               {projectEmptyState.loading ? (
                 <AppActivityIndicator colorClassName="accent-icon-muted" />
               ) : null}
@@ -400,7 +398,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   ) : null}
                 </>
               )}
-            </View>
+            </GroupedCard>
           ) : visibleScopes.length === 0 ? (
             <View className="items-center gap-2 px-6 py-8">
               <Text className="text-center text-lg font-t3-bold text-foreground">
@@ -411,7 +409,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               </Text>
             </View>
           ) : (
-            <View collapsable={false} className="overflow-hidden rounded-[24px] bg-grouped-card">
+            <GroupedCard>
               {visibleScopes.map((scope, scopeIndex) => {
                 const hasMultipleProjects = scope.projects.length > 1;
                 const selectionTarget = getProjectScopeSelectionTarget(
@@ -465,7 +463,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   </View>
                 );
               })}
-            </View>
+            </GroupedCard>
           )}
         </ScrollView>
       </ScreenContent>

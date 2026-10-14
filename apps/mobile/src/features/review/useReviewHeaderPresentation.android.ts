@@ -1,4 +1,5 @@
 import type { useReviewHeaderPresentation as useIosReviewHeaderPresentation } from "./useReviewHeaderPresentation";
+import { useReviewGitMenu } from "./useReviewGitMenu";
 
 export function useReviewHeaderPresentation(
   props: Parameters<typeof useIosReviewHeaderPresentation>[0],
@@ -6,7 +7,8 @@ export function useReviewHeaderPresentation(
   return {
     title: props.title,
     subtitle: props.subtitle,
-    gitMenu: null,
+    // iOS shows the git branch menu beside "…"; ScreenHeader renders it as a capsule slot.
+    gitMenu: useReviewGitMenu(props),
     menuIcon: "ellipsis",
     refreshAction: {
       id: "refresh",

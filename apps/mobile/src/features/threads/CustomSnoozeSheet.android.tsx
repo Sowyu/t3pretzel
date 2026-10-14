@@ -10,7 +10,6 @@ import { requireNativeModule } from "expo";
 import { useEffect, useMemo, useState } from "react";
 import {
   AppState,
-  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,12 +17,11 @@ import {
   useWindowDimensions,
 } from "react-native";
 
+import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { AppText as Text } from "../../components/AppText";
-import { OverlayPortal } from "../../components/OverlayPortal";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { WheelPicker } from "../../components/WheelPicker";
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import type { CustomSnoozeSheet as SharedCustomSnoozeSheet } from "./CustomSnoozeSheet.shared";
 
 type Props = Parameters<typeof SharedCustomSnoozeSheet>[0];
@@ -60,16 +58,42 @@ function systemUses24HourClock() {
   return requireNativeModule<{ is24HourFormat(): boolean }>("T3NativeControls").is24HourFormat();
 }
 
+/** Opens the anchored popover as soon as the snooze row mounts it. */
+function OpenOnMount(props: { readonly open: () => void }) {
+  const { open } = props;
+  useEffect(() => {
+    open();
+  }, [open]);
+  return null;
+}
+
 /**
  * The iOS custom snooze popover in RN: an xmark, centered title and Snooze
  * button bar over a mode picker and SwiftUI-style wheels (day, hour, minute
- * and AM/PM, or amount and unit). Rendered through OverlayPortal because
- * recycled thread rows can unmount it.
+ * and AM/PM, or amount and unit). Anchored to the thread row it is mounted in,
+ * like iOS's `Popover`; back and a tap outside cancel it.
  */
 export function CustomSnoozeSheet(props: Props) {
-  const liquid = useLiquidGlass().tier !== "none";
   const { width: windowWidth } = useWindowDimensions();
-  const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
+  return (
+    <AndroidAnchoredMenu
+      actions={[]}
+      className="absolute inset-0"
+      style={{ pointerEvents: "none" }}
+      popoverWidth={Math.min(360, windowWidth - 32)}
+      popover={(close) => <CustomSnoozeContent onSnooze={props.onSnooze} close={close} />}
+      onClose={props.onClose}
+    >
+      {(open) => <OpenOnMount open={open} />}
+    </AndroidAnchoredMenu>
+  );
+}
+
+function CustomSnoozeContent(props: {
+  readonly onSnooze: Props["onSnooze"];
+  readonly close: () => void;
+}) {
+  const liquid = useLiquidGlass().tier !== "none";
   const [is24Hour, setIs24Hour] = useState(systemUses24HourClock);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -77,14 +101,6 @@ export function CustomSnoozeSheet(props: Props) {
     });
     return () => subscription.remove();
   }, []);
-  const { onClose } = props;
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
-      return true;
-    });
-    return () => subscription.remove();
-  }, [onClose]);
   const [mode, setMode] = useState<CustomSnoozeInput["mode"]>("date");
   const [date, setDate] = useState(() => new Date(Date.now() + 3_600_000));
   // The day wheel covers a year from today; it is built once per open.
@@ -133,7 +149,7 @@ export function CustomSnoozeSheet(props: Props) {
       return;
     }
     props.onSnooze(snoozedUntil);
-    props.onClose();
+    props.close();
   };
 
   const dayOffset = Math.round((startOfDay(date).getTime() - today.getTime()) / DAY_MS);
@@ -144,162 +160,131 @@ export function CustomSnoozeSheet(props: Props) {
     setDate(next);
     setError(null);
   };
-  const cardFill =
-    themeAppearance === "dark" ? colors["--color-grouped-card"] : colors["--color-card-alt"];
-
   return (
-    <OverlayPortal>
-      <View className="absolute inset-0 items-center justify-center bg-backdrop px-4">
-        <Pressable
+    <>
+      <View className="min-h-14 flex-row items-center px-3">
+        <AndroidHeaderIconButton
           accessibilityLabel="Cancel custom snooze"
-          className="absolute inset-0"
-          onPress={props.onClose}
+          icon="xmark"
+          onPress={props.close}
         />
-        <View
-          accessibilityViewIsModal
-          className="overflow-hidden"
-          style={{
-            width: Math.min(360, windowWidth - 32),
-            maxHeight: "80%",
-            borderRadius: 28,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor:
-              themeAppearance === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
-            backgroundColor: cardFill,
-            boxShadow: "0 16px 48px rgba(0, 0, 0, 0.24)",
-          }}
+        <Text
+          accessibilityRole="header"
+          numberOfLines={1}
+          className="flex-1 text-center font-t3-bold"
+          style={{ fontSize: 17, lineHeight: 22 }}
         >
-          <View className="min-h-14 flex-row items-center px-3">
-            <AndroidHeaderIconButton
-              accessibilityLabel="Cancel custom snooze"
-              icon="xmark"
-              onPress={props.onClose}
-            />
-            <Text
-              accessibilityRole="header"
-              numberOfLines={1}
-              className="flex-1 text-center font-t3-bold"
-              style={{ fontSize: 17, lineHeight: 22 }}
-            >
-              Custom snooze
-            </Text>
-            {/* The iOS glass capsule bar button. */}
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={4}
-              className={
-                liquid
-                  ? "h-10 justify-center rounded-full px-4"
-                  : "h-10 justify-center rounded-full border-separator bg-glass-fallback px-4 active:opacity-50"
+          Custom snooze
+        </Text>
+        {/* The iOS glass capsule bar button. */}
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={4}
+          className={
+            liquid
+              ? "h-10 justify-center rounded-full px-4"
+              : "h-10 justify-center rounded-full border-separator bg-glass-fallback px-4 active:opacity-50"
+          }
+          style={{ borderWidth: StyleSheet.hairlineWidth }}
+          onPress={submit}
+        >
+          {liquid ? <GlassFill /> : null}
+          <Text className="font-t3-semibold" style={{ fontSize: 17 }}>
+            Snooze
+          </Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 16 }}
+      >
+        <SegmentedControl
+          options={modes}
+          selected={mode}
+          onSelect={(value) => {
+            setMode(value);
+            setError(null);
+          }}
+          role="tab"
+        />
+        {mode === "date" ? (
+          <View className="flex-row">
+            <WheelPicker
+              accessibilityLabel="Snooze day"
+              options={dayOptions}
+              value={Math.min(Math.max(dayOffset, 0), dayOptions.length - 1)}
+              onChange={(offset) =>
+                updateDate((next) =>
+                  next.setFullYear(today.getFullYear(), today.getMonth(), today.getDate() + offset),
+                )
               }
-              style={{ borderWidth: StyleSheet.hairlineWidth }}
-              onPress={submit}
-            >
-              {liquid ? <GlassFill /> : null}
-              <Text className="font-t3-semibold" style={{ fontSize: 17 }}>
-                Snooze
-              </Text>
-            </Pressable>
+              align="right"
+              band="start"
+              flex={2.2}
+            />
+            <WheelPicker
+              accessibilityLabel="Snooze hour"
+              options={hourOptions}
+              value={is24Hour ? hours : hours % 12 || 12}
+              onChange={(hour) =>
+                updateDate((next) =>
+                  next.setHours(is24Hour ? hour : (hour % 12) + (hours >= 12 ? 12 : 0)),
+                )
+              }
+              align="right"
+              band="middle"
+            />
+            <WheelPicker
+              accessibilityLabel="Snooze minute"
+              options={minutes}
+              value={date.getMinutes()}
+              onChange={(minute) => updateDate((next) => next.setMinutes(minute, 0, 0))}
+              align="left"
+              band={is24Hour ? "end" : "middle"}
+            />
+            {is24Hour ? null : (
+              <WheelPicker
+                accessibilityLabel="AM or PM"
+                options={meridiems}
+                value={hours >= 12 ? "PM" : "AM"}
+                onChange={(meridiem) =>
+                  updateDate((next) => next.setHours((hours % 12) + (meridiem === "PM" ? 12 : 0)))
+                }
+                align="left"
+                band="end"
+              />
+            )}
           </View>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 16 }}
-          >
-            <SegmentedControl
-              options={modes}
-              selected={mode}
-              onSelect={(value) => {
-                setMode(value);
+        ) : (
+          <View className="flex-row">
+            <WheelPicker
+              accessibilityLabel="Duration amount"
+              options={amounts}
+              value={amount}
+              onChange={(value) => {
+                setAmount(value);
                 setError(null);
               }}
-              role="tab"
+              band="start"
             />
-            {mode === "date" ? (
-              <View className="flex-row">
-                <WheelPicker
-                  accessibilityLabel="Snooze day"
-                  options={dayOptions}
-                  value={Math.min(Math.max(dayOffset, 0), dayOptions.length - 1)}
-                  onChange={(offset) =>
-                    updateDate((next) =>
-                      next.setFullYear(
-                        today.getFullYear(),
-                        today.getMonth(),
-                        today.getDate() + offset,
-                      ),
-                    )
-                  }
-                  align="right"
-                  band="start"
-                  flex={2.2}
-                />
-                <WheelPicker
-                  accessibilityLabel="Snooze hour"
-                  options={hourOptions}
-                  value={is24Hour ? hours : hours % 12 || 12}
-                  onChange={(hour) =>
-                    updateDate((next) =>
-                      next.setHours(is24Hour ? hour : (hour % 12) + (hours >= 12 ? 12 : 0)),
-                    )
-                  }
-                  align="right"
-                  band="middle"
-                />
-                <WheelPicker
-                  accessibilityLabel="Snooze minute"
-                  options={minutes}
-                  value={date.getMinutes()}
-                  onChange={(minute) => updateDate((next) => next.setMinutes(minute, 0, 0))}
-                  align="left"
-                  band={is24Hour ? "end" : "middle"}
-                />
-                {is24Hour ? null : (
-                  <WheelPicker
-                    accessibilityLabel="AM or PM"
-                    options={meridiems}
-                    value={hours >= 12 ? "PM" : "AM"}
-                    onChange={(meridiem) =>
-                      updateDate((next) =>
-                        next.setHours((hours % 12) + (meridiem === "PM" ? 12 : 0)),
-                      )
-                    }
-                    align="left"
-                    band="end"
-                  />
-                )}
-              </View>
-            ) : (
-              <View className="flex-row">
-                <WheelPicker
-                  accessibilityLabel="Duration amount"
-                  options={amounts}
-                  value={amount}
-                  onChange={(value) => {
-                    setAmount(value);
-                    setError(null);
-                  }}
-                  band="start"
-                />
-                <WheelPicker
-                  accessibilityLabel="Duration unit"
-                  options={units}
-                  value={unit}
-                  onChange={(value) => {
-                    setUnit(value);
-                    setError(null);
-                  }}
-                  band="end"
-                />
-              </View>
-            )}
-            {error ? (
-              <Text accessibilityRole="alert" className="text-[13px] text-danger-foreground">
-                {error}
-              </Text>
-            ) : null}
-          </ScrollView>
-        </View>
-      </View>
-    </OverlayPortal>
+            <WheelPicker
+              accessibilityLabel="Duration unit"
+              options={units}
+              value={unit}
+              onChange={(value) => {
+                setUnit(value);
+                setError(null);
+              }}
+              band="end"
+            />
+          </View>
+        )}
+        {error ? (
+          <Text accessibilityRole="alert" className="text-[13px] text-danger-foreground">
+            {error}
+          </Text>
+        ) : null}
+      </ScrollView>
+    </>
   );
 }

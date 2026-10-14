@@ -40,6 +40,8 @@ interface GlassTabs {
   readonly selected: number;
   /** Padding between the bar edge and the indicator, in dp. */
   readonly inset: number;
+  /** A segmented control's raised selection rather than the tab bar's tint. */
+  readonly raised?: boolean;
   readonly onSelect: (index: number) => void;
 }
 
@@ -67,8 +69,10 @@ interface GlassSurfaceProps extends ViewProps {
    * Android: "menu" is the thicker, more opaque material of context menus.
    * "edge" is iOS's scroll-edge band under a floating header: blurred backdrop
    * under `tintColor` (the screen color), fading out from `edgeFadeStart`.
+   * "scrim" is the full-screen blur and dim behind a long-press context menu:
+   * the blurred backdrop under `tintColor` as given, with no fade.
    */
-  readonly variant?: "regular" | "menu" | "edge";
+  readonly variant?: "regular" | "menu" | "edge" | "scrim";
   /** Fraction of the "edge" band's height where it starts fading out. */
   readonly edgeFadeStart?: number;
   readonly tabs?: GlassTabs;
@@ -148,15 +152,17 @@ export function GlassSurface({
     } = StyleSheet.flatten(style) ?? {};
     const fill = fallbackColor ?? themeVariables["--color-glass-fallback"];
     const tint =
-      variant === "edge"
-        ? themeColorWithAlpha(String(tintColor ?? themeVariables["--color-screen"]), 0.86)
-        : tintColor !== undefined && tintColor !== "transparent"
-          ? // iOS tinted glass, like a selected filter: the color carries, the backdrop still shows.
-            themeColorWithAlpha(String(tintColor), 0.82)
-          : themeColorWithAlpha(
-              themeVariables["--color-glass-surface"],
-              variant === "menu" ? (isDarkMode ? 0.74 : 0.8) : isDarkMode ? 0.4 : 0.46,
-            );
+      variant === "scrim"
+        ? String(tintColor ?? "rgba(0, 0, 0, 0.2)")
+        : variant === "edge"
+          ? themeColorWithAlpha(String(tintColor ?? themeVariables["--color-screen"]), 0.86)
+          : tintColor !== undefined && tintColor !== "transparent"
+            ? // iOS tinted glass, like a selected filter: the color carries, the backdrop still shows.
+              themeColorWithAlpha(String(tintColor), 0.82)
+            : themeColorWithAlpha(
+                themeVariables["--color-glass-surface"],
+                variant === "menu" ? (isDarkMode ? 0.74 : 0.8) : isDarkMode ? 0.4 : 0.46,
+              );
     const borderRadius = typeof glassStyle.borderRadius === "number" ? glassStyle.borderRadius : 32;
     return (
       <ThemedLiquidGlass
@@ -171,12 +177,15 @@ export function GlassSurface({
           typeof fill === "string" ? themeColorWithMinimumAlpha(fill, 1) : fill,
         )}
         dark={isDarkMode}
-        blurRadius={variant === "menu" ? 12 : variant === "edge" ? 8 : 4}
-        edgeFadeStart={variant === "edge" ? edgeFadeStart : -1}
+        blurRadius={variant === "scrim" ? 16 : variant === "menu" ? 12 : variant === "edge" ? 8 : 4}
+        // The edge shader's fade is a smoothstep from the start to 1; just
+        // under 1 keeps the scrim solid to the bottom.
+        edgeFadeStart={variant === "scrim" ? 0.999 : variant === "edge" ? edgeFadeStart : -1}
         interactive={interactive}
         tabCount={tabs?.count ?? 0}
         selectedTab={tabs?.selected ?? 0}
         tabInset={tabs?.inset ?? 0}
+        tabRaised={tabs?.raised ?? false}
         onTabSelect={tabs ? (event) => tabs.onSelect(event.nativeEvent.index) : undefined}
       >
         {children}

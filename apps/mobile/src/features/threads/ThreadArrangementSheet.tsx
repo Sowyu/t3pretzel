@@ -4,13 +4,16 @@ import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell
 import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import { sortInboxThreadsByReturn } from "@t3tools/client-runtime/state/thread-inbox";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, FlatList, Modal, Pressable, View } from "react-native";
+import { Animated, FlatList, Modal, Platform, Pressable, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Reanimated, { ReduceMotion, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { threadDragGapOffset } from "./threadDragGap";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AndroidSheetHeader } from "../../components/AndroidScreenHeader";
+import { GlassFlatBackdrop } from "../../components/GlassBackdropSource";
 import { AppText as Text } from "../../components/AppText";
+import { cn } from "../../lib/cn";
 import { SymbolView } from "../../components/AppSymbol";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { environmentServerConfigsAtom } from "../../state/server";
@@ -57,6 +60,8 @@ function ArrangementRow(props: {
   lifted: boolean;
   dragging: boolean;
   children: ReactNode;
+  /** Android: a thread row's place in its inset-grouped section card. */
+  grouped?: { readonly first: boolean; readonly last: boolean };
 }) {
   const { dragging, offset, lifted } = props;
   const style = useAnimatedStyle(() => ({
@@ -69,6 +74,23 @@ function ArrangementRow(props: {
     ],
     opacity: lifted ? 0 : 1,
   }));
+  if (Platform.OS === "android") {
+    const grouped = props.grouped;
+    return (
+      <Reanimated.View
+        style={[{ height: props.height }, style]}
+        className={cn(
+          "flex-row items-center px-4",
+          grouped ? "mx-4 bg-grouped-card" : "px-8",
+          grouped?.first && "rounded-t-[24px]",
+          grouped?.last && "rounded-b-[24px]",
+          grouped && !grouped.last && "border-b border-border-subtle",
+        )}
+      >
+        {props.children}
+      </Reanimated.View>
+    );
+  }
   return (
     <Reanimated.View
       style={[{ height: props.height }, style]}
@@ -384,17 +406,40 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
           className="flex-1 bg-screen"
           style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         >
-          <View className="flex-row items-center justify-between gap-3 px-5 py-3">
-            <Text className="flex-1 text-xl font-t3-semibold">Arrange threads</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={props.onClose}
-              className="min-h-11 justify-center px-3"
-            >
-              <Text className="text-base text-primary-text">Done</Text>
-            </Pressable>
-          </View>
-          <Text className="px-5 pb-3 text-sm text-foreground-muted">
+          {/* A Modal is its own window: Android glass needs a backdrop in it. */}
+          <GlassFlatBackdrop />
+          {Platform.OS === "android" ? (
+            // The iOS sheet bar: centered title and a prominent Done.
+            <AndroidSheetHeader
+              title="Arrange threads"
+              actions={[
+                {
+                  accessibilityLabel: "Done",
+                  label: "Done",
+                  icon: "checkmark",
+                  prominent: true,
+                  onPress: props.onClose,
+                },
+              ]}
+            />
+          ) : (
+            <View className="flex-row items-center justify-between gap-3 px-5 py-3">
+              <Text className="flex-1 text-xl font-t3-semibold">Arrange threads</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={props.onClose}
+                className="min-h-11 justify-center px-3"
+              >
+                <Text className="text-base text-primary-text">Done</Text>
+              </Pressable>
+            </View>
+          )}
+          <Text
+            className={cn(
+              "px-5 pb-3 text-sm text-foreground-muted",
+              Platform.OS === "android" && "pt-3",
+            )}
+          >
             Drag to reorder, pin, or settle. Changes save when you drop.
           </Text>
           <View
@@ -419,7 +464,7 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
                 offset: rows[index]!.offset,
                 index,
               })}
-              renderItem={({ item }) => {
+              renderItem={({ item, index }) => {
                 const thread = item.thread;
                 const planner =
                   item.section === "pinned" || item.section === "active"
@@ -459,6 +504,11 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
                   : [];
                 return (
                   <ArrangementRow
+                    grouped={
+                      thread
+                        ? { first: !rows[index - 1]?.thread, last: !rows[index + 1]?.thread }
+                        : undefined
+                    }
                     height={item.height}
                     dragging={visiblePreview !== null}
                     lifted={item.key === sourceRow?.key}

@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { PullRequestEntryRow } from "./PullRequestEntryRow";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -91,7 +92,7 @@ function TimelineComment({ comment }: { comment: PullRequestComment }) {
         </Text>
       ) : null}
       {preview.trim() || content.attachments.length ? (
-        <View className="gap-2 overflow-hidden rounded-2xl bg-grouped-card p-3">
+        <GroupedCard className="gap-2 p-3" radius={16}>
           <View style={long && !expanded ? { maxHeight: 240, overflow: "hidden" } : undefined}>
             <PullRequestMarkdown
               markdown={long && !expanded ? comment.body.slice(0, 1200) : comment.body}
@@ -167,7 +168,7 @@ function TimelineComment({ comment }: { comment: PullRequestComment }) {
               />
             </Pressable>
           ) : null}
-        </View>
+        </GroupedCard>
       ) : null}
     </TimelineEvent>
   );

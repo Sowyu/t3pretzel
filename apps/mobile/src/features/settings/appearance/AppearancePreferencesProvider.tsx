@@ -338,6 +338,11 @@ export function AppearancePreferencesProvider(props: { readonly children: ReactN
   );
 }
 
+/** The preferences, or null outside the provider (root error screens). */
+export function useOptionalAppearancePreferences(): AppearancePreferencesContextValue | null {
+  return use(AppearancePreferencesContext);
+}
+
 export function useAppearancePreferences(): AppearancePreferencesContextValue {
   const context = use(AppearancePreferencesContext);
   if (!context) {

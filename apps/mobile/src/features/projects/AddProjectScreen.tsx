@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
@@ -134,6 +135,12 @@ function sourceFromParam(value: string | string[] | undefined): AddProjectRemote
 }
 
 function SectionTitle(props: { readonly children: string }) {
+  // Android uses the sentence-case ListSection title the rest of the app shows.
+  if (Platform.OS === "android") {
+    return (
+      <Text className="px-2 text-sm font-t3-medium text-foreground-muted">{props.children}</Text>
+    );
+  }
   return (
     <Text className="px-1 text-2xs font-t3-bold tracking-[0.7px] uppercase text-foreground-muted">
       {props.children}
@@ -168,7 +175,7 @@ function AddProjectShell(props: { readonly children: ReactNode; readonly title: 
 }
 
 function ListSection(props: { readonly children: ReactNode }) {
-  return <View className="overflow-hidden rounded-[24px] bg-grouped-card">{props.children}</View>;
+  return <GroupedCard>{props.children}</GroupedCard>;
 }
 
 function ListRow(props: {
@@ -240,6 +247,9 @@ function PrimaryActionButton(props: {
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={props.label}
+      accessibilityState={{ disabled: Boolean(props.disabled), busy: Boolean(props.loading) }}
       disabled={props.disabled}
       onPress={props.onPress}
       className="h-12 items-center justify-center rounded-full bg-primary active:opacity-70 disabled:opacity-45"
@@ -432,7 +442,7 @@ function EmptyEnvironmentState() {
   const navigation = useNavigation();
 
   return (
-    <View className="items-center gap-3 rounded-2xl bg-grouped-card px-5 py-8">
+    <GroupedCard className="items-center gap-3 px-5 py-8" radius={16}>
       <Text className="text-center text-lg font-t3-bold">Environment unavailable</Text>
       <Text className="text-center text-sm leading-normal text-foreground-muted">
         Start or reconnect an environment before adding a project.
@@ -443,7 +453,7 @@ function EmptyEnvironmentState() {
       >
         <Text className="text-sm font-t3-bold text-primary-foreground">Add environment</Text>
       </Pressable>
-    </View>
+    </GroupedCard>
   );
 }
 
@@ -1434,12 +1444,12 @@ export function AddProjectDestinationScreen(props: {
     <AddProjectShell title="Clone destination">
       {error ? <ErrorBanner message={error} /> : null}
       {repositoryTitle ? (
-        <View className="rounded-[24px] bg-grouped-card px-4 py-3">
+        <GroupedCard className="px-4 py-3">
           <Text className="text-base font-t3-bold">{repositoryTitle}</Text>
           <Text className="mt-0.5 text-xs text-foreground-muted" numberOfLines={2}>
             {remoteUrl}
           </Text>
-        </View>
+        </GroupedCard>
       ) : null}
       {environment ? (
         <>

@@ -176,7 +176,8 @@ function SettingsIndexSections() {
       <SettingsSection title="Projects & threads">
         {selectedProjectKey !== null ? (
           <SettingsRow
-            icon="folder"
+            // Android gives each row its own icon (Organization is also "folder").
+            icon={Platform.OS === "android" ? "info.circle" : "folder"}
             label="Overview"
             value={projectLabel}
             target="SettingsProjectOverview"
@@ -190,7 +191,7 @@ function SettingsIndexSections() {
 
       <SettingsSection title="Server settings">
         <SettingsRow
-          icon="person.crop.circle"
+          icon={Platform.OS === "android" ? "person.2" : "person.crop.circle"}
           label="Provider accounts"
           target="SettingsProviderAccounts"
           disabled={noServerTargets}

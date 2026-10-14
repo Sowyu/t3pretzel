@@ -1,6 +1,6 @@
 import type { MenuAction, MenuComponentProps } from "@react-native-menu/menu";
 import type { ReactNode, Ref } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewInstance, ViewStyle } from "react-native";
 import {
   AccessibilityInfo,
@@ -19,6 +19,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { viewMirrorView } from "../../modules/t3-liquid-glass";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { cn } from "../lib/cn";
 import { menuSections } from "./menuSections";
@@ -66,12 +67,54 @@ const MENU_EXIT: EntryExitAnimationFunction = () => {
   };
 };
 
+// The long-press preview: the scrim fades in while the pressed row lifts a
+// little, as UIContextMenuInteraction does. One-shot, on the UI thread.
+const SCRIM_ENTER: EntryExitAnimationFunction = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 0 },
+    animations: { opacity: withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System }) },
+  };
+};
+
+const SCRIM_EXIT: EntryExitAnimationFunction = () => {
+  "worklet";
+  return {
+    initialValues: { opacity: 1 },
+    animations: { opacity: withTiming(0, { duration: 140, reduceMotion: ReduceMotion.System }) },
+  };
+};
+
+const PREVIEW_SCALE = 1.02;
+
+const PREVIEW_ENTER: EntryExitAnimationFunction = () => {
+  "worklet";
+  return {
+    initialValues: { transform: [{ scale: 1 }] },
+    animations: {
+      transform: [
+        {
+          scale: withSpring(PREVIEW_SCALE, {
+            duration: 260,
+            dampingRatio: 0.7,
+            reduceMotion: ReduceMotion.System,
+          }),
+        },
+      ],
+    },
+  };
+};
+
+const Mirror = viewMirrorView();
+
 // Anchor position is snapshotted in window coordinates when the menu opens;
 // the overlay root measures itself the same way, and the menu is placed from
 // the delta. Both snapshots are taken at open time so later reflows (keyboard
 // show/hide, screen transitions) can't flip an opens-up menu to opens-down
 // mid-presentation.
 type AnchorSnapshot = {
+  /** The anchor's native tag, for the context preview's mirror. */
+  readonly tag: number | null;
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -106,6 +149,13 @@ export type AndroidAnchoredMenuProps = {
   readonly popover?: (close: () => void) => ReactNode;
   /** Card width for `popover` content; menus use the UIMenu width. */
   readonly popoverWidth?: number;
+  /**
+   * The long-press context menu look: the screen blurs and dims, and the
+   * anchor lifts above the scrim with the menu under it.
+   */
+  readonly contextPreview?: boolean;
+  /** Called after the menu closes for any reason (tap outside, back, an item, `close`). */
+  readonly onClose?: () => void;
 };
 
 function focusAccessibility(target: ViewInstance | null) {
@@ -224,14 +274,73 @@ function SectionSeparator(props: { readonly dark: boolean }) {
  * The menu lives in-window (OverlayPortal) so opening it from the composer
  * keeps the keyboard up; back press and a tap outside dismiss it, and
  * TalkBack focus moves into the menu and back to the anchor.
+ *
+ * Closed, this is only the anchor wrapper: everything the open menu needs
+ * (keyboard state, theme, sizing) lives in OpenMenu, so the many closed menus
+ * on a list's rows never re-render when the keyboard moves.
  */
 export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
+  const [anchor, setAnchor] = useState<AnchorSnapshot | null>(null);
+  const anchorRef = useRef<ViewInstance>(null);
+
+  const { onClose } = props;
+  const close = useCallback(() => {
+    setAnchor(null);
+    // Return TalkBack focus to the control that opened the menu.
+    setTimeout(() => focusAccessibility(anchorRef.current), 0);
+    onClose?.();
+  }, [onClose]);
+
+  const open = useCallback(() => {
+    const anchorView = anchorRef.current;
+    anchorView?.measureInWindow((x, y, width, height) => {
+      setAnchor({ tag: findNodeHandle(anchorView) ?? null, x, y, width, height });
+    });
+  }, []);
+
+  // Opening and closing re-render this wrapper; the same element lets React
+  // skip the anchor's own subtree.
+  const { children } = props;
+  const anchorContent = useMemo(
+    () => (typeof children === "function" ? children(open) : children),
+    [children, open],
+  );
+
+  return (
+    <>
+      {typeof children === "function" ? (
+        <View ref={anchorRef} collapsable={false} className={props.className} style={props.style}>
+          {anchorContent}
+        </View>
+      ) : (
+        <Pressable
+          ref={anchorRef}
+          accessibilityRole="button"
+          className={props.className}
+          collapsable={false}
+          style={props.style}
+          onPress={open}
+        >
+          <View pointerEvents="none">{anchorContent}</View>
+        </Pressable>
+      )}
+      {anchor === null ? null : <OpenMenu {...props} anchor={anchor} close={close} />}
+    </>
+  );
+}
+
+function OpenMenu(
+  props: AndroidAnchoredMenuProps & {
+    readonly anchor: AnchorSnapshot;
+    readonly close: () => void;
+  },
+) {
+  const { anchor, close } = props;
   const { scale, menuWidth } = useAndroidControlSizing();
   const desiredMenuWidth = props.popover ? (props.popoverWidth ?? menuWidth) : menuWidth;
   const { themeAppearance, themeVariables: colors } = useAppearancePreferences();
   const isDark = themeAppearance === "dark";
   const liquid = useLiquidGlass().tier !== "none";
-  const [anchor, setAnchor] = useState<AnchorSnapshot | null>(null);
   const [path, setPath] = useState<readonly MenuAction[]>([]);
   // Height of the overlay root. Menus that flip above their anchor are pinned
   // by their BOTTOM edge (bottom = rootHeight - anchorTop), so drill-in height
@@ -241,25 +350,15 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
     overlay === null
       ? desiredMenuWidth
       : Math.min(desiredMenuWidth, Math.max(0, overlay.width - 2 * SCREEN_MARGIN));
-  const anchorRef = useRef<ViewInstance>(null);
   const overlayRef = useRef<ViewInstance>(null);
   const firstRowRef = useRef<ViewInstance>(null);
+  // The mirror draws the live anchor view; without the native module the
+  // menu still opens, just without the lifted row.
+  const previewTag = props.contextPreview && Mirror ? anchor.tag : null;
+  const anchorGap = previewTag === null ? ANCHOR_GAP : ANCHOR_GAP + 6;
 
   const keyboardVisible = useKeyboardState((state) => state.isVisible);
   const keyboardHeight = useKeyboardState((state) => state.height);
-  const close = useCallback(() => {
-    setAnchor(null);
-    setPath([]);
-    setOverlay(null);
-    // Return TalkBack focus to the control that opened the menu.
-    setTimeout(() => focusAccessibility(anchorRef.current), 0);
-  }, []);
-
-  const open = useCallback(() => {
-    anchorRef.current?.measureInWindow((x, y, width, height) => {
-      setAnchor({ x, y, width, height });
-    });
-  }, []);
 
   const measureOverlay = useCallback(() => {
     overlayRef.current?.measureInWindow((x, y, width, height) => {
@@ -269,23 +368,21 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
 
   // Back returns to the parent submenu before closing the menu.
   const submenuDepth = path.length;
-  const isOpen = anchor !== null;
   useEffect(() => {
-    if (!isOpen) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (submenuDepth > 0) setPath((current) => current.slice(0, -1));
       else close();
       return true;
     });
     return () => subscription.remove();
-  }, [isOpen, close, submenuDepth]);
+  }, [close, submenuDepth]);
 
   const parent = path[path.length - 1] ?? null;
   const sections = menuSections(parent?.subactions ?? props.actions);
 
   // Anchor in overlay-local coordinates (both measured in window space).
   const local =
-    anchor === null || overlay === null
+    overlay === null
       ? null
       : {
           x: anchor.x - overlay.x,
@@ -306,10 +403,14 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const usableBottom =
     overlay === null ? 0 : overlay.height - (keyboardVisible ? keyboardHeight : 0);
   const spaceBelow =
-    local === null ? 0 : usableBottom - (local.y + local.height) - ANCHOR_GAP - SCREEN_MARGIN;
-  const spaceAbove = local === null ? 0 : local.y - ANCHOR_GAP - SCREEN_MARGIN;
+    local === null ? 0 : usableBottom - (local.y + local.height) - anchorGap - SCREEN_MARGIN;
+  const spaceAbove = local === null ? 0 : local.y - anchorGap - SCREEN_MARGIN;
   const opensDown = spaceBelow >= 280 || spaceBelow >= spaceAbove;
-  const maxHeight = Math.min(opensDown ? spaceBelow : spaceAbove, 480);
+  // UIMenu uses the room up to the screen edge, then scrolls.
+  const maxHeight = Math.min(
+    opensDown ? spaceBelow : spaceAbove,
+    overlay === null ? 0 : overlay.height * 0.8,
+  );
 
   // Move TalkBack focus into the menu once it is placed, and on each drill-in.
   const placed = local !== null;
@@ -343,164 +444,200 @@ export function AndroidAnchoredMenu(props: AndroidAnchoredMenuProps) {
   const showTitle = parent === null && Boolean(props.title) && !props.popover;
 
   return (
-    <>
-      {typeof props.children === "function" ? (
-        <View ref={anchorRef} collapsable={false} className={props.className} style={props.style}>
-          {props.children(open)}
-        </View>
-      ) : (
-        <Pressable
-          ref={anchorRef}
-          accessibilityRole="button"
-          className={props.className}
-          collapsable={false}
-          style={props.style}
-          onPress={open}
-        >
-          <View pointerEvents="none">{props.children}</View>
-        </Pressable>
-      )}
-      {anchor === null ? null : (
-        <OverlayPortal>
-          <View
-            ref={overlayRef}
-            collapsable={false}
+    <OverlayPortal>
+      <View
+        ref={overlayRef}
+        collapsable={false}
+        className="absolute inset-0"
+        onLayout={measureOverlay}
+      >
+        {previewTag === null ? (
+          <Pressable
+            accessibilityLabel="Close menu"
+            accessibilityRole="button"
             className="absolute inset-0"
-            onLayout={measureOverlay}
-          >
+            onPress={close}
+          />
+        ) : (
+          <Animated.View entering={SCRIM_ENTER} exiting={SCRIM_EXIT} className="absolute inset-0">
+            {liquid ? (
+              // One blur over the still screen: nothing under it moves while
+              // the menu is open, so it draws only while the scrim fades.
+              <GlassSurface
+                chrome="none"
+                variant="scrim"
+                tintColor={isDark ? "rgba(0, 0, 0, 0.36)" : "rgba(0, 0, 0, 0.14)"}
+                pointerEvents="none"
+                style={{ position: "absolute", inset: 0, borderRadius: 0 }}
+              >
+                {null}
+              </GlassSurface>
+            ) : (
+              <View
+                pointerEvents="none"
+                className="absolute inset-0"
+                style={{ backgroundColor: isDark ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.22)" }}
+              />
+            )}
             <Pressable
               accessibilityLabel="Close menu"
               accessibilityRole="button"
               className="absolute inset-0"
               onPress={close}
             />
-            {local === null ? null : (
-              <Animated.View
-                entering={MENU_ENTER}
-                exiting={MENU_EXIT}
-                accessibilityRole="menu"
-                className="absolute overflow-hidden"
-                style={{
-                  left,
-                  maxHeight,
-                  width: cardWidth,
-                  borderRadius: 24,
-                  // Glass draws its own rim. Without glass the card is solid: any
-                  // translucency without a blur lets the text underneath read
-                  // through the items. Dark menus sit a step above the screen,
-                  // like iOS's lighter dark menus.
-                  borderWidth: liquid ? 0 : StyleSheet.hairlineWidth,
-                  backgroundColor: liquid
-                    ? "transparent"
-                    : isDark
-                      ? colors["--color-grouped-card"]
-                      : colors["--color-card-alt"],
-                  borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
-                  boxShadow: isDark
-                    ? "0 16px 48px rgba(0, 0, 0, 0.55)"
-                    : "0 16px 48px rgba(0, 0, 0, 0.18)",
-                  transformOrigin: `${opensDown ? "top" : "bottom"} ${alignsLeft ? "left" : "right"}`,
-                  ...(opensDown
-                    ? { top: local.y + local.height + ANCHOR_GAP }
-                    : { bottom: (overlay?.height ?? 0) - local.y + ANCHOR_GAP }),
-                }}
+          </Animated.View>
+        )}
+        {local === null || previewTag === null || !Mirror ? null : (
+          <Animated.View
+            entering={PREVIEW_ENTER}
+            pointerEvents="none"
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              position: "absolute",
+              left: local.x,
+              top: local.y,
+              width: local.width,
+              height: local.height,
+              borderRadius: 16,
+              transform: [{ scale: PREVIEW_SCALE }],
+              boxShadow: isDark
+                ? "0 10px 32px rgba(0, 0, 0, 0.6)"
+                : "0 10px 32px rgba(0, 0, 0, 0.2)",
+            }}
+          >
+            <View
+              className="flex-1 overflow-hidden"
+              style={{ borderRadius: 16, backgroundColor: colors["--color-screen"] }}
+            >
+              <Mirror sourceTag={previewTag} style={{ flex: 1 }} />
+            </View>
+          </Animated.View>
+        )}
+        {local === null ? null : (
+          <Animated.View
+            entering={MENU_ENTER}
+            exiting={MENU_EXIT}
+            accessibilityRole="menu"
+            className="absolute overflow-hidden"
+            style={{
+              left,
+              maxHeight,
+              width: cardWidth,
+              borderRadius: 24,
+              // Glass draws its own rim. Without glass the card is solid: any
+              // translucency without a blur lets the text underneath read
+              // through the items. Dark menus sit a step above the screen,
+              // like iOS's lighter dark menus.
+              borderWidth: liquid ? 0 : StyleSheet.hairlineWidth,
+              backgroundColor: liquid
+                ? "transparent"
+                : isDark
+                  ? colors["--color-grouped-card"]
+                  : colors["--color-card-alt"],
+              borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
+              boxShadow: isDark
+                ? "0 16px 48px rgba(0, 0, 0, 0.55)"
+                : "0 16px 48px rgba(0, 0, 0, 0.18)",
+              transformOrigin: `${opensDown ? "top" : "bottom"} ${alignsLeft ? "left" : "right"}`,
+              ...(opensDown
+                ? { top: local.y + local.height + anchorGap }
+                : { bottom: (overlay?.height ?? 0) - local.y + anchorGap }),
+            }}
+          >
+            {liquid ? (
+              <GlassSurface
+                chrome="none"
+                variant="menu"
+                pointerEvents="none"
+                style={{ position: "absolute", inset: 0, borderRadius: 24 }}
               >
-                {liquid ? (
-                  <GlassSurface
-                    chrome="none"
-                    variant="menu"
-                    pointerEvents="none"
-                    style={{ position: "absolute", inset: 0, borderRadius: 24 }}
+                {null}
+              </GlassSurface>
+            ) : null}
+            {props.popover ? (
+              props.popover(close)
+            ) : (
+              // keyboardShouldPersistTaps: the menu often opens over an
+              // active editor; the first item tap must act, not just
+              // dismiss the keyboard. The key resets scroll on drill-in.
+              <ScrollView
+                key={submenuDepth}
+                bounces={false}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingVertical: 6 }}
+              >
+                {showTitle ? (
+                  <View
+                    ref={firstRowRef}
+                    accessible
+                    accessibilityRole="header"
+                    style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 }}
                   >
-                    {null}
-                  </GlassSurface>
+                    <Text
+                      className="text-center text-foreground-muted"
+                      style={{ fontSize: 13 * scale, lineHeight: 18 * scale }}
+                    >
+                      {props.title}
+                    </Text>
+                  </View>
                 ) : null}
-                {props.popover ? (
-                  props.popover(close)
-                ) : (
-                  // keyboardShouldPersistTaps: the menu often opens over an
-                  // active editor; the first item tap must act, not just
-                  // dismiss the keyboard. The key resets scroll on drill-in.
-                  <ScrollView
-                    key={submenuDepth}
-                    bounces={false}
-                    keyboardShouldPersistTaps="always"
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingVertical: 6 }}
-                  >
-                    {showTitle ? (
-                      <View
-                        ref={firstRowRef}
-                        accessible
+                {parent ? (
+                  <>
+                    <MenuRow
+                      back
+                      ref={firstRowRef}
+                      title={parent.title}
+                      checkColumn={false}
+                      onPress={() => setPath((current) => current.slice(0, -1))}
+                    />
+                    <SectionSeparator dark={isDark} />
+                  </>
+                ) : null}
+                {sections.map((section, sectionIndex) => (
+                  <View key={section.key}>
+                    {sectionIndex > 0 ? <SectionSeparator dark={isDark} /> : null}
+                    {section.title ? (
+                      <Text
                         accessibilityRole="header"
-                        style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 }}
+                        className="text-foreground-muted"
+                        style={{
+                          fontSize: 13 * scale,
+                          lineHeight: 18 * scale,
+                          paddingHorizontal: 16,
+                          paddingTop: 6,
+                          paddingBottom: 2,
+                        }}
                       >
-                        <Text
-                          className="text-center text-foreground-muted"
-                          style={{ fontSize: 13 * scale, lineHeight: 18 * scale }}
-                        >
-                          {props.title}
-                        </Text>
-                      </View>
+                        {section.title}
+                      </Text>
                     ) : null}
-                    {parent ? (
-                      <>
-                        <MenuRow
-                          back
-                          ref={firstRowRef}
-                          title={parent.title}
-                          checkColumn={false}
-                          onPress={() => setPath((current) => current.slice(0, -1))}
-                        />
-                        <SectionSeparator dark={isDark} />
-                      </>
-                    ) : null}
-                    {sections.map((section, sectionIndex) => (
-                      <View key={section.key}>
-                        {sectionIndex > 0 ? <SectionSeparator dark={isDark} /> : null}
-                        {section.title ? (
-                          <Text
-                            accessibilityRole="header"
-                            className="text-foreground-muted"
-                            style={{
-                              fontSize: 13 * scale,
-                              lineHeight: 18 * scale,
-                              paddingHorizontal: 16,
-                              paddingTop: 6,
-                              paddingBottom: 2,
-                            }}
-                          >
-                            {section.title}
-                          </Text>
-                        ) : null}
-                        {section.actions.map((action, index) => (
-                          <MenuRow
-                            key={action.id ?? `${index}-${action.title}`}
-                            ref={
-                              sectionIndex === 0 && index === 0 && !parent && !showTitle
-                                ? firstRowRef
-                                : undefined
-                            }
-                            title={action.title}
-                            subtitle={action.subtitle}
-                            icon={action.image}
-                            checked={action.state === "on"}
-                            checkColumn={checkColumn}
-                            destructive={action.attributes?.destructive}
-                            disabled={action.attributes?.disabled}
-                            submenu={(action.subactions?.length ?? 0) > 0}
-                            onPress={() => onPressItem(action)}
-                          />
-                        ))}
-                      </View>
+                    {section.actions.map((action, index) => (
+                      <MenuRow
+                        key={action.id ?? `${index}-${action.title}`}
+                        ref={
+                          sectionIndex === 0 && index === 0 && !parent && !showTitle
+                            ? firstRowRef
+                            : undefined
+                        }
+                        title={action.title}
+                        subtitle={action.subtitle}
+                        icon={action.image}
+                        checked={action.state === "on"}
+                        checkColumn={checkColumn}
+                        destructive={action.attributes?.destructive}
+                        disabled={action.attributes?.disabled}
+                        submenu={(action.subactions?.length ?? 0) > 0}
+                        onPress={() => onPressItem(action)}
+                      />
                     ))}
-                  </ScrollView>
-                )}
-              </Animated.View>
+                  </View>
+                ))}
+              </ScrollView>
             )}
-          </View>
-        </OverlayPortal>
-      )}
-    </>
+          </Animated.View>
+        )}
+      </View>
+    </OverlayPortal>
   );
 }

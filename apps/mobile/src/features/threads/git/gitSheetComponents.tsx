@@ -1,7 +1,9 @@
 import { SymbolView } from "../../../components/AppSymbol";
 import type { ComponentProps } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { AppText as Text } from "../../../components/AppText";
+import { GlassFill } from "../../../components/GlassSurface";
+import { useLiquidGlass } from "../../../components/useLiquidGlass";
 import { cn } from "../../../lib/cn";
 
 /* ─── Shared sheet components ──────────────────────────────────────── */
@@ -20,20 +22,25 @@ export function SheetActionButton(props: {
       : tone === "danger"
         ? "accent-danger-foreground"
         : "accent-secondary-foreground";
+  // Android: iOS's sentence-case capsule buttons; the secondary one is glass.
+  const android = Platform.OS === "android";
+  const glass = useLiquidGlass().tier !== "none" && android && tone === "secondary";
 
   return (
     <Pressable
       className={cn(
         "min-h-[48px] flex-row items-center justify-center gap-2 px-4 py-3 disabled:opacity-[0.45]",
-        "flex-1 rounded-[18px]",
+        android ? "flex-1 rounded-full" : "flex-1 rounded-[18px]",
         tone === "primary" ? "bg-primary" : tone === "danger" ? "bg-danger" : "bg-secondary",
         tone !== "primary" &&
           (tone === "danger" ? "border border-danger-border" : "border border-secondary-border"),
+        glass && "border-0 bg-transparent",
       )}
       accessibilityRole="button"
       disabled={props.disabled}
       onPress={props.onPress}
     >
+      {glass ? <GlassFill interactive={!props.disabled} /> : null}
       <SymbolView
         name={props.icon}
         size={16}
@@ -42,7 +49,9 @@ export function SheetActionButton(props: {
       />
       <Text
         className={cn(
-          "text-xs font-t3-bold tracking-[0.9px] uppercase",
+          android
+            ? "text-[15px] font-t3-semibold"
+            : "text-xs font-t3-bold tracking-[0.9px] uppercase",
           tone === "primary"
             ? "text-primary-foreground"
             : tone === "danger"

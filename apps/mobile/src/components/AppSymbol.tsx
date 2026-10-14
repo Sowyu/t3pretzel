@@ -38,6 +38,7 @@ import IconWifiOff from "@tabler/icons-react-native/IconWifiOff";
 import type { AndroidSymbol, SFSymbol, SymbolViewProps } from "expo-symbols";
 import Svg, { Circle, Ellipse, Path, Rect } from "react-native-svg";
 import { withUniwind } from "uniwind";
+import { useOptionalAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { IONICONS, type IoniconElement, type IoniconName } from "./ionicons";
 
 // Android draws Ionicons, the closest open set to SF Symbols (outline for
@@ -307,6 +308,8 @@ function IoniconElementView(props: {
 }
 
 function AppSymbolView(props: AppSymbolViewProps) {
+  // An icon without a tint draws in the theme's icon color, never black on dark.
+  const themeIcon = useOptionalAppearancePreferences()?.themeVariables["--color-icon"];
   const materialName = typeof props.name === "string" ? undefined : props.name.android;
   const sfSymbol = typeof props.name === "string" ? props.name : props.name.ios;
   const androidIcon =
@@ -318,7 +321,7 @@ function AppSymbolView(props: AppSymbolViewProps) {
   }
 
   const strokeScale = strokeScaleForWeight(props.weight);
-  const color = props.tintColor ?? "black";
+  const color = props.tintColor ?? themeIcon ?? "black";
   if (typeof androidIcon === "string") {
     const size = props.size ?? 24;
     return (

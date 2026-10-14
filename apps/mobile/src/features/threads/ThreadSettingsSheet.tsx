@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { AppRefreshControl } from "../../components/AppRefreshControl";
 import { createV5StackNavigator as createNativeStackNavigator } from "../../native/createV5StackNavigator";
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
@@ -960,7 +961,7 @@ function ThreadSettingsOptionsItem(props: {
       </Animated.View>
 
       <Text className="px-5 pb-2 pt-7 text-sm font-t3-medium text-foreground-muted">Catalog</Text>
-      <View className="mx-4 overflow-hidden rounded-2xl bg-grouped-card">
+      <GroupedCard outerClassName="mx-4" radius={16}>
         <SwitchRow
           label="Manage hidden models"
           value={session.manageHidden}
@@ -975,7 +976,7 @@ function ThreadSettingsOptionsItem(props: {
             value={session.showLegacy}
           />
         ) : null}
-      </View>
+      </GroupedCard>
     </View>
   );
 }
@@ -1197,7 +1198,7 @@ function ThreadSettingsChoiceContent(props: {
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
     >
-      <View className="overflow-hidden rounded-2xl bg-grouped-card">
+      <GroupedCard radius={16}>
         {submenuContent.rows.map((row, index) => (
           <ChoiceRow
             key={row.id}
@@ -1208,7 +1209,7 @@ function ThreadSettingsChoiceContent(props: {
             onPress={row.onPress}
           />
         ))}
-      </View>
+      </GroupedCard>
     </ScrollView>
   );
 }

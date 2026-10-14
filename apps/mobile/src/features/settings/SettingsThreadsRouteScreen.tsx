@@ -5,7 +5,7 @@ import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollVie
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import { useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
@@ -229,9 +229,23 @@ function AutoSettleSettingsRows() {
           }
         />
         {afterDays !== null ? (
-          <View className="flex-row items-center gap-4 px-4 py-4">
-            <View className="w-[22px]" />
-            <Text className="flex-1 text-foreground text-lg">Inactive days</Text>
+          // Android matches its sibling rows (ListRowLayout geometry); iOS keeps its row.
+          <View
+            className={
+              Platform.OS === "android"
+                ? "min-h-14 flex-row items-center gap-3 px-4 py-3"
+                : "flex-row items-center gap-4 px-4 py-4"
+            }
+          >
+            <View className={Platform.OS === "android" ? "w-6" : "w-[22px]"} />
+            <Text
+              className={cn(
+                "flex-1 text-foreground",
+                Platform.OS === "android" ? "text-base" : "text-lg",
+              )}
+            >
+              Inactive days
+            </Text>
             <AutoSettleDaysField
               value={afterDays}
               disabled={disabled}

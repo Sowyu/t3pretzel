@@ -1,4 +1,5 @@
 import { requireNativeModule } from "expo";
+import { useState } from "react";
 import { View } from "react-native";
 
 import { WheelPicker } from "./WheelPicker";
@@ -30,12 +31,14 @@ export function TimeWheel(props: {
   readonly onChange: (hours: number, minutes: number) => void;
   readonly accessibilityLabel: string;
 }) {
-  const is24Hour = requireNativeModule<{ is24HourFormat(): boolean }>(
-    "T3NativeControls",
-  ).is24HourFormat();
+  // A synchronous native call: read it once per mount, not on every wheel settle.
+  const [is24Hour] = useState(() =>
+    requireNativeModule<{ is24HourFormat(): boolean }>("T3NativeControls").is24HourFormat(),
+  );
   const pm = props.hours >= 12;
+  // iOS's compact spinner: narrow columns centered together, one shared band.
   return (
-    <View className="flex-row px-4 pb-3">
+    <View className="flex-row justify-center px-4 pb-3">
       <WheelPicker
         accessibilityLabel={`${props.accessibilityLabel} hour`}
         options={is24Hour ? hours24 : hours12}
@@ -45,6 +48,7 @@ export function TimeWheel(props: {
         }
         align="right"
         band="start"
+        width={64}
       />
       <WheelPicker
         accessibilityLabel={`${props.accessibilityLabel} minute`}
@@ -53,6 +57,7 @@ export function TimeWheel(props: {
         onChange={(minute) => props.onChange(props.hours, minute)}
         align="left"
         band={is24Hour ? "end" : "middle"}
+        width={64}
       />
       {is24Hour ? null : (
         <WheelPicker
@@ -64,6 +69,7 @@ export function TimeWheel(props: {
           }
           align="left"
           band="end"
+          width={64}
         />
       )}
     </View>

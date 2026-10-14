@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { ComponentProps } from "react";
 import { View } from "react-native";
@@ -24,10 +25,7 @@ export function LocalEnvironmentList({
 }) {
   if (environments.length === 0) {
     return (
-      <View
-        collapsable={false}
-        className="items-center gap-3 rounded-[24px] bg-grouped-card px-6 py-8"
-      >
+      <GroupedCard className="items-center gap-3 px-6 py-8">
         <View className="h-12 w-12 items-center justify-center rounded-[16px] bg-subtle">
           <SymbolView
             name="point.3.connected.trianglepath.dotted"
@@ -40,12 +38,12 @@ export function LocalEnvironmentList({
           No environments connected yet.{"\n"}Tap{" "}
           <Text className="font-t3-bold text-foreground">+</Text> to add one.
         </Text>
-      </View>
+      </GroupedCard>
     );
   }
 
   return (
-    <View collapsable={false} className="overflow-hidden rounded-[24px] bg-grouped-card">
+    <GroupedCard>
       {environments.map((environment) => (
         <View key={environment.environmentId} collapsable={false}>
           <ConnectionEnvironmentRow
@@ -56,6 +54,6 @@ export function LocalEnvironmentList({
           />
         </View>
       ))}
-    </View>
+    </GroupedCard>
   );
 }

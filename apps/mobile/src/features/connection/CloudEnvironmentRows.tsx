@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { GlassFill } from "../../components/GlassSurface";
 import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
@@ -123,7 +124,7 @@ function CloudEnvironmentRowsContent(
       ) : null}
 
       {hasCloudRows ? (
-        <View collapsable={false} className="overflow-hidden rounded-[24px] bg-grouped-card">
+        <GroupedCard>
           {props.connectedCloudEnvironments.map((environment) => (
             <ConnectedCloudEnvironmentRow
               key={environment.environmentId}
@@ -152,20 +153,20 @@ function CloudEnvironmentRowsContent(
               onToggleError={() => handleToggleCloudError(environment.environment.environmentId)}
             />
           ))}
-        </View>
+        </GroupedCard>
       ) : controller.relayDiscovery.isRefreshing ? (
-        <View collapsable={false} className="items-center gap-3 rounded-[24px] bg-grouped-card p-6">
+        <GroupedCard className="items-center gap-3 p-6">
           <AppActivityIndicator colorClassName={"accent-icon"} />
           <Text className="text-center text-sm leading-normal text-foreground-muted">
             Loading linked cloud environments.
           </Text>
-        </View>
+        </GroupedCard>
       ) : controller.relayDiscovery.error ? null : (
-        <View collapsable={false} className="rounded-[24px] bg-grouped-card p-5">
+        <GroupedCard className="p-5">
           <Text className="text-sm leading-normal text-foreground-muted">
             No additional linked cloud environments.
           </Text>
-        </View>
+        </GroupedCard>
       )}
 
       {/* Rendered alongside any connected rows — a failed discovery must not
@@ -173,7 +174,7 @@ function CloudEnvironmentRowsContent(
       {discoveryAvailable &&
       controller.relayDiscovery.error &&
       !controller.relayDiscovery.isRefreshing ? (
-        <View collapsable={false} className="gap-3 rounded-[24px] bg-grouped-card p-5">
+        <GroupedCard className="gap-3 p-5">
           <Text className="text-base font-t3-bold text-foreground">
             Could not load T3 Connect environments
           </Text>
@@ -195,7 +196,7 @@ function CloudEnvironmentRowsContent(
             {liquid ? <GlassFill /> : null}
             <Text className="text-xs font-t3-bold text-foreground">Try again</Text>
           </Pressable>
-        </View>
+        </GroupedCard>
       ) : null}
     </View>
   );

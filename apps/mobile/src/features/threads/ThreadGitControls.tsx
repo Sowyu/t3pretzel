@@ -551,6 +551,87 @@ export function ThreadGitMenu(props: ThreadGitMenuProps) {
 }
 
 /** Returns menu data because native toolbars serialize direct items rather than rendering component children. */
+/** The terminal header menu as data, for Android's header: the same items as the iOS menu. */
+export function useThreadTerminalMenuDefinition(
+  props: Pick<
+    ThreadGitControlsProps,
+    | "canOperateTerminal"
+    | "projectScripts"
+    | "terminalSessions"
+    | "onOpenTerminal"
+    | "onOpenNewTerminal"
+    | "onRunProjectScript"
+  >,
+): ScreenHeaderMenu {
+  const {
+    canOperateTerminal,
+    projectScripts,
+    terminalSessions,
+    onOpenTerminal,
+    onOpenNewTerminal,
+    onRunProjectScript,
+  } = props;
+  return useMemo(
+    () => ({
+      title: "Open terminal",
+      icon: "terminal",
+      beforeActions: true,
+      items: [
+        ...(projectScripts.length > 0
+          ? projectScripts.map((script) => ({
+              id: `script-${script.id}`,
+              title: projectScriptMenuLabel(script),
+              icon: projectScriptMenuIcon(script.icon),
+              subtitle: script.command,
+              disabled: !canOperateTerminal,
+              onPress: () => void onRunProjectScript(script),
+            }))
+          : [
+              {
+                id: "no-scripts",
+                title: "No project scripts",
+                icon: "play",
+                subtitle: "This project has no saved scripts yet",
+                disabled: true,
+                onPress: () => {},
+              },
+            ]),
+        ...terminalSessions.map((session) => ({
+          id: `session-${session.terminalId}`,
+          title: session.displayLabel,
+          icon: "terminal",
+          subtitle: [
+            getTerminalStatusLabel({
+              status: session.status,
+              hasRunningSubprocess: session.hasRunningSubprocess,
+            }),
+            basename(session.cwd),
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          onPress: () => onOpenTerminal(session.terminalId),
+        })),
+        {
+          id: "new-terminal",
+          title: "Open new terminal",
+          icon: "plus",
+          subtitle: "Start another shell for this thread",
+          disabled: !canOperateTerminal,
+          onPress: onOpenNewTerminal,
+        },
+      ],
+    }),
+    [
+      canOperateTerminal,
+      projectScripts,
+      terminalSessions,
+      onOpenTerminal,
+      onOpenNewTerminal,
+      onRunProjectScript,
+    ],
+  );
+}
+
 export function useThreadGitMenuDefinition(props: ThreadGitMenuProps): ScreenHeaderMenu | null {
   return threadGitMenuDefinition(props, useThreadGitControlModel(props));
 }

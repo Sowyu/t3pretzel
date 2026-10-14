@@ -37,6 +37,8 @@ export interface ScreenHeaderMenu {
   readonly icon: AppSymbolName;
   readonly status?: string;
   readonly separateBackground?: boolean;
+  /** Android: sits in the capsule before the plain actions, as the iOS item order has it. */
+  readonly beforeActions?: boolean;
   readonly items: ReadonlyArray<ScreenHeaderMenuItem>;
 }
 

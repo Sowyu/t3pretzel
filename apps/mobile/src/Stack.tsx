@@ -143,9 +143,13 @@ import { NATIVE_LIQUID_GLASS_SUPPORTED } from "./native/native-glass";
 import { deriveLayout } from "./lib/layout";
 import { useNativeLayoutMetrics } from "./native/native-layout-metrics";
 import { nativeHeaderScrollEdgeEffects } from "./native/StackHeader";
-import { FORM_SHEET_PRESENTATION_OPTIONS } from "./native/sheet-surface";
+import {
+  FLOATING_SHEET_INSET,
+  FLOATING_SHEET_RADIUS,
+  FORM_SHEET_PRESENTATION_OPTIONS,
+} from "./native/sheet-surface";
 import { GlassFlatBackdrop } from "./components/GlassBackdropSource";
-import { AndroidPageSheet } from "./components/AndroidPageSheet";
+import { AndroidPageSheet, SheetEdgeLight, SheetGrabber } from "./components/AndroidPageSheet";
 import { useThreadOutboxDrain } from "./state/use-thread-outbox-drain";
 import { useComposerAttachmentUploadWorker } from "./state/composer-attachment-uploads";
 
@@ -1042,19 +1046,13 @@ function GuardedScreenLayout(props: {
   readonly route: { readonly name: string; readonly params?: object | undefined };
   readonly options?: NativeStackNavigationOptions;
 }) {
+  const androidFormSheet = Platform.OS === "android" && props.options?.presentation === "formSheet";
   // Android form sheets have no system grabber; draw the iOS 36x5 pill over the content.
   const grabber =
-    Platform.OS === "android" &&
-    props.options?.presentation === "formSheet" &&
-    props.options.sheetGrabberVisible ? (
-      <View
-        pointerEvents="none"
-        importantForAccessibility="no-hide-descendants"
-        className="absolute inset-x-0 top-1.5 z-10 items-center"
-      >
-        <View className="h-[5px] w-9 rounded-full bg-foreground-tertiary" />
-      </View>
-    ) : null;
+    androidFormSheet && props.options?.sheetGrabberVisible ? <SheetGrabber top={6} /> : null;
+  // A sheet that sizes to its content keeps the native edge-to-edge frame;
+  // the rest float as the iOS 26 inset card, like AndroidPageSheet.
+  const floatingCard = androidFormSheet && props.options?.sheetAllowedDetents !== "fitToContents";
   // Android draws the iOS page sheet itself over a transparent modal.
   const pageSheet = Platform.OS === "android" && props.options?.presentation === "transparentModal";
   return (
@@ -1068,10 +1066,28 @@ function GuardedScreenLayout(props: {
         <AndroidPageSheet>{props.children}</AndroidPageSheet>
       ) : (
         <>
-          {/* Android glass on a screen's plain background (headers, pills, segmented controls) samples this. */}
-          <GlassFlatBackdrop />
-          {props.children}
-          {grabber}
+          {floatingCard ? (
+            <View
+              className="flex-1 overflow-hidden bg-sheet-solid"
+              style={{
+                marginHorizontal: FLOATING_SHEET_INSET,
+                marginBottom: FLOATING_SHEET_INSET,
+                borderRadius: FLOATING_SHEET_RADIUS,
+              }}
+            >
+              <GlassFlatBackdrop />
+              {props.children}
+              {grabber}
+              <SheetEdgeLight />
+            </View>
+          ) : (
+            <>
+              {/* Android glass on a screen's plain background (headers, pills, segmented controls) samples this. */}
+              <GlassFlatBackdrop />
+              {props.children}
+              {grabber}
+            </>
+          )}
         </>
       )}
     </RenderErrorBoundary>

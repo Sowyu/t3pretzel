@@ -27,9 +27,10 @@ import { useAndroidHeaderLayout } from "../../components/useAndroidHeaderLayout"
 export function AndroidThreadListToolbar(props: {
   readonly searchQuery: string;
   readonly onSearchQueryChange: (query: string) => void;
-  readonly filterActions: MenuAction[];
-  readonly filterCustomized: boolean;
-  readonly onFilterAction: NonNullable<ComponentProps<typeof ControlPillMenu>["onPressAction"]>;
+  /** The split-view sidebar's filter menu; the phone list filters with chips above the rows. */
+  readonly filterActions?: MenuAction[];
+  readonly filterCustomized?: boolean;
+  readonly onFilterAction?: NonNullable<ComponentProps<typeof ControlPillMenu>["onPressAction"]>;
   readonly onOpenSettings: () => void;
   readonly onOpenEnvironments: () => void;
   readonly sidebar?: boolean;
@@ -122,14 +123,14 @@ export function AndroidThreadListToolbar(props: {
                 brand={<CompactBrandTitle allowFontScaling={false} />}
               />
             </View>
-            {/* Search and filter share one capsule; settings keeps the iOS "..." circle. */}
+            {/* Search (and the sidebar's filter) share one capsule; settings keeps the iOS "..." circle. */}
             <AndroidHeaderButtonGroup>
               <AndroidHeaderIconButton
                 accessibilityLabel="Search threads"
                 icon="magnifyingglass"
                 onPress={openSearch}
               />
-              {state.hasConnections ? (
+              {state.hasConnections && props.filterActions ? (
                 <AndroidAnchoredMenu
                   actions={props.filterActions}
                   onPressAction={props.onFilterAction}

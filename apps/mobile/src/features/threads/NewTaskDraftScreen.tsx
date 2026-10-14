@@ -52,7 +52,8 @@ import {
   ComposerInlineControl,
   ComposerToolbarRow,
 } from "../../components/ComposerToolbar";
-import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
+import { AndroidHeaderTextButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { ScreenContent } from "../../components/ScreenContent";
 import { ComposerAttachmentButton } from "../../components/ComposerAttachmentButton";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
@@ -1414,12 +1415,23 @@ export function NewTaskDraftScreen(props: {
             <AndroidScreenHeader
               title="New thread"
               hideBottomBorder
-              onBack={() => navigation.goBack()}
+              leading={
+                <AndroidHeaderTextButton
+                  accessibilityLabel="Cancel new task"
+                  label="Cancel"
+                  onPress={() => navigation.goBack()}
+                />
+              }
             />
           </>
         ) : (
           <NativeStackScreenOptions options={{ title: "Loading task" }} />
         )}
+        {Platform.OS === "android" ? (
+          <View className="flex-1 items-center justify-center">
+            <AppActivityIndicator />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -1894,7 +1906,17 @@ export function NewTaskDraftScreen(props: {
     return (
       <View className="flex-1 bg-sheet" collapsable={false}>
         <NativeStackScreenOptions options={{ headerShown: false }} />
-        <AndroidScreenHeader title="New thread" hideBottomBorder onBack={closeNewTask} />
+        <AndroidScreenHeader
+          title="New thread"
+          hideBottomBorder
+          leading={
+            <AndroidHeaderTextButton
+              accessibilityLabel="Cancel new task"
+              label="Cancel"
+              onPress={closeNewTask}
+            />
+          }
+        />
         <ScreenContent>
           {heroViewport}
 

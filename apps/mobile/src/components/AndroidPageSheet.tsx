@@ -1,5 +1,5 @@
 import { useNavigation, type NavigationAction } from "@react-navigation/native";
-import { createContext, use, useEffect, useRef, type ReactNode } from "react";
+import { createContext, use, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -7,6 +7,7 @@ import Animated, {
   interpolate,
   ReduceMotion,
   runOnJS,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -23,7 +24,10 @@ const CORNER_RADIUS = 38;
 const EDGE_INSET = 8;
 /** iOS's compact settings sheet detent (Stack.tsx), as a share of the window height. */
 const DETENT = 0.92;
-/** Drags that start this far from the sheet top (grabber plus header) move the sheet. */
+/**
+ * Drags that start this far from the sheet top (grabber plus header) always
+ * move the sheet; below it they do only while the content is scrolled to the top.
+ */
 const DRAG_ZONE = 76;
 const PRESENT = { duration: 480, dampingRatio: 1, reduceMotion: ReduceMotion.System } as const;
 const DISMISS = {
@@ -32,11 +36,56 @@ const DISMISS = {
   reduceMotion: ReduceMotion.System,
 } as const;
 
-const InPageSheetContext = createContext(false);
+type PageSheetContext = {
+  /** Whether the focused screen's scroll view rests at its top. Written by NativeScrollView. */
+  readonly contentAtTop: SharedValue<boolean>;
+};
+
+const InPageSheetContext = createContext<PageSheetContext | null>(null);
 
 /** True inside an Android page sheet; headers center their title and leave room for the grabber. */
 export function useInAndroidPageSheet() {
-  return use(InPageSheetContext);
+  return use(InPageSheetContext) !== null;
+}
+
+/** The page sheet's content-at-top flag, or null outside a page sheet. */
+export function useAndroidPageSheetContentAtTop() {
+  return use(InPageSheetContext)?.contentAtTop ?? null;
+}
+
+/** The lit top edge of a floating sheet card. Render it last inside the card. */
+export function SheetEdgeLight() {
+  const { themeAppearance } = useAppearancePreferences();
+  return (
+    <View
+      pointerEvents="none"
+      className="absolute inset-0"
+      style={{
+        borderRadius: CORNER_RADIUS,
+        boxShadow:
+          themeAppearance === "dark"
+            ? "inset 0 1px 0 rgba(255, 255, 255, 0.12)"
+            : "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+      }}
+    />
+  );
+}
+
+/** iOS's sheet grabber: a 36x5 pill in the tertiary label color at half strength. */
+export function SheetGrabber(props: { readonly top?: number }) {
+  return (
+    <View
+      pointerEvents="none"
+      importantForAccessibility="no-hide-descendants"
+      className="absolute inset-x-0 z-10 items-center"
+      style={{ top: props.top ?? 5 }}
+    >
+      <View
+        className="rounded-full bg-foreground-tertiary opacity-50"
+        style={{ width: 36, height: 5 }}
+      />
+    </View>
+  );
 }
 
 /**
@@ -55,6 +104,8 @@ export function AndroidPageSheet(props: { readonly children: ReactNode }) {
   const top = Math.max(insets.top + 8, Math.round(height * (1 - DETENT)));
   const travel = height - top;
   const offset = useSharedValue(travel);
+  const contentAtTop = useSharedValue(false);
+  const context = useMemo(() => ({ contentAtTop }), [contentAtTop]);
   const removing = useRef(false);
 
   useEffect(() => {
@@ -90,7 +141,9 @@ export function AndroidPageSheet(props: { readonly children: ReactNode }) {
     .failOffsetX([-24, 24])
     .onTouchesDown((event, manager) => {
       const touch = event.allTouches[0];
-      if (touch && touch.y > DRAG_ZONE) manager.fail();
+      // Content drags dismiss like iOS only from the top of the scroll; the
+      // sheet's pan then cancels the scroll view, which has nothing to scroll.
+      if (touch && touch.y > DRAG_ZONE && !contentAtTop.get()) manager.fail();
     })
     .onUpdate((event) => {
       offset.set(Math.max(0, event.translationY));
@@ -145,7 +198,7 @@ export function AndroidPageSheet(props: { readonly children: ReactNode }) {
             cardStyle,
           ]}
         >
-          <InPageSheetContext value>
+          <InPageSheetContext value={context}>
             <SafeAreaInsetsContext
               value={{ ...insets, top: 0, bottom: Math.max(0, insets.bottom - EDGE_INSET) }}
             >
@@ -154,29 +207,8 @@ export function AndroidPageSheet(props: { readonly children: ReactNode }) {
               {props.children}
             </SafeAreaInsetsContext>
           </InPageSheetContext>
-          {/* The lit top edge of the card. */}
-          <View
-            pointerEvents="none"
-            className="absolute inset-0"
-            style={{
-              borderRadius: CORNER_RADIUS,
-              boxShadow:
-                themeAppearance === "dark"
-                  ? "inset 0 1px 0 rgba(255, 255, 255, 0.12)"
-                  : "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
-            }}
-          />
-          <View
-            pointerEvents="none"
-            importantForAccessibility="no-hide-descendants"
-            className="absolute inset-x-0 items-center"
-            style={{ top: 5 }}
-          >
-            <View
-              className="rounded-full bg-foreground-tertiary opacity-50"
-              style={{ width: 36, height: 5 }}
-            />
-          </View>
+          <SheetEdgeLight />
+          <SheetGrabber />
         </Animated.View>
       </GestureDetector>
     </View>

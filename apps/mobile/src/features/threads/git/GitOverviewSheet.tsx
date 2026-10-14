@@ -30,6 +30,7 @@ import {
   AndroidSheetHeader,
 } from "../../../components/AndroidScreenHeader";
 import { AndroidAnchoredMenu } from "../../../components/AndroidAnchoredMenu";
+import { useAndroidControlSizing } from "../../../components/useAndroidControlSizing";
 import { ScreenContent } from "../../../components/ScreenContent";
 import { AppText as Text } from "../../../components/AppText";
 import { nativeHeaderScrollEdgeEffects } from "../../../native/StackHeader";
@@ -254,6 +255,7 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
   // isPending flag left the spinner stuck (the status query reports pending
   // during quiet background refreshes too).
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { scale } = useAndroidControlSizing();
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
@@ -274,12 +276,12 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
       contentContainerStyle={{
         paddingHorizontal: isInspector ? 12 : 20,
         paddingTop: 8,
+        // contentInset is iOS-only; Android keeps the last card off the sheet edge here.
+        paddingBottom: Platform.OS === "android" ? Math.max(insets.bottom, 18) + 18 : undefined,
         gap: 14,
       }}
       refreshControl={
-        Platform.OS === "ios" || isInspector ? (
-          <AppRefreshControl refreshing={isRefreshing} onRefresh={() => void handleRefresh()} />
-        ) : undefined
+        <AppRefreshControl refreshing={isRefreshing} onRefresh={() => void handleRefresh()} />
       }
     >
       <View
@@ -535,23 +537,31 @@ function GitOverviewSheetContent(props: GitOverviewSheetProps) {
           </Text>
         </View>
       ) : (
+        // iOS's editor-style sheet bar: the branch left-aligned with its
+        // status, no back button, and pull to refresh instead of a menu.
         <AndroidSheetHeader
           title={currentBranchLabel}
-          hideBottomBorder={Platform.OS === "android"}
-          subtitle={currentStatusSummary}
-          onBack={() => navigation.goBack()}
-          trailing={Platform.OS === "android" ? refreshMenu : undefined}
-          actions={
-            Platform.OS === "android"
-              ? undefined
-              : [
-                  {
-                    accessibilityLabel: "Refresh repository status",
-                    disabled: busy,
-                    icon: "arrow.clockwise",
-                    onPress: () => void gitActions.refreshSelectedThreadGitStatus(),
-                  },
-                ]
+          hideBottomBorder
+          titleContent={
+            <View className="pl-2">
+              <Text
+                accessibilityRole="header"
+                numberOfLines={1}
+                className="font-t3-extrabold text-header-foreground"
+                style={{ fontSize: 18 * scale, lineHeight: 23 * scale }}
+              >
+                {currentBranchLabel}
+              </Text>
+              {currentStatusSummary ? (
+                <Text
+                  numberOfLines={1}
+                  className="text-foreground-muted"
+                  style={{ fontSize: 13 * scale, lineHeight: 17 * scale }}
+                >
+                  {currentStatusSummary}
+                </Text>
+              ) : null}
+            </View>
           }
         />
       )}

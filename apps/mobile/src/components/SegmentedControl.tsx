@@ -12,6 +12,7 @@ import { cn } from "../lib/cn";
 import { GlassSurface } from "./GlassSurface";
 import type { SegmentedControlProps } from "./SegmentedControl.types";
 import { useLiquidGlass } from "./useLiquidGlass";
+import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 
 export type { SegmentedControlProps } from "./SegmentedControl.types";
 
@@ -20,6 +21,9 @@ export function SegmentedControl<Value extends number | string>(
 ) {
   const compact = props.size === "compact";
   const liquid = useLiquidGlass().tier !== "none";
+  const isDark = useAppearancePreferences().themeAppearance === "dark";
+  // UISegmentedControl: a grey system-fill track under a raised selected capsule.
+  const android = Platform.OS === "android";
   const [width, setWidth] = useState(0);
   const index = Math.max(
     0,
@@ -63,6 +67,7 @@ export function SegmentedControl<Value extends number | string>(
           count: props.options.length,
           selected: index,
           inset: 3,
+          raised: true,
           onSelect: (next) => {
             const option = props.options[next];
             if (option) props.onSelect(option.value);
@@ -100,15 +105,36 @@ export function SegmentedControl<Value extends number | string>(
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       className={cn(
         "flex-row overflow-hidden",
-        "rounded-full border-continuous bg-card",
+        android ? "rounded-full border-continuous" : "rounded-full border-continuous bg-card",
         props.className,
       )}
+      style={
+        android
+          ? { backgroundColor: isDark ? "rgba(120, 120, 128, 0.24)" : "rgba(120, 120, 128, 0.12)" }
+          : undefined
+      }
     >
-      <Animated.View
-        pointerEvents="none"
-        className="absolute inset-y-0 rounded-full bg-secondary"
-        style={[{ width: `${100 / props.options.length}%`, start: 0 }, indicatorStyle]}
-      />
+      {android ? (
+        <Animated.View
+          pointerEvents="none"
+          className="absolute inset-y-0"
+          style={[
+            { width: `${100 / props.options.length}%`, start: 0, padding: 2 },
+            indicatorStyle,
+          ]}
+        >
+          <View
+            className="flex-1 rounded-full bg-card-alt"
+            style={{ boxShadow: "0 1px 4px rgba(0, 0, 0, 0.12)" }}
+          />
+        </Animated.View>
+      ) : (
+        <Animated.View
+          pointerEvents="none"
+          className="absolute inset-y-0 rounded-full bg-secondary"
+          style={[{ width: `${100 / props.options.length}%`, start: 0 }, indicatorStyle]}
+        />
+      )}
       {props.options.map((option) => {
         const active = option.value === props.selected;
         return (
@@ -126,7 +152,11 @@ export function SegmentedControl<Value extends number | string>(
             <Text
               className={cn(
                 compact ? "text-xs" : "text-sm",
-                active ? "font-t3-medium text-secondary-foreground" : "text-foreground-muted",
+                active
+                  ? android
+                    ? "font-t3-medium text-foreground"
+                    : "font-t3-medium text-secondary-foreground"
+                  : "text-foreground-muted",
               )}
             >
               {option.label}

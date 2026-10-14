@@ -28,6 +28,7 @@ vi.mock("react", async (importOriginal) => ({
 vi.mock("../../components/ScreenScrollView", () => ({ ScreenScrollView: "ScrollView" }));
 vi.mock("../settings/components/SettingsScreen", () => ({ SettingsScreen: "SettingsScreen" }));
 vi.mock("../../components/ThemedSwitch", () => ({ ThemedSwitch: "Switch" }));
+vi.mock("../../components/ListSection", () => ({ GroupedCard: "GroupedCard" }));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   ActivityIndicator: "ActivityIndicator",

@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { GlassFill } from "../../components/GlassSurface";
 import { useLiquidGlass } from "../../components/useLiquidGlass";
 import { AppActivityIndicator } from "../../components/AppActivityIndicator";
@@ -143,7 +144,7 @@ function BranchSelectionRow(props: {
 }
 
 function PickerSurface(props: { readonly children: ReactNode }) {
-  return <View className="overflow-hidden rounded-2xl bg-grouped-card">{props.children}</View>;
+  return <GroupedCard radius={16}>{props.children}</GroupedCard>;
 }
 
 export function NewTaskEnvironmentPickerRouteScreen() {

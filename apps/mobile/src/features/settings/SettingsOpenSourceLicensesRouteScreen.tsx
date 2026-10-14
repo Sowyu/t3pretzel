@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { LegendList } from "@legendapp/list/react-native";
 import { type StaticScreenProps, useNavigation } from "@react-navigation/native";
@@ -249,11 +250,11 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
           ) : null}
         </View>
 
-        <View className="overflow-hidden rounded-[24px] border-continuous bg-grouped-card p-4">
+        <GroupedCard className="p-4">
           <Text selectable className="font-mono text-base leading-normal text-foreground">
             {entry.noticeText}
           </Text>
-        </View>
+        </GroupedCard>
       </ScrollView>
     </SettingsScreen>
   );

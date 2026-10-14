@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../../components/ListSection";
 import { parsePatchFiles } from "@pierre/diffs/utils/parsePatchFiles";
 import type { FileDiffMetadata } from "@pierre/diffs";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
@@ -143,7 +144,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
       />
       {Platform.OS === "android" ? (
         <AndroidScreenHeader
-          title={`Stop ${route.params.position + 1}`}
+          title={`Stop ${route.params.position + 1} of ${guide?.stops.length ?? "…"}`}
           onBack={() => navigation.goBack()}
           trailing={
             <ControlPillMenu
@@ -200,7 +201,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                 <Text className="text-2xl leading-8 font-t3-semibold">{stop.title}</Text>
                 <PullRequestMarkdown markdown={stop.summary} />
                 {stop.attention ? (
-                  <View className="gap-3 rounded-xl border border-border bg-grouped-card p-4">
+                  <GroupedCard className="gap-3 border border-border p-4" radius={12}>
                     <View className="flex-row items-center gap-2">
                       <SymbolView name="eye" size={17} tintColorClassName="accent-icon-muted" />
                       <Text className="text-sm font-t3-semibold">
@@ -208,7 +209,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                       </Text>
                     </View>
                     <PullRequestMarkdown markdown={stop.attention.note} />
-                  </View>
+                  </GroupedCard>
                 ) : null}
                 {stale ? (
                   <Text className="text-sm text-foreground-muted">

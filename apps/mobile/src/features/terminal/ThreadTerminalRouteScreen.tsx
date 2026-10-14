@@ -1380,7 +1380,8 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
                   onPress={handleShowKeyboard}
                   style={({ pressed }) => ({
                     bottom: 16,
-                    borderRadius: 28,
+                    // Matches the 48dp glass circle inside.
+                    borderRadius: 24,
                     opacity: pressed ? 0.72 : 1,
                     position: "absolute",
                     right: 16,

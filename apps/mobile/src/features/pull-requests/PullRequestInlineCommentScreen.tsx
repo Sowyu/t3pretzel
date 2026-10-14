@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { useFocusEffect, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useCallback, useRef, useState } from "react";
 import { Alert, View } from "react-native";
@@ -98,12 +99,12 @@ export function PullRequestInlineCommentScreen({ route }: StaticScreenProps<Inli
         />
       }
     >
-      <View className="gap-2 rounded-[20px] bg-grouped-card p-4">
+      <GroupedCard className="gap-2 p-4" radius={20}>
         <Text className="font-mono text-xs text-foreground-muted">{params.path}</Text>
         <Text selectable className="font-mono text-xs">
           {params.code}
         </Text>
-      </View>
+      </GroupedCard>
       <TextInput
         multiline
         editable={store.ready && !busy}

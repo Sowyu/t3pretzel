@@ -10,7 +10,7 @@ import { cn } from "../lib/cn";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
 import { useInAndroidPageSheet } from "./AndroidPageSheet";
-import { GlassSurface } from "./GlassSurface";
+import { GlassFill, GlassSurface } from "./GlassSurface";
 import { useLiquidGlass } from "./useLiquidGlass";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
 import { useAndroidHeaderLayout } from "./useAndroidHeaderLayout";
@@ -22,10 +22,17 @@ export interface AndroidHeaderAction {
   readonly disabled?: boolean;
   readonly loading?: boolean;
   readonly selected?: boolean;
+  /** iOS's `.prominent` bar button (a sheet's Done): its own tinted glass circle. */
+  readonly prominent?: boolean;
+  /** A prominent action with a label renders as a text capsule ("Done") instead of the icon. */
+  readonly label?: string;
 }
 
 /** How far the scroll-edge band reaches below the bar, matching the static scrim's fade. */
 const SCROLL_EDGE_FADE = 24;
+
+/** The in-flow bar's fade below its bottom edge; short enough to clear content at rest. */
+const IN_FLOW_EDGE = 16;
 
 /** Buttons inside a shared capsule drop their own surface and become 44dp slots. */
 const InHeaderCapsuleContext = createContext(false);
@@ -112,6 +119,109 @@ export function AndroidHeaderIconButton(props: {
   return inCapsule ? button : <HeaderGlass size={size}>{button}</HeaderGlass>;
 }
 
+/**
+ * iOS's text bar button ("Cancel", "Done"): a glass capsule with a 17sp label.
+ * `prominent` tints it with the action color, like a sheet's confirm button.
+ */
+export function AndroidHeaderTextButton(props: {
+  readonly label: string;
+  readonly onPress: () => void;
+  readonly accessibilityLabel?: string;
+  readonly disabled?: boolean;
+  readonly prominent?: boolean;
+}) {
+  const { scale, size } = useHeaderButtonSize();
+  const { themeVariables } = useAppearancePreferences();
+  const liquid = useLiquidGlass().tier !== "none";
+  const prominent = props.prominent && !props.disabled;
+  const label = (
+    <Pressable
+      accessibilityLabel={props.accessibilityLabel ?? props.label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(props.disabled) }}
+      disabled={props.disabled}
+      onPress={props.onPress}
+      className={cn("h-full justify-center", !liquid && "active:opacity-50")}
+      style={{ paddingHorizontal: 16 * scale }}
+    >
+      <Text
+        numberOfLines={1}
+        className={cn(
+          "font-t3-semibold",
+          props.disabled
+            ? "text-foreground-tertiary"
+            : prominent
+              ? "text-prominent-action-foreground"
+              : "text-header-foreground",
+        )}
+        style={{ fontSize: 17 * scale, lineHeight: 22 * scale }}
+      >
+        {props.label}
+      </Text>
+    </Pressable>
+  );
+  if (!prominent) return <HeaderGlass size={size}>{label}</HeaderGlass>;
+  return (
+    <TintedHeaderGlass size={size} color={themeVariables["--color-prominent-action"]}>
+      {label}
+    </TintedHeaderGlass>
+  );
+}
+
+/** A prominent bar button's surface: glass tinted with the action color, or a solid fill. */
+function TintedHeaderGlass(props: {
+  readonly size: number;
+  readonly color: ColorValue;
+  readonly children: ReactNode;
+}) {
+  const liquid = useLiquidGlass().tier !== "none";
+  return (
+    <View
+      className="flex-row items-center overflow-hidden"
+      style={{
+        height: props.size,
+        minWidth: props.size,
+        borderRadius: props.size / 2,
+        backgroundColor: liquid ? undefined : props.color,
+        elevation: liquid ? 0 : 2,
+      }}
+    >
+      {liquid ? <GlassFill tintColor={props.color} /> : null}
+      {props.children}
+    </View>
+  );
+}
+
+/** iOS's `.prominent` icon bar button, like the checkmark that confirms a sheet. */
+function AndroidHeaderProminentButton(props: AndroidHeaderAction) {
+  const { scale, size } = useHeaderButtonSize();
+  const { themeVariables } = useAppearancePreferences();
+  return (
+    <TintedHeaderGlass size={size} color={themeVariables["--color-prominent-action"]}>
+      <Pressable
+        accessibilityLabel={props.accessibilityLabel}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: Boolean(props.disabled) }}
+        disabled={props.disabled}
+        onPress={props.onPress}
+        className="items-center justify-center rounded-full"
+        style={{ width: size, height: size }}
+      >
+        {props.loading ? (
+          <AppActivityIndicator colorClassName="accent-prominent-action-foreground" />
+        ) : (
+          <SymbolView
+            name={props.icon}
+            size={Math.round(20 * scale)}
+            tintColorClassName="accent-prominent-action-foreground"
+            type="monochrome"
+          />
+        )}
+      </Pressable>
+    </TintedHeaderGlass>
+  );
+}
+
 /** One glass capsule around several bar buttons; a single button reads as a circle. */
 export function AndroidHeaderButtonGroup(props: { readonly children: ReactNode }) {
   const { size } = useHeaderButtonSize();
@@ -157,6 +267,28 @@ function HeaderScrim(props: {
   );
 }
 
+/** Hangs below an in-flow bar: the screen color fading out over the content's top edge. */
+function InFlowScrollEdge(props: { readonly color: ColorValue }) {
+  const color = String(props.color);
+  return (
+    <Svg
+      pointerEvents="none"
+      style={{ position: "absolute", left: 0, right: 0, top: "100%" }}
+      width="100%"
+      height={IN_FLOW_EDGE}
+    >
+      <Defs>
+        <LinearGradient id="screen-header-edge" x1="0" x2="0" y1="0" y2="1">
+          <Stop offset={0} stopColor={color} stopOpacity={1} />
+          <Stop offset={0.35} stopColor={color} stopOpacity={0.55} />
+          <Stop offset={1} stopColor={color} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height={IN_FLOW_EDGE} fill="url(#screen-header-edge)" />
+    </Svg>
+  );
+}
+
 /**
  * In-flow Android version of the iOS 26 navigation bar: a 44dp glass back
  * circle, the title and subtitle left-aligned beside it, and every trailing
@@ -173,13 +305,18 @@ export function AndroidScreenHeader(props: {
   readonly actions?: ReadonlyArray<AndroidHeaderAction>;
   readonly leading?: ReactNode;
   readonly trailing?: ReactNode;
+  /** Capsule slots before `actions` (Android header menus that iOS orders first). */
+  readonly capsuleLeading?: ReactNode;
   readonly onBack?: () => void;
   readonly embedded?: boolean;
   readonly overlay?: { readonly color: ColorValue };
   /** iOS bars have no bottom border; kept so call sites stay unchanged. */
   readonly hideBottomBorder?: boolean;
+  /** The surface under an in-flow bar, for its fade into the content. */
+  readonly edgeColor?: ColorValue;
 }) {
   const { scale, size } = useHeaderButtonSize();
+  const { themeVariables } = useAppearancePreferences();
   const liquid = useLiquidGlass().tier !== "none";
   // Inside a page sheet every screen gets the iOS sheet bar: centered title, grabber room.
   const inPageSheet = useInAndroidPageSheet();
@@ -187,7 +324,10 @@ export function AndroidScreenHeader(props: {
   const { height: toolbarHeight, ...headerPadding } = useAndroidHeaderLayout(embedded);
   const [headerWidth, setHeaderWidth] = useState(0);
   const [sideWidths, setSideWidths] = useState({ leading: 0, trailing: 0 });
-  const actions = props.actions ?? [];
+  const allActions = props.actions ?? [];
+  // Prominent actions stand apart from the capsule, as iOS separates `.prominent` items.
+  const actions = allActions.filter((action) => !action.prominent);
+  const prominentActions = allActions.filter((action) => action.prominent);
   // Phones fit three capsule slots beside a readable title; wider bars fit five.
   const budget = headerWidth >= 600 ? 5 : 3;
   const directCount = actions.length > budget ? budget - 1 : actions.length;
@@ -195,7 +335,9 @@ export function AndroidScreenHeader(props: {
   const overflowActions = actions.slice(directCount);
   const centered = embedded && props.titleContent === undefined;
   const titleInset = Math.max(sideWidths.leading, sideWidths.trailing) + 8;
-  const hasTrailing = actions.length > 0 || hasContent(props.trailing);
+  const hasCapsule =
+    actions.length > 0 || hasContent(props.trailing) || hasContent(props.capsuleLeading);
+  const hasTrailing = hasCapsule || prominentActions.length > 0;
 
   const titleText = (
     <>
@@ -203,7 +345,7 @@ export function AndroidScreenHeader(props: {
         accessibilityRole="header"
         numberOfLines={1}
         className={cn("text-header-foreground font-t3-extrabold", centered && "text-center")}
-        style={{ fontSize: 17 * scale, lineHeight: 22 * scale }}
+        style={{ fontSize: 18 * scale, lineHeight: 23 * scale }}
       >
         {props.title}
       </Text>
@@ -272,62 +414,92 @@ export function AndroidScreenHeader(props: {
         </View>
 
         {hasTrailing ? (
-          <View className="pl-2" onLayout={trackSide("trailing")}>
-            <AndroidHeaderButtonGroup>
-              {visibleActions.map((action) =>
-                action.loading ? (
-                  <View
-                    key={action.accessibilityLabel}
-                    accessibilityLabel={action.accessibilityLabel}
-                    className="items-center justify-center"
-                    style={{ width: size, height: size }}
-                  >
-                    <AppActivityIndicator colorClassName="accent-header-foreground" />
-                  </View>
-                ) : (
-                  <AndroidHeaderIconButton
-                    key={action.accessibilityLabel}
-                    accessibilityLabel={action.accessibilityLabel}
-                    disabled={action.disabled}
-                    selected={action.selected}
-                    icon={action.icon}
-                    onPress={action.onPress}
-                  />
-                ),
-              )}
-              {overflowActions.length > 0 ? (
-                <AndroidAnchoredMenu
-                  actions={overflowActions.map((action, index) => ({
-                    id: String(index),
-                    title: action.accessibilityLabel,
-                    image: typeof action.icon === "string" ? action.icon : undefined,
-                    attributes: {
-                      disabled: Boolean(action.disabled),
-                    },
-                    state: action.selected ? "on" : undefined,
-                  }))}
-                  onPressAction={({ nativeEvent }) =>
-                    overflowActions[Number(nativeEvent.event)]?.onPress()
-                  }
-                >
-                  {(open) => (
+          <View className="flex-row items-center gap-2 pl-2" onLayout={trackSide("trailing")}>
+            {hasCapsule ? (
+              <AndroidHeaderButtonGroup>
+                {props.capsuleLeading}
+                {visibleActions.map((action) =>
+                  action.loading ? (
+                    <View
+                      key={action.accessibilityLabel}
+                      accessibilityLabel={action.accessibilityLabel}
+                      className="items-center justify-center"
+                      style={{ width: size, height: size }}
+                    >
+                      <AppActivityIndicator colorClassName="accent-header-foreground" />
+                    </View>
+                  ) : (
                     <AndroidHeaderIconButton
-                      accessibilityLabel="More actions"
-                      icon="ellipsis"
-                      onPress={open}
+                      key={action.accessibilityLabel}
+                      accessibilityLabel={action.accessibilityLabel}
+                      disabled={action.disabled}
+                      selected={action.selected}
+                      icon={action.icon}
+                      onPress={action.onPress}
                     />
-                  )}
-                </AndroidAnchoredMenu>
-              ) : null}
-              {props.trailing}
-            </AndroidHeaderButtonGroup>
+                  ),
+                )}
+                {overflowActions.length > 0 ? (
+                  <AndroidAnchoredMenu
+                    actions={overflowActions.map((action, index) => ({
+                      id: String(index),
+                      title: action.accessibilityLabel,
+                      image: typeof action.icon === "string" ? action.icon : undefined,
+                      attributes: {
+                        disabled: Boolean(action.disabled),
+                      },
+                      state: action.selected ? "on" : undefined,
+                    }))}
+                    onPressAction={({ nativeEvent }) =>
+                      overflowActions[Number(nativeEvent.event)]?.onPress()
+                    }
+                  >
+                    {(open) => (
+                      <AndroidHeaderIconButton
+                        accessibilityLabel="More actions"
+                        icon="ellipsis"
+                        onPress={open}
+                      />
+                    )}
+                  </AndroidAnchoredMenu>
+                ) : null}
+                {props.trailing}
+              </AndroidHeaderButtonGroup>
+            ) : null}
+            {prominentActions.map((action) =>
+              action.label ? (
+                <AndroidHeaderTextButton
+                  key={action.accessibilityLabel}
+                  label={action.label}
+                  accessibilityLabel={action.accessibilityLabel}
+                  disabled={action.disabled}
+                  onPress={action.onPress}
+                  prominent
+                />
+              ) : (
+                <AndroidHeaderProminentButton key={action.accessibilityLabel} {...action} />
+              ),
+            )}
           </View>
         ) : null}
       </View>
     </View>
   );
 
-  if (!props.overlay) return bar;
+  if (!props.overlay) {
+    // In-flow bars end in a short fade into the content instead of a hard
+    // cut, iOS's scroll-edge look. Static, so it costs nothing while scrolling.
+    return (
+      <View style={{ zIndex: 10 }}>
+        {bar}
+        <InFlowScrollEdge
+          color={
+            props.edgeColor ?? themeVariables[embedded ? "--color-sheet-solid" : "--color-screen"]
+          }
+        />
+      </View>
+    );
+  }
   const barHeight = headerPadding.paddingTop + toolbarHeight + headerPadding.paddingBottom;
   return (
     <View pointerEvents="box-none" className="absolute inset-x-0 top-0" style={{ zIndex: 10 }}>

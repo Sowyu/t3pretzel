@@ -3,6 +3,7 @@ import { Platform, View } from "react-native";
 import { FormSheet, Screen, ScreenStack, ScreenStackHeaderConfig } from "react-native-screens";
 import { useResolveClassNames, withUniwind } from "uniwind";
 
+import { SheetGrabber } from "./AndroidPageSheet";
 import { AndroidSheetHeader } from "./AndroidScreenHeader";
 import { GlassFlatBackdrop } from "./GlassBackdropSource";
 import { nativeHeaderScrollEdgeEffects } from "../native/StackHeader";
@@ -78,10 +79,16 @@ export function AppSheet(props: {
             <AndroidSheetHeader
               title={props.title}
               actions={[
-                { accessibilityLabel: `Close ${props.title}`, icon: "checkmark", onPress: close },
+                {
+                  accessibilityLabel: `Close ${props.title}`,
+                  icon: "checkmark",
+                  onPress: close,
+                  prominent: true,
+                },
               ]}
             />
             {props.children}
+            <SheetGrabber top={6} />
           </>
         )}
       </View>

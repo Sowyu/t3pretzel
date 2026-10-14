@@ -4,7 +4,7 @@ import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 import { mcpAppFromToolItem } from "@t3tools/shared/toolOutput";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
@@ -131,7 +131,11 @@ export function McpAppFullscreenScreen({ route }: McpAppFullscreenScreenProps) {
           hitSlop={8}
           onPress={onClose}
         >
-          <SymbolView name="xmark" size={18} tintColor="gray" />
+          {Platform.OS === "android" ? (
+            <SymbolView name="xmark" size={18} tintColorClassName="accent-icon" />
+          ) : (
+            <SymbolView name="xmark" size={18} tintColor="gray" />
+          )}
         </Pressable>
       </View>
       <View

@@ -17,6 +17,7 @@ export function ControlPillMenu(props: ControlPillMenuProps) {
         title={props.title}
         style={props.style}
         onPressAction={props.onPressAction}
+        contextPreview
       >
         {(open) =>
           cloneElement(child, {

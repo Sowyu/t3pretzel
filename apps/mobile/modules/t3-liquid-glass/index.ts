@@ -23,6 +23,8 @@ export interface LiquidGlassViewProps extends ViewProps {
   readonly tabCount: number;
   readonly selectedTab: number;
   readonly tabInset: number;
+  /** The segmented-control selection: a raised capsule instead of the tab bar's tint. */
+  readonly tabRaised?: boolean;
   /** >= 0 draws the scroll-edge band, fading out from this fraction of the height. */
   readonly edgeFadeStart: number;
   readonly onTabSelect?: (event: NativeSyntheticEvent<{ readonly index: number }>) => void;
@@ -95,4 +97,21 @@ export function liquidToggleView() {
       : null;
   }
   return toggleView;
+}
+
+interface ViewMirrorViewProps extends ViewProps {
+  /** findNodeHandle() of the on-screen view to draw. */
+  readonly sourceTag: number;
+}
+
+let mirrorView: ComponentType<ViewMirrorViewProps> | null | undefined;
+
+/** Draws another on-screen view in place (a context menu's lifted row), or null where the module is missing. */
+export function viewMirrorView() {
+  if (mirrorView === undefined) {
+    mirrorView = nativeModule()
+      ? requireNativeView<ViewMirrorViewProps>(MODULE_NAME, "T3ViewMirror")
+      : null;
+  }
+  return mirrorView;
 }

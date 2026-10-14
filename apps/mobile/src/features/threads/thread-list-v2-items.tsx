@@ -119,6 +119,16 @@ const CARD_MENU_ACTIONS: MenuAction[] = [
   { id: "delete", title: "Delete", image: "trash", attributes: { destructive: true } },
 ];
 
+const NEW_THREAD_ON_BRANCH_ACTION: MenuAction = {
+  id: "new-thread-on-branch",
+  title: "New thread on branch",
+  image: "square.and.pencil",
+};
+const COPY_THREAD_ID_ACTION: MenuAction = {
+  id: "copy-thread-id",
+  title: "Copy thread ID",
+  image: "doc.on.doc",
+};
 const SLIM_MENU_ACTIONS: MenuAction[] = [
   { id: "unsettle", title: "Un-settle", image: "arrow.uturn.backward" },
   { id: "delete", title: "Delete", image: "trash", attributes: { destructive: true } },
@@ -142,6 +152,11 @@ const MONO_TEXT_STYLE = { fontFamily: MONO_FONT };
 const RECEDED_ROW_STYLE = { opacity: 0.55 };
 /** Rounded-row radius shared with the v1 sidebar rows. */
 const SIDEBAR_V2_ROW_RADIUS = 12;
+const SIDEBAR_PENDING_ROW_STYLE = {
+  borderRadius: SIDEBAR_V2_ROW_RADIUS,
+  paddingHorizontal: 12,
+  paddingVertical: 10,
+};
 
 function ThreadListV2Section(props: {
   readonly label: string;
@@ -468,15 +483,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
           className={sidebarPane ? "bg-drawer" : "bg-screen"}
           interactionClassName={sidebarPane ? "bg-thread-hover" : "bg-row-hover"}
           onPress={() => onSelectPendingTask(pendingTask)}
-          style={
-            sidebarPane
-              ? {
-                  borderRadius: SIDEBAR_V2_ROW_RADIUS,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                }
-              : undefined
-          }
+          style={sidebarPane ? SIDEBAR_PENDING_ROW_STYLE : undefined}
         >
           {sidebarPane ? (
             rowContent
@@ -849,6 +856,25 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       LEGACY_MENU_ACTIONS[1]!,
     ],
     [arrangementMenuItems, titleMenuItems],
+  );
+  // One array per row state, so a re-render hands the menu the same actions.
+  const rowStateMenuActions = snoozedRow
+    ? snoozedMenuActions
+    : !props.settlementSupported
+      ? legacyMenuActions
+      : canUnsettle
+        ? slimMenuActions
+        : swipeActions.secondary === "snooze"
+          ? snoozableCardMenuActions
+          : cardMenuActions;
+  const hasBranch = Boolean(thread.branch);
+  const rowMenuActions = useMemo<MenuAction[]>(
+    () => [
+      ...(hasBranch ? [NEW_THREAD_ON_BRANCH_ACTION] : []),
+      COPY_THREAD_ID_ACTION,
+      ...rowStateMenuActions,
+    ],
+    [hasBranch, rowStateMenuActions],
   );
   const handleMenuAction = useCallback(
     ({ nativeEvent }: { readonly nativeEvent: { readonly event: string } }) => {
@@ -1331,27 +1357,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       >
         {(close) => (
           <ControlPillMenu
-            actions={[
-              ...(thread.branch
-                ? [
-                    {
-                      id: "new-thread-on-branch",
-                      title: "New thread on branch",
-                      image: "square.and.pencil",
-                    },
-                  ]
-                : []),
-              { id: "copy-thread-id", title: "Copy thread ID", image: "doc.on.doc" },
-              ...(snoozedRow
-                ? snoozedMenuActions
-                : !props.settlementSupported
-                  ? legacyMenuActions
-                  : canUnsettle
-                    ? slimMenuActions
-                    : swipeActions.secondary === "snooze"
-                      ? snoozableCardMenuActions
-                      : cardMenuActions),
-            ]}
+            actions={rowMenuActions}
             onPressAction={handleMenuAction}
             shouldOpenOnLongPress
           >

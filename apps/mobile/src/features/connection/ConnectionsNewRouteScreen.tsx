@@ -1,3 +1,4 @@
+import { GroupedCard } from "../../components/ListSection";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { useAuth } from "@clerk/expo";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -230,10 +231,10 @@ export function ConnectionsNewRouteScreen({
 
           <View collapsable={false} className="gap-2">
             <Text className="px-4 text-sm font-t3-medium text-foreground-muted">Or enter it</Text>
-            <View
-              collapsable={false}
+            <GroupedCard
+              radius={26}
               className={cn(
-                "overflow-hidden rounded-[26px] border-continuous border bg-grouped-card",
+                "border",
                 pairingConnectionError ? "border-danger-foreground" : "border-transparent",
               )}
             >
@@ -255,7 +256,7 @@ export function ConnectionsNewRouteScreen({
                   if (!connectDisabled) void handleSubmit();
                 }}
               />
-            </View>
+            </GroupedCard>
             <Text
               accessibilityLiveRegion="polite"
               className={cn(

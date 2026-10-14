@@ -118,6 +118,18 @@ class LiquidGlassView(context: Context, appContext: AppContext) :
   private val isEdge: Boolean get() = edgeFadeStart >= 0f
   private val edgeMaskPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
   private val edgeTintPaint = Paint()
+  /**
+   * Segmented-control look: the resting selection is UISegmentedControl's
+   * raised capsule (white in light, a lighter grey in dark) instead of the tab
+   * bar's faint tint.
+   */
+  var tabRaised = false
+    set(value) {
+      if (field != value) {
+        field = value
+        markGeometryDirty()
+      }
+    }
   var tabInsetDp = 4f
     set(value) {
       if (field != value) {
@@ -405,7 +417,19 @@ class LiquidGlassView(context: Context, appContext: AppContext) :
       } else {
         null
       }
-    indicatorPaint.color = if (dark) Color.argb(26, 255, 255, 255) else Color.argb(26, 0, 0, 0)
+    indicatorPaint.color =
+      when {
+        tabRaised && dark -> Color.argb(235, 99, 99, 102)
+        tabRaised -> Color.WHITE
+        dark -> Color.argb(26, 255, 255, 255)
+        else -> Color.argb(26, 0, 0, 0)
+      }
+    // The raised capsule's soft drop shadow; hardware canvases draw shadow layers for shapes.
+    if (tabRaised) {
+      indicatorPaint.setShadowLayer(3f * density, 0f, 1f * density, Color.argb(if (dark) 70 else 36, 0, 0, 0))
+    } else {
+      indicatorPaint.clearShadowLayer()
+    }
     if (width > 0 && height > 0) {
       renderer?.configure(
         width,

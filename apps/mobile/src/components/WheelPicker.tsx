@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import {
   FlatList,
   type NativeScrollEvent,
@@ -8,19 +8,21 @@ import {
 } from "react-native";
 
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
-import { themeColorWithAlpha } from "../lib/mobileTheme";
 import { AppText as Text } from "./AppText";
 
 const ROW_HEIGHT = 36;
 const VISIBLE_ROWS = 5;
 const PAD = ((VISIBLE_ROWS - 1) / 2) * ROW_HEIGHT;
+const ROW_STYLE = { height: ROW_HEIGHT };
+const LABEL_STYLE = { fontSize: 20, fontVariant: ["tabular-nums" as const] };
 
 export type WheelOption<T> = { readonly value: T; readonly label: string };
 
 /**
  * A column of SwiftUI's `.wheel` picker in JS: five 36dp rows that snap, a
- * rounded selection band behind the middle row, and the outer rows dimmed by
- * a static veil, so scrolling does no per-frame work. The value commits when
+ * rounded selection band behind the middle row, and the outer rows faded out
+ * by the native scroll view's fading edge, which fades to transparent on any
+ * background and does no JS work while scrolling. The value commits when
  * the scroll settles; tapping a row scrolls to it. Put several side by side
  * in a row for a multi-column wheel.
  */
@@ -34,8 +36,10 @@ export function WheelPicker<T extends string | number>(props: {
   /** Rounds only the band's outer ends when columns sit side by side. */
   readonly band?: "full" | "start" | "middle" | "end";
   readonly flex?: number;
+  /** A fixed column width in dp, for compact multi-column wheels. Overrides `flex`. */
+  readonly width?: number;
 }) {
-  const { themeVariables: colors, themeAppearance } = useAppearancePreferences();
+  const { themeAppearance } = useAppearancePreferences();
   const listRef = useRef<FlatList<WheelOption<T>>>(null);
   const index = Math.max(
     0,
@@ -68,11 +72,32 @@ export function WheelPicker<T extends string | number>(props: {
     listRef.current?.scrollToOffset({ offset: next * ROW_HEIGHT, animated: true });
     props.onChange(option.value);
   };
-
-  const veil = themeColorWithAlpha(
-    themeAppearance === "dark" ? colors["--color-grouped-card"] : colors["--color-card-alt"],
-    0.6,
+  // Rows render once per scroll window, not on every parent render.
+  const selectRef = useRef(select);
+  useLayoutEffect(() => {
+    selectRef.current = select;
+  });
+  const align = props.align ?? "center";
+  const renderItem = useCallback(
+    ({ item, index: row }: { readonly item: WheelOption<T>; readonly index: number }) => (
+      <Pressable
+        importantForAccessibility="no"
+        onPress={() => selectRef.current(row)}
+        className="justify-center px-3"
+        style={ROW_STYLE}
+      >
+        <Text
+          numberOfLines={1}
+          className="text-foreground"
+          style={[LABEL_STYLE, { textAlign: align }]}
+        >
+          {item.label}
+        </Text>
+      </Pressable>
+    ),
+    [align],
   );
+
   const band = props.band ?? "full";
   const radius = 8;
 
@@ -87,7 +112,10 @@ export function WheelPicker<T extends string | number>(props: {
         if (event.nativeEvent.actionName === "increment") select(index + 1);
         if (event.nativeEvent.actionName === "decrement") select(index - 1);
       }}
-      style={{ flex: props.flex ?? 1, height: ROW_HEIGHT * VISIBLE_ROWS }}
+      style={{
+        ...(props.width === undefined ? { flex: props.flex ?? 1 } : { width: props.width }),
+        height: ROW_HEIGHT * VISIBLE_ROWS,
+      }}
     >
       <View
         pointerEvents="none"
@@ -122,36 +150,10 @@ export function WheelPicker<T extends string | number>(props: {
           // A slow release snaps without a fling, so no momentum event follows.
           if (Math.abs(event.nativeEvent.velocity?.y ?? 0) < 0.05) settle(event);
         }}
-        renderItem={({ item, index: row }) => (
-          <Pressable
-            importantForAccessibility="no"
-            onPress={() => select(row)}
-            className="justify-center px-3"
-            style={{ height: ROW_HEIGHT }}
-          >
-            <Text
-              numberOfLines={1}
-              className="text-foreground"
-              style={{
-                fontSize: 20,
-                textAlign: props.align ?? "center",
-                fontVariant: ["tabular-nums"],
-              }}
-            >
-              {item.label}
-            </Text>
-          </Pressable>
-        )}
-      />
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 top-0"
-        style={{ height: PAD, backgroundColor: veil }}
-      />
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 bottom-0"
-        style={{ height: PAD, backgroundColor: veil }}
+        renderItem={renderItem}
+        // Two rows of fade at each end, iOS's dimmed outer rows. Native, so it
+        // works over any surface and costs nothing per frame.
+        fadingEdgeLength={PAD}
       />
     </View>
   );

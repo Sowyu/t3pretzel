@@ -1,3 +1,4 @@
+import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { TextInputWrapper } from "expo-paste-input";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
@@ -175,17 +176,27 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
           }}
         >
           <View className="flex-row items-center justify-between py-2">
-            <Pressable
-              className="bg-subtle h-12 w-12 items-center justify-center rounded-full"
-              onPress={dismissComposer}
-            >
-              <SymbolView
-                name="xmark"
-                size={18}
-                tintColorClassName={"accent-icon"}
-                type="monochrome"
+            {isAndroid ? (
+              <AndroidHeaderIconButton
+                accessibilityLabel="Close"
+                icon="xmark"
+                onPress={dismissComposer}
               />
-            </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                className="bg-subtle h-12 w-12 items-center justify-center rounded-full"
+                onPress={dismissComposer}
+              >
+                <SymbolView
+                  name="xmark"
+                  size={18}
+                  tintColorClassName={"accent-icon"}
+                  type="monochrome"
+                />
+              </Pressable>
+            )}
 
             <Text className="text-lg font-t3-bold text-foreground">Add Comment</Text>
 
