@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  LayoutAnimationConfig,
   LinearTransition,
   ReduceMotion,
   useAnimatedStyle,
@@ -132,25 +133,53 @@ export function ComposerDictationDraftContent(props: {
   );
 }
 
-/** Flips the entire row while keeping the outgoing controls intact until it leaves. */
+/**
+ * Flips the entire row while keeping the outgoing controls intact until it leaves.
+ * Showing and hiding follows the keyboard, so it rotates a mounted row: an
+ * entering animation cut short by a fast keyboard toggle could stay frozen
+ * near 90deg, squeezing the send button out of reach.
+ */
 export function ComposerDictationToolbar(props: {
   readonly children: ReactNode;
   readonly showsDictation: boolean;
   readonly visible?: boolean;
 }) {
+  const visible = props.visible !== false;
+  const hiddenRotation = props.showsDictation ? -1 : 1;
+  const rotation = useSharedValue(visible ? 0 : hiddenRotation);
+  useLayoutEffect(() => {
+    rotation.value = withTiming(visible ? 0 : hiddenRotation, TOOLBAR_FLIP_TIMING);
+  }, [hiddenRotation, rotation, visible]);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: 1 - Math.abs(rotation.value),
+    transform: [
+      { perspective: TOOLBAR_PERSPECTIVE },
+      { translateY: -TOOLBAR_HALF_HEIGHT * Math.sin((rotation.value * Math.PI) / 2) },
+      { rotateX: `${rotation.value * 90}deg` },
+    ],
+  }));
+
   return (
     <View className="relative h-[44px] overflow-hidden">
-      {props.visible !== false ? (
-        <Animated.View
-          key={props.showsDictation ? "dictation" : "draft"}
-          className="absolute inset-0"
-          entering={props.showsDictation ? DICTATION_TOOLBAR_ENTERING : DRAFT_TOOLBAR_ENTERING}
-          exiting={props.showsDictation ? DICTATION_TOOLBAR_EXITING : DRAFT_TOOLBAR_EXITING}
-          style={{ backfaceVisibility: "hidden" }}
-        >
-          {props.children}
-        </Animated.View>
-      ) : null}
+      <Animated.View
+        accessibilityElementsHidden={!visible}
+        importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
+        className="absolute inset-0"
+        pointerEvents={visible ? "auto" : "none"}
+        style={[animatedStyle, { backfaceVisibility: "hidden" }]}
+      >
+        <LayoutAnimationConfig skipEntering>
+          <Animated.View
+            key={props.showsDictation ? "dictation" : "draft"}
+            className="absolute inset-0"
+            entering={props.showsDictation ? DICTATION_TOOLBAR_ENTERING : DRAFT_TOOLBAR_ENTERING}
+            exiting={props.showsDictation ? DICTATION_TOOLBAR_EXITING : DRAFT_TOOLBAR_EXITING}
+            style={{ backfaceVisibility: "hidden" }}
+          >
+            {props.children}
+          </Animated.View>
+        </LayoutAnimationConfig>
+      </Animated.View>
     </View>
   );
 }
