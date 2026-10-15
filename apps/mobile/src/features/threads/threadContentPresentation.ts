@@ -20,6 +20,7 @@ export function projectThreadContentPresentation(input: {
   readonly detailError: string | null;
   readonly detailDeleted: boolean;
   readonly connectionState: EnvironmentConnectionPhase;
+  readonly connectionError: string | null;
 }): ThreadContentPresentation {
   if (input.hasDetail) {
     return READY_THREAD_CONTENT;
@@ -40,11 +41,13 @@ export function projectThreadContentPresentation(input: {
   }
   if (
     input.connectionState === "connected" ||
-    input.connectionState === "connecting" ||
-    input.connectionState === "reconnecting"
+    ((input.connectionState === "connecting" || input.connectionState === "reconnecting") &&
+      input.connectionError === null)
   ) {
-    // Messages will arrive once the (re)connection completes — present as
+    // Messages will arrive once the (re)connection completes, so present as
     // loading; the composer's connection pill reports the connection phase.
+    // A reconnect that already failed keeps retrying with no pill, and would
+    // leave this loading until the machine came back.
     return LOADING_THREAD_CONTENT;
   }
   return {

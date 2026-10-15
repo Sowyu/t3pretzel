@@ -134,7 +134,11 @@ import {
   FLOATING_WORKING_CONTROL_COVERAGE,
   FloatingWorkingControl,
 } from "./floating-working-control";
-import { connectionFloatingStatus, type FloatingWorkingStatus } from "./floating-working-status";
+import {
+  connectionFloatingStatus,
+  threadSyncFloatingLabel,
+  type FloatingWorkingStatus,
+} from "./floating-working-status";
 import {
   derivePendingUserInputMaxHeight,
   ESTIMATED_KEYBOARD_HEIGHT,
@@ -500,22 +504,11 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     ? 0
     : Math.max(insets.bottom, 12);
   const contentPresentationKind = props.contentPresentation.kind;
-  // The raw sync status enters "synchronizing" on every full fetch, cached or
-  // not. Whether messages are already on screen decides the pill label: no
-  // data yet → "Loading messages", cached data reconciling → "Syncing".
-  const realThreadSyncLabel = (() => {
-    switch (props.threadSyncStatus) {
-      case "empty":
-      case "cached":
-      case "synchronizing":
-        if (contentPresentationKind === "ready") {
-          return "Syncing messages...";
-        }
-        return contentPresentationKind === "loading" ? "Loading messages..." : null;
-      default:
-        return null;
-    }
-  })();
+  const realThreadSyncLabel = threadSyncFloatingLabel({
+    syncStatus: props.threadSyncStatus,
+    contentKind: contentPresentationKind,
+    connectionState: props.connectionStateLabel,
+  });
   // Opening a running thread resyncs for a few frames. The pill shows the
   // sync label only when the sync lasts, so it does not flash before the timer.
   const threadSyncLabel = useDelayedStatus(selectedThreadKey, realThreadSyncLabel);

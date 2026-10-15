@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { connectionFloatingStatus } from "./floating-working-status";
+import { connectionFloatingStatus, threadSyncFloatingLabel } from "./floating-working-status";
 
 const status = (
   connectionState: Parameters<typeof connectionFloatingStatus>[0]["connectionState"],
@@ -63,5 +63,31 @@ describe("connectionFloatingStatus", () => {
     if (pill?.kind !== "connection") throw new Error("expected a connection pill");
     pill.onPress();
     expect(onReconnect).toHaveBeenCalledOnce();
+  });
+});
+
+describe("threadSyncFloatingLabel", () => {
+  it("labels a sync by whether messages are already on screen", () => {
+    const label = (contentKind: "ready" | "loading" | "unavailable") =>
+      threadSyncFloatingLabel({
+        syncStatus: "synchronizing",
+        contentKind,
+        connectionState: "connected",
+      });
+    expect(label("ready")).toBe("Syncing messages...");
+    expect(label("loading")).toBe("Loading messages...");
+    expect(label("unavailable")).toBeNull();
+  });
+
+  it("does not spin while the environment cannot be reached", () => {
+    for (const connectionState of ["reconnecting", "connecting", "error", "offline"] as const) {
+      expect(
+        threadSyncFloatingLabel({
+          syncStatus: "synchronizing",
+          contentKind: "ready",
+          connectionState,
+        }),
+      ).toBeNull();
+    }
   });
 });

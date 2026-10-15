@@ -10,6 +10,7 @@ describe("thread content presentation", () => {
         detailError: null,
         detailDeleted: false,
         connectionState: "reconnecting",
+        connectionError: null,
       }),
     ).toEqual({ kind: "ready" });
   });
@@ -21,6 +22,7 @@ describe("thread content presentation", () => {
         detailError: null,
         detailDeleted: false,
         connectionState: "connected",
+        connectionError: null,
       }),
     ).toEqual({ kind: "loading" });
   });
@@ -32,12 +34,34 @@ describe("thread content presentation", () => {
         detailError: null,
         detailDeleted: false,
         connectionState: "error",
+        connectionError: null,
       }),
     ).toEqual({
       kind: "unavailable",
       title: "Messages not cached",
       detail: "Reconnect this environment to load the conversation.",
     });
+  });
+
+  it("stops loading uncached detail once a reconnect has failed", () => {
+    expect(
+      projectThreadContentPresentation({
+        hasDetail: false,
+        detailError: null,
+        detailDeleted: false,
+        connectionState: "reconnecting",
+        connectionError: "Failed to connect",
+      }),
+    ).toMatchObject({ kind: "unavailable", title: "Messages not cached" });
+    expect(
+      projectThreadContentPresentation({
+        hasDetail: false,
+        detailError: null,
+        detailDeleted: false,
+        connectionState: "reconnecting",
+        connectionError: null,
+      }),
+    ).toEqual({ kind: "loading" });
   });
 
   it("surfaces detail errors before presenting a loading state", () => {
@@ -47,6 +71,7 @@ describe("thread content presentation", () => {
         detailError: "The thread stream failed.",
         detailDeleted: false,
         connectionState: "connected",
+        connectionError: null,
       }),
     ).toEqual({
       kind: "unavailable",
@@ -62,6 +87,7 @@ describe("thread content presentation", () => {
       detailError: null,
       detailDeleted: false,
       connectionState: "connected",
+      connectionError: null,
     } as const;
     expect(projectThreadContentPresentation(input)).toBe(projectThreadContentPresentation(input));
     const loading = { ...input, hasDetail: false };

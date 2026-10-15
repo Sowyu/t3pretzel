@@ -1,4 +1,5 @@
 import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
+import type { EnvironmentThreadStatus } from "@t3tools/client-runtime/state/threads";
 
 /**
  * What the floating pill says. Connection, syncing, and working share one
@@ -78,6 +79,30 @@ export function connectionFloatingStatus(input: {
     case "available":
       return unavailable(`${environmentLabel} is not connected`);
     case "connected":
+      return null;
+  }
+}
+
+/**
+ * The pill's sync label. The raw status enters "synchronizing" on every full
+ * fetch, cached or not: messages already on screen read "Syncing", none yet
+ * read "Loading". A fetch only moves while connected. An environment whose
+ * reconnect already failed hides its connection pill, and a sync label in its
+ * place would spin until the machine came back.
+ */
+export function threadSyncFloatingLabel(input: {
+  readonly syncStatus: EnvironmentThreadStatus | undefined;
+  readonly contentKind: "ready" | "loading" | "unavailable";
+  readonly connectionState: EnvironmentConnectionPhase;
+}): string | null {
+  if (input.connectionState !== "connected") return null;
+  switch (input.syncStatus) {
+    case "empty":
+    case "cached":
+    case "synchronizing":
+      if (input.contentKind === "ready") return "Syncing messages...";
+      return input.contentKind === "loading" ? "Loading messages..." : null;
+    default:
       return null;
   }
 }
