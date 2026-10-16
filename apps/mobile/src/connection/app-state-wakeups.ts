@@ -1,10 +1,11 @@
 import type { Wakeups } from "@t3tools/client-runtime/connection";
 
-// A long background resume replaces the connection and re-downloads the
-// whole shell snapshot, which the user sees as "Syncing threads…". Ten seconds
-// made every app switch pay that price. Within this window the resume only
-// probes the socket and falls through to the full reconnect when the probe
-// fails, so a socket the OS silently dropped still recovers.
+// A long background resume replaces the connection, and every open shell and
+// thread catches up on the new socket, which the user sees as "Syncing
+// threads…". Ten seconds made every app switch pay that price. Within this
+// window the resume only probes the socket and falls through to the full
+// reconnect when the probe fails, so a socket the OS silently dropped still
+// recovers.
 export const MOBILE_BACKGROUND_RECONNECT_AFTER_MS = 5 * 60_000;
 
 export type MobileApplicationActiveWakeup = Extract<

@@ -81,6 +81,7 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
   readonly primaryBearerToken?: string;
   readonly prepareSsh?: ClientCapabilities.SshEnvironmentGateway["Service"]["prepare"];
   readonly descriptorProtocolVersion?: number | null | undefined;
+  readonly onDescriptorFetch?: () => void;
 }) => {
   const profiles = new Map(
     (options?.profiles ?? []).map((profile) => [profile.connectionId, profile]),
@@ -146,8 +147,9 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
   });
 
   const layerDependencies = Layer.mergeAll(
-    RpcHttp.layerRemoteHttpClient((() =>
-      Promise.resolve(
+    RpcHttp.layerRemoteHttpClient((() => {
+      options?.onDescriptorFetch?.();
+      return Promise.resolve(
         Response.json({
           environmentId: ENVIRONMENT_ID,
           label: "Compatible environment",
@@ -160,7 +162,8 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
               : { orchestrationProtocolVersion: options.descriptorProtocolVersion }),
           capabilities: { repositoryIdentity: true },
         }),
-      )) satisfies typeof fetch),
+      );
+    }) satisfies typeof fetch),
     Layer.succeed(
       ConnectionProfileStore.ConnectionProfileStore,
       options?.profileStore ?? profileStore,
@@ -326,6 +329,67 @@ describe("ConnectionResolver", () => {
         (yield* broker.prepare(catalogEntry(target, Option.some(profile)))).socketUrl,
       ).toContain("wsTicket=ticket");
       expect(yield* Ref.get(bearerInputs)).toEqual([{ token: "secret-bearer", method: "direct" }]);
+    }),
+  );
+
+  it.effect("reuses the descriptor a route check or authorization already read", () =>
+    Effect.gen(function* () {
+      let descriptorFetches = 0;
+      const authorizedWith: Array<string | undefined> = [];
+      const checkedDescriptor = {
+        environmentId: ENVIRONMENT_ID,
+        label: "Checked",
+        platform: { os: "linux", arch: "x64" },
+        serverVersion: "0.0.0-test",
+        orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,
+        capabilities: { repositoryIdentity: true },
+      } as const;
+      const target = new BearerConnectionTarget({
+        environmentId: ENVIRONMENT_ID,
+        label: "Saved",
+        connectionId: "saved-1",
+      });
+      const profile = new BearerConnectionProfile({
+        connectionId: "saved-1",
+        environmentId: ENVIRONMENT_ID,
+        label: "Saved",
+        httpBaseUrl: ENDPOINT.httpBaseUrl,
+        wsBaseUrl: ENDPOINT.wsBaseUrl,
+      });
+      const layerBroker = yield* makeDependencies({
+        onDescriptorFetch: () => {
+          descriptorFetches += 1;
+        },
+        credentials: [["saved-1", new BearerConnectionCredential({ token: "secret-bearer" })]],
+        authorizeBearer: (input) => {
+          authorizedWith.push(input.descriptor?.label);
+          return Effect.succeed({
+            environmentId: input.expectedEnvironmentId,
+            label: "Saved",
+            httpBaseUrl: input.httpBaseUrl,
+            socketUrl: "wss://environment.example.test/ws?wsTicket=ticket",
+            httpAuthorization: { _tag: "Bearer" as const, token: input.bearerToken },
+            ...(input.descriptor === undefined ? {} : { descriptor: input.descriptor }),
+          });
+        },
+      });
+      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(layerBroker));
+      const entry = catalogEntry(target, Option.some(profile));
+
+      const prepared = yield* broker.prepare(entry, {
+        httpBaseUrl: ENDPOINT.httpBaseUrl,
+        descriptor: checkedDescriptor,
+      });
+      expect(prepared).not.toHaveProperty("descriptor");
+      expect(descriptorFetches).toBe(0);
+
+      // A check of another address says nothing about this one.
+      yield* broker.prepare(entry, {
+        httpBaseUrl: "http://192.168.1.10:3773",
+        descriptor: checkedDescriptor,
+      });
+      expect(descriptorFetches).toBe(1);
+      expect(authorizedWith).toEqual(["Checked", undefined]);
     }),
   );
 

@@ -14,7 +14,7 @@ import type {
 } from "./model.ts";
 import { ConnectionTransientError } from "./model.ts";
 import * as ConnectionResolver from "./resolver.ts";
-import { connectionRoutes, routeEntry, routeHttpBaseUrl } from "./routes.ts";
+import { connectionRouteKind, connectionRoutes, routeEntry, routeHttpBaseUrl } from "./routes.ts";
 import * as RpcSession from "../rpc/session.ts";
 import { fetchRemoteEnvironmentDescriptor } from "../environment/descriptor.ts";
 
@@ -40,6 +40,12 @@ export type RouteCheck = "answered" | "silent" | "unchecked";
 
 /** How long a direct route has to answer before it counts as unreachable from here. */
 const ROUTE_CHECK_TIMEOUT_MS = 2_500;
+/**
+ * A LAN or loopback server answers in milliseconds when it is reachable, and
+ * from another network the check usually hangs, so the fallback route waits
+ * less. A slow LAN still gets tried after the other routes.
+ */
+const LOCAL_ROUTE_CHECK_TIMEOUT_MS = 1_000;
 
 export class ConnectionDriver extends Context.Service<
   ConnectionDriver,
@@ -141,25 +147,41 @@ export const make = Effect.gen(function* () {
   const sessions = yield* RpcSession.RpcSessionFactory;
   const httpClient = yield* HttpClient.HttpClient;
 
-  const checkRoute = (entry: ConnectionCatalogEntry, route: ConnectionRoute) => {
+  // An answered check keeps the descriptor it read, so preparing that route
+  // does not read it again.
+  const describeRoute = (
+    entry: ConnectionCatalogEntry,
+    route: ConnectionRoute,
+  ): Effect.Effect<{
+    readonly check: RouteCheck;
+    readonly checked?: ConnectionResolver.CheckedDescriptor;
+  }> => {
     const httpBaseUrl = routeHttpBaseUrl(route);
-    if (httpBaseUrl === null) return Effect.succeed<RouteCheck>("unchecked");
+    if (httpBaseUrl === null) return Effect.succeed({ check: "unchecked" });
     // The descriptor is public, so this sends no credential to whatever
     // answers at a saved LAN address on a different network.
+    const kind = connectionRouteKind(route);
     return fetchRemoteEnvironmentDescriptor({
       httpBaseUrl,
-      timeoutMs: ROUTE_CHECK_TIMEOUT_MS,
+      timeoutMs:
+        kind === "lan" || kind === "loopback"
+          ? LOCAL_ROUTE_CHECK_TIMEOUT_MS
+          : ROUTE_CHECK_TIMEOUT_MS,
     }).pipe(
-      Effect.map((descriptor): RouteCheck =>
-        descriptor.environmentId === entry.target.environmentId ? "answered" : "silent",
+      Effect.map((descriptor) =>
+        descriptor.environmentId === entry.target.environmentId
+          ? { check: "answered" as const, checked: { httpBaseUrl, descriptor } }
+          : { check: "silent" as const },
       ),
-      Effect.orElseSucceed((): RouteCheck => "silent"),
+      Effect.orElseSucceed(() => ({ check: "silent" as const })),
       Effect.provideService(HttpClient.HttpClient, httpClient),
       Effect.withSpan("ConnectionDriver.checkRoute", {
         attributes: { "connection.target.kind": route.target._tag },
       }),
     );
   };
+  const checkRoute = (entry: ConnectionCatalogEntry, route: ConnectionRoute) =>
+    describeRoute(entry, route).pipe(Effect.map((result) => result.check));
 
   const connect = Effect.fn("ConnectionDriver.connect")(function* (
     entry: ConnectionCatalogEntry,
@@ -172,11 +194,18 @@ export const make = Effect.gen(function* () {
       "connection.route.count": connectionRoutes(entry).length,
     });
     yield* reportProgress({ stage: "preparing" });
+    const checked = new Map<ConnectionRoute, ConnectionResolver.CheckedDescriptor>();
     return yield* connectOverRoutes(
       entry,
-      (route) => checkRoute(entry, route),
+      (route) =>
+        describeRoute(entry, route).pipe(
+          Effect.map((result) => {
+            if (result.checked !== undefined) checked.set(route, result.checked);
+            return result.check;
+          }),
+        ),
       Effect.fnUntraced(function* (route) {
-        const prepared = yield* resolver.prepare(routeEntry(entry, route));
+        const prepared = yield* resolver.prepare(routeEntry(entry, route), checked.get(route));
         yield* reportProgress({ stage: "opening", prepared });
         const session = yield* sessions.connect(prepared);
         yield* reportProgress({ stage: "synchronizing", prepared });
@@ -187,10 +216,10 @@ export const make = Effect.gen(function* () {
   });
 
   const preflight = (entry: ConnectionCatalogEntry, route: ConnectionRoute) =>
-    checkRoute(entry, route).pipe(
-      Effect.flatMap((check) =>
+    describeRoute(entry, route).pipe(
+      Effect.flatMap(({ check, checked }) =>
         check === "answered"
-          ? resolver.prepare(routeEntry(entry, route)).pipe(
+          ? resolver.prepare(routeEntry(entry, route), checked).pipe(
               Effect.as(true),
               Effect.orElseSucceed(() => false),
             )

@@ -807,7 +807,9 @@ describe("server state projection", () => {
         );
       });
       yield* sendConfig("/first");
-      yield* TestClock.adjust("500 millis");
+      yield* TestClock.adjust("2999 millis");
+      expect(yield* Queue.poll(savedConfigs)).toEqual(Option.none());
+      yield* TestClock.adjust("1 millis");
       expect((yield* Queue.take(savedConfigs)).cwd).toBe("/first");
       for (let index = 1; index <= 9; index++) {
         yield* sendConfig(`/repo-${index}`);

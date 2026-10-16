@@ -29,3 +29,24 @@ index f5b14ef..cccf0a4 100644
    }).pipe(Option.isSome(hooks) ? Effect.ensuring(hooks.value.onDisconnect) : identity, Effect.tapCause(cause => {
      const error = Cause.findError(cause);
      const hasError = Result.isSuccess(error);
+diff --git a/dist/reactivity/Atom.js b/dist/reactivity/Atom.js
+--- a/dist/reactivity/Atom.js
++++ b/dist/reactivity/Atom.js
+@@ -796,7 +796,7 @@
+  */
+ export const withLabel = /*#__PURE__*/dual(2, (self, name) => Object.assign(Object.create(Object.getPrototypeOf(self)), {
+   ...self,
+-  label: [name, getStackTraceLimit() === 0 ? "" : new Error().stack?.split("\n")[5] ?? ""]
++  label: [name, ""]
+ }));
+ /**
+  * Pairs an atom with an initial value for registry initialization.
+@@ -1489,7 +1489,7 @@
+   const codecJson = Schema.toCodecJson(options.schema);
+   return Object.assign(Object.create(Object.getPrototypeOf(self)), {
+     ...self,
+-    label: self.label ?? [options.key, getStackTraceLimit() === 0 ? "" : new Error().stack?.split("\n")[5] ?? ""],
++    label: self.label ?? [options.key, ""],
+     [SerializableTypeId]: {
+       key: options.key,
+       encode: Schema.encodeSync(codecJson),

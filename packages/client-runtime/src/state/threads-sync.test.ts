@@ -112,6 +112,8 @@ const makeHarness = Effect.fn("TestEnvironmentThreads.makeHarness")(function* (o
   readonly saveThread?: Persistence.EnvironmentCacheStore["Service"]["saveThread"];
   readonly historyPaging?: "enabled" | "no-http" | "no-controller";
   readonly historyHttpClient?: HttpClient.HttpClient;
+  /** No session yet, as while the environment connects; `replaceSession` connects. */
+  readonly connecting?: boolean;
 }) {
   const inputs = yield* Queue.unbounded<TestThreadInput>();
   const observed = yield* Queue.unbounded<EnvironmentThreadState>();
@@ -155,7 +157,7 @@ const makeHarness = Effect.fn("TestEnvironmentThreads.makeHarness")(function* (o
       ),
   } as unknown as WsRpcProtocolClient;
   const supervisorSession = yield* SubscriptionRef.make<Option.Option<RpcSession.RpcSession>>(
-    Option.some(testSession(client, options)),
+    options?.connecting === true ? Option.none() : Option.some(testSession(client, options)),
   );
   const prepared = yield* SubscriptionRef.make<Option.Option<PreparedConnection>>(
     Option.some(PREPARED),
@@ -1118,6 +1120,36 @@ describe("EnvironmentThreads", () => {
       expect(yield* Ref.get(harness.loaderCalls)).toBeGreaterThanOrEqual(1);
       expect(yield* Ref.get(harness.lastSubscribeAfterSequence)).toBe(1);
       expect(yield* Ref.get(harness.lastAcceptBoundedSnapshot)).toBe(true);
+    }),
+  );
+
+  it.effect("loads a thread opened while connecting before its socket is ready", () =>
+    Effect.gen(function* () {
+      const httpProjection: OrchestrationV2ThreadProjection = {
+        ...BASE_PROJECTION,
+        thread: { ...BASE_PROJECTION.thread, title: "HTTP title" },
+      };
+      const harness = yield* makeHarness({
+        connecting: true,
+        httpSnapshot: {
+          _tag: "present",
+          snapshot: { snapshotSequence: 1, projection: httpProjection },
+        },
+      });
+      for (let index = 0; index < 20; index += 1) {
+        yield* Effect.yieldNow;
+      }
+      expect(yield* Ref.get(harness.loaderCalls)).toBe(1);
+      expect(yield* Ref.get(harness.subscriptionCount)).toBe(0);
+
+      yield* harness.replaceSession;
+      yield* Queue.offer(harness.inputs, titleUpdated("Live title", 2));
+      yield* awaitThreadState(
+        harness.observed,
+        (value) => Option.isSome(value.data) && value.data.value.thread.title === "Live title",
+      );
+      expect(yield* Ref.get(harness.loaderCalls)).toBe(1);
+      expect(yield* Ref.get(harness.lastSubscribeAfterSequence)).toBe(1);
     }),
   );
 
@@ -2143,28 +2175,33 @@ describe("EnvironmentThreads", () => {
           value.data.value.thread.title === "Latest title",
       );
 
+      // Every status published from here on, so a brief "Syncing" flash shows up.
+      yield* Queue.clear(harness.observed);
       yield* Queue.offer(harness.wakeups, "application-active");
-      const synchronizing = yield* awaitThreadState(
-        harness.observed,
-        (value) => value.status === "synchronizing" && Option.isSome(value.data),
-      );
       for (let attempt = 0; attempt < 100; attempt += 1) {
         if ((yield* Ref.get(harness.subscriptionCount)) >= 2) break;
         yield* Effect.yieldNow;
       }
 
-      expect(synchronizing.status).toBe("synchronizing");
       expect(yield* Ref.get(harness.subscriptionCount)).toBe(2);
       expect(yield* Ref.get(harness.lastSubscribeAfterSequence)).toBe(CACHED_SNAPSHOT_SEQUENCE + 1);
       expect(yield* Ref.get(harness.lastRequestCompletionMarker)).toBe(true);
       expect(yield* Ref.get(harness.loaderCalls)).toBe(0);
 
-      yield* Queue.offer(harness.inputs, synchronized());
-      const live = yield* awaitThreadState(
-        harness.observed,
-        (value) => value.status === "live" && Option.isSome(value.data),
+      // The socket stayed open, so its catch-up keeps the thread live.
+      yield* Queue.offer(
+        harness.inputs,
+        titleUpdated("Resumed title", CACHED_SNAPSHOT_SEQUENCE + 2),
       );
-      expect(Option.getOrThrow(live.data).thread.title).toBe("Latest title");
+      yield* Queue.offer(harness.inputs, synchronized());
+      for (let index = 0; index < 20; index += 1) {
+        yield* Effect.yieldNow;
+      }
+      const published = yield* Queue.clear(harness.observed);
+      expect(published.map((value) => value.status)).not.toContain("synchronizing");
+      const latest = yield* Ref.get(harness.latest);
+      expect(latest.status).toBe("live");
+      expect(Option.getOrThrow(latest.data).thread.title).toBe("Resumed title");
 
       yield* Queue.offer(harness.wakeups, "application-active-probe");
       for (let attempt = 0; attempt < 100; attempt += 1) {

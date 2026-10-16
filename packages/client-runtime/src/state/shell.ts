@@ -30,6 +30,7 @@ import { subscribeDynamic } from "../rpc/client.ts";
 import type { RpcSession } from "../rpc/session.ts";
 import * as ShellSnapshotLoader from "./shellSnapshotHttp.ts";
 import type { DeferredShellSnapshot } from "./shellPullRequests.ts";
+import { prefetchOnPrepared } from "./preparedPrefetch.ts";
 import {
   applyShellStreamEvent,
   mergeShellSnapshotProjects,
@@ -67,6 +68,12 @@ function withoutDeferredPullRequests(value: DeferredShellSnapshot): Orchestratio
 
 const SHELL_SYNCHRONIZATION_ERROR_MESSAGE = "Could not synchronize environment data.";
 
+interface ShellSubscription {
+  readonly session: RpcSession;
+  /** Undefined when the server config did not load. */
+  readonly serverVersion: string | undefined;
+}
+
 export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")(function* () {
   const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
   const cache = yield* Persistence.EnvironmentCacheStore;
@@ -91,8 +98,9 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
     error: Option.none(),
   });
   const awaitingCompletion = yield* Ref.make(false);
-  const lastAuthoritativeSession = yield* Ref.make<RpcSession | null>(null);
-  const activeSubscriptionSession = yield* Ref.make<RpcSession | null>(null);
+  // The session (and its server build) whose snapshot the in-memory shell came from.
+  const lastAuthoritative = yield* Ref.make<ShellSubscription | null>(null);
+  const activeSubscription = yield* Ref.make<ShellSubscription | null>(null);
   const latestLiveSnapshot = yield* Ref.make<Option.Option<OrchestrationV2ShellSnapshot>>(
     Option.none(),
   );
@@ -238,9 +246,9 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
     }
     yield* SubscriptionRef.set(state, next);
     if (receivedSnapshot) {
-      const session = yield* Ref.get(activeSubscriptionSession);
-      if (session !== null) {
-        yield* Ref.set(lastAuthoritativeSession, session);
+      const active = yield* Ref.get(activeSubscription);
+      if (active !== null) {
+        yield* Ref.set(lastAuthoritative, active);
       }
     }
     if (next.snapshot !== initial.snapshot && Option.isSome(next.snapshot)) {
@@ -328,25 +336,53 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
       service.changes.pipe(Stream.filter(ConnectionWakeups.shouldResubscribeAfterWakeup)),
   });
 
+  // Only a shell without a server snapshot from this run downloads one when a
+  // connection is prepared; the others resume over the socket.
+  const loadHttpSnapshot = yield* prefetchOnPrepared(
+    supervisor.prepared,
+    snapshotLoader.load,
+    Ref.get(lastAuthoritative).pipe(Effect.map((authoritative) => authoritative === null)),
+  );
+
   yield* setSynchronizing;
   yield* Effect.forkScoped(
     subscribeDynamic(
       ORCHESTRATION_V2_WS_METHODS.subscribeShell,
       Effect.fn("EnvironmentShellState.makeSubscribeInput")(function* (session) {
-        yield* Ref.set(activeSubscriptionSession, session);
-        const supportsCompletionMarker = yield* session.initialConfig.pipe(
-          Effect.map((config) => config.shellResumeCompletionMarker === true),
-          Effect.orElseSucceed(() => false),
-        );
-        yield* Ref.set(awaitingCompletion, supportsCompletionMarker);
-        yield* setSynchronizing;
+        const config = Option.getOrUndefined(yield* session.initialConfig.pipe(Effect.option));
+        const supportsCompletionMarker = config?.shellResumeCompletionMarker === true;
+        const subscription: ShellSubscription = {
+          session,
+          serverVersion: config?.environment?.serverVersion,
+        };
+        const previousSubscription = yield* Ref.getAndSet(activeSubscription, subscription);
 
-        // Foreground resubscriptions on the same live session can resume from
-        // the in-memory cursor. A new session reloads the authoritative HTTP
-        // snapshot so a valid cursor cannot preserve incomplete cached data.
-        const hasAuthoritativeSnapshot = (yield* Ref.get(lastAuthoritativeSession)) === session;
+        // The in-memory shell came from a server snapshot in this run, and
+        // every event since moved its cursor, so the server can replay what it
+        // missed: on the same session after a foreground resubscribe, and on a
+        // new session of the same server build, where a gap too large to
+        // replay comes back as a full snapshot. A cold cache from disk, or a
+        // server that changed build, reloads the authoritative HTTP snapshot
+        // so a valid cursor cannot preserve incomplete or stale rows.
+        const authoritative = yield* Ref.get(lastAuthoritative);
+        const hasAuthoritativeSnapshot =
+          authoritative !== null &&
+          (authoritative.session === session ||
+            (subscription.serverVersion !== undefined &&
+              authoritative.serverVersion === subscription.serverVersion));
         let canResume = hasAuthoritativeSnapshot;
         let current = yield* SubscriptionRef.get(state);
+        // A foreground resubscribe on the socket that stayed open missed
+        // nothing, so a live shell stays live instead of flashing "Syncing"
+        // for the round trip. A dead socket fails the supervisor's probe,
+        // which reports the reconnect.
+        const quietResume =
+          previousSubscription?.session === session &&
+          hasAuthoritativeSnapshot &&
+          current.status === "live";
+        yield* Ref.set(awaitingCompletion, supportsCompletionMarker && !quietResume);
+        if (!quietResume) yield* setSynchronizing;
+
         if (!hasAuthoritativeSnapshot || Option.isNone(current.snapshot)) {
           const prepared = yield* SubscriptionRef.get(supervisor.prepared).pipe(
             Effect.flatMap(
@@ -362,7 +398,7 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
               }),
             ),
           );
-          const httpSnapshot = yield* snapshotLoader.load(prepared);
+          const httpSnapshot = yield* loadHttpSnapshot(prepared);
           if (Option.isSome(httpSnapshot)) {
             yield* cancelActiveFill;
             const previous = yield* SubscriptionRef.get(state);

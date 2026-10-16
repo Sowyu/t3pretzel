@@ -30,7 +30,9 @@ import * as Persistence from "../platform/persistence.ts";
 import { runCachePersistence } from "./cachePersistence.ts";
 import * as ManagedRelay from "../relay/managedRelay.ts";
 import { SubscriptionDefectRetry, subscribeDynamic } from "../rpc/client.ts";
+import type { RpcSession } from "../rpc/session.ts";
 import { parseThreadKey, threadKey } from "./entities.ts";
+import { prefetchOnPrepared } from "./preparedPrefetch.ts";
 import { applyOrchestrationV2ProjectionEvent } from "./orchestrationV2Projection.ts";
 import { THREAD_SNAPSHOT_IDLE_TTL_MS } from "./threadRetention.ts";
 import { followStreamInEnvironment } from "./runtime.ts";
@@ -781,8 +783,8 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
   });
 
   // Only the first subscription after a warm live resume keeps the retained
-  // status. A replacement session or foreground resubscribe on the same scope
-  // may have missed events, so those show sync progress until confirmed.
+  // status. A replacement session may have missed events, so it shows sync
+  // progress until confirmed.
   const resumingLive = yield* Ref.make(initialState.status === "live");
   const markSynchronizing = Effect.gen(function* () {
     if (yield* Ref.get(resumingLive)) return;
@@ -794,6 +796,17 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         : { ...current, status: "synchronizing" as const, error: Option.none() },
     );
   });
+
+  // A thread opened while its environment connects starts its HTTP load once
+  // the connection is prepared, not after the socket is ready.
+  const loadHttpSnapshot = yield* prefetchOnPrepared(
+    supervisor.prepared,
+    (prepared) => snapshotLoader.load(prepared, threadId),
+    SubscriptionRef.get(state).pipe(
+      Effect.map((current) => Option.isNone(current.data) && current.status !== "deleted"),
+    ),
+  );
+  let subscribedSession: RpcSession | undefined;
 
   yield* markSynchronizing;
   yield* Effect.forkScoped(
@@ -812,8 +825,14 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
           Effect.map((config) => config.threadResumeCompletionMarker === true),
           Effect.orElseSucceed(() => false),
         );
-        yield* Ref.set(awaitingCompletion, supportsCompletionMarker);
-        yield* markSynchronizing;
+        // A foreground resubscribe on the socket that stayed open missed
+        // nothing, so a live thread stays live through the catch-up instead of
+        // flashing "Syncing". A dead socket fails the supervisor's probe.
+        const quietResume =
+          subscribedSession === session && (yield* SubscriptionRef.get(state)).status === "live";
+        subscribedSession = session;
+        yield* Ref.set(awaitingCompletion, supportsCompletionMarker && !quietResume);
+        if (!quietResume) yield* markSynchronizing;
         yield* Ref.set(resumingLive, false);
 
         if (Option.isNone(current.data)) {
@@ -832,7 +851,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
             ),
           );
           const httpResult: ThreadSnapshotLoader.ThreadSnapshotLoadResult =
-            yield* snapshotLoader.load(prepared, threadId);
+            yield* loadHttpSnapshot(prepared);
           switch (httpResult._tag) {
             case "present": {
               if (canLoadHistory && httpResult.history !== undefined) {

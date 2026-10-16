@@ -50,6 +50,8 @@ export interface AuthorizedRemoteEnvironment {
   readonly httpBaseUrl: string;
   readonly socketUrl: string;
   readonly httpAuthorization: PreparedHttpAuthorization;
+  /** The descriptor read from `httpBaseUrl` while authorizing, so the resolver need not read it again. */
+  readonly descriptor?: ExecutionEnvironmentDescriptor;
 }
 
 export interface AuthorizedRemoteHttpEnvironment {
@@ -68,6 +70,8 @@ export class RemoteEnvironmentAuthorization extends Context.Service<
       readonly wsBaseUrl: string;
       readonly bearerToken: string;
       readonly connectionMethod: ClientConnectionMethod;
+      /** Read from `httpBaseUrl` moments ago by a route check; skips reading it again. */
+      readonly descriptor?: ExecutionEnvironmentDescriptor;
     }) => Effect.Effect<AuthorizedRemoteEnvironment, ConnectionAttemptError>;
     readonly authorizeDpop: (input: {
       readonly expectedEnvironmentId: EnvironmentId;
@@ -78,6 +82,8 @@ export class RemoteEnvironmentAuthorization extends Context.Service<
        * LAN or tailnet address.
        */
       readonly directEndpoint?: { readonly httpBaseUrl: string; readonly wsBaseUrl: string };
+      /** Read from the direct endpoint moments ago by a route check; skips reading it again. */
+      readonly descriptor?: ExecutionEnvironmentDescriptor;
     }) => Effect.Effect<AuthorizedRemoteEnvironment, ConnectionAttemptError>;
     readonly authorizeDpopHttp: (input: {
       readonly expectedEnvironmentId: EnvironmentId;
@@ -149,6 +155,7 @@ export const make = Effect.gen(function* () {
       readonly expectedEnvironmentId: EnvironmentId;
       readonly httpBaseUrl: string;
       readonly connectionMethod: ClientConnectionMethod;
+      readonly descriptor?: ExecutionEnvironmentDescriptor | undefined;
     }) {
       const now = yield* Clock.currentTimeMillis;
       const cachedDescriptor = (yield* Ref.get(bearerDescriptors)).get(input.expectedEnvironmentId);
@@ -157,9 +164,10 @@ export const make = Effect.gen(function* () {
         cachedDescriptor.validatedAtEpochMs + BEARER_DESCRIPTOR_CACHE_TTL_MS > now;
       const descriptor = canReuseDescriptor
         ? cachedDescriptor.descriptor
-        : yield* fetchDescriptor(input.httpBaseUrl, input.connectionMethod).pipe(
+        : (input.descriptor ??
+          (yield* fetchDescriptor(input.httpBaseUrl, input.connectionMethod).pipe(
             Effect.provideService(HttpClient.HttpClient, httpClient),
-          );
+          )));
       if (descriptor.environmentId !== input.expectedEnvironmentId) {
         return yield* environmentMismatchError({
           expected: input.expectedEnvironmentId,
@@ -190,6 +198,7 @@ export const make = Effect.gen(function* () {
       readonly wsBaseUrl: string;
       readonly bearerToken: string;
       readonly connectionMethod: ClientConnectionMethod;
+      readonly descriptor?: ExecutionEnvironmentDescriptor;
     }) {
       const descriptor = yield* verifyDirectEndpoint(input);
       const socketUrl = yield* resolveRemoteWebSocketConnectionUrl({
@@ -211,6 +220,7 @@ export const make = Effect.gen(function* () {
           _tag: "Bearer" as const,
           token: input.bearerToken,
         },
+        descriptor,
       };
     },
   );
@@ -491,16 +501,19 @@ export const make = Effect.gen(function* () {
     input: Parameters<RemoteEnvironmentAuthorization["Service"]["authorizeDpop"]>[0],
   ) {
     const endpoint = input.directEndpoint;
-    if (endpoint !== undefined) {
-      yield* verifyDirectEndpoint({
-        expectedEnvironmentId: input.expectedEnvironmentId,
-        httpBaseUrl: endpoint.httpBaseUrl,
-        connectionMethod: "direct",
-      });
-    }
+    const descriptor =
+      endpoint === undefined
+        ? undefined
+        : yield* verifyDirectEndpoint({
+            expectedEnvironmentId: input.expectedEnvironmentId,
+            httpBaseUrl: endpoint.httpBaseUrl,
+            connectionMethod: "direct",
+            descriptor: input.descriptor,
+          });
     const authorized = (token: TokenStore.RemoteDpopAccessToken, socketUrl: string) => ({
       ...httpAuthorization(token, endpoint?.httpBaseUrl),
       socketUrl,
+      ...(descriptor === undefined ? {} : { descriptor }),
     });
     let selected = yield* getDpopToken(input);
     if (selected.fromCache) {

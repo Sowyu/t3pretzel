@@ -432,7 +432,10 @@ export const makeEnvironmentServerConfigState = Effect.fn("EnvironmentServerConf
       ),
     );
 
-    yield* runCachePersistence(persistence, persistPending).pipe(Effect.forkScoped);
+    // Encoding a config with its provider list blocks the JS thread for about
+    // 150 ms on Android. Every environment connects at once, so wait until
+    // the shells have synced.
+    yield* runCachePersistence(persistence, persistPending, "3 seconds").pipe(Effect.forkScoped);
 
     yield* subscribe(WS_METHODS.subscribeServerConfig, {
       ...(subscription.environmentThemes === true ? { environmentThemes: true } : {}),

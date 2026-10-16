@@ -269,6 +269,30 @@ describe("RemoteEnvironmentAuthorization", () => {
     }),
   );
 
+  it.effect("uses a route check's descriptor and returns it without reading it again", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness({ responses: [websocketTicket("ticket")] });
+
+      const authorized = yield* Effect.gen(function* () {
+        const remote = yield* RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization;
+        return yield* remote.authorizeBearer({
+          expectedEnvironmentId: ENVIRONMENT_ID,
+          httpBaseUrl: ENDPOINT.httpBaseUrl,
+          wsBaseUrl: ENDPOINT.wsBaseUrl,
+          bearerToken: "bearer-token",
+          connectionMethod: "direct",
+          descriptor: DESCRIPTOR as never,
+        });
+      }).pipe(Effect.provide(harness.layer));
+
+      expect(authorized.socketUrl).toContain("wsTicket=ticket");
+      expect(authorized.descriptor).toBe(DESCRIPTOR);
+      expect(
+        harness.fetch.calls.filter(([url]) => String(url).endsWith("/.well-known/t3/environment")),
+      ).toHaveLength(0);
+    }),
+  );
+
   it.effect("revalidates a bearer descriptor after the cache expires", () =>
     Effect.gen(function* () {
       const reassignedEnvironmentId = EnvironmentId.make("environment-2");
