@@ -8,6 +8,7 @@ import type { SQLiteBindValue, SQLiteDatabase } from "expo-sqlite";
 
 const DATABASE_NAME = "t3code-client.db";
 const DATABASE_SCHEMA_VERSION = 1;
+const WAL_SIZE_LIMIT_BYTES = 32 * 1024 * 1024;
 const LEGACY_CACHE_DIRECTORIES = [
   "connection-shell-snapshots",
   "shell-snapshots",
@@ -300,7 +301,18 @@ const makeAvailable = Effect.fnUntraced(function* (options: MobileDatabaseOption
 
   yield* Effect.tryPromise({
     try: async () => {
-      await database.execAsync("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+      // In WAL mode NORMAL fsyncs only at checkpoints instead of on every cache
+      // save, so slow flash stops stalling the connection reads queue behind. A
+      // crash cannot corrupt the cache; power loss can drop the latest saves.
+      // checkpoint_fullfsync makes those checkpoints durable on iOS, and the size
+      // limit stops the -wal file keeping its largest size after a big PR diff.
+      await database.execAsync(`
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA checkpoint_fullfsync = ON;
+        PRAGMA journal_size_limit = ${WAL_SIZE_LIMIT_BYTES};
+        PRAGMA foreign_keys = ON;
+      `);
       const schema = await database.getFirstAsync<{ readonly user_version: number }>(
         "PRAGMA user_version",
       );
@@ -380,7 +392,12 @@ const makeAvailable = Effect.fnUntraced(function* (options: MobileDatabaseOption
                  ON CONFLICT (environment_id, kind, cache_key) DO UPDATE SET
                    schema_version = excluded.schema_version,
                    payload = excluded.payload,
-                   updated_at = excluded.updated_at`,
+                   updated_at = excluded.updated_at
+                 -- An unchanged payload writes nothing. Pull requests and favicons
+                 -- still bump updated_at, which drives their expiry and order.
+                 WHERE excluded.kind IN ('pull-request', 'project-favicon')
+                   OR client_cache.payload IS NOT excluded.payload
+                   OR client_cache.schema_version IS NOT excluded.schema_version`,
                 environmentId,
                 kind,
                 cacheKey,

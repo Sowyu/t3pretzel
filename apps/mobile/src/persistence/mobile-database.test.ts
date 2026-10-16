@@ -126,6 +126,35 @@ describe("offline pull request cache", () => {
     ),
   );
 
+  it.effect("skips rewriting unchanged payloads except where updated_at drives expiry", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const sqlite = yield* Effect.promise(sqliteDatabase);
+        const database = yield* MobileDatabase.make;
+        const updatedAt = (kind: string) =>
+          (
+            sqlite.prepare("SELECT updated_at FROM client_cache WHERE kind = ?").get(kind) as {
+              updated_at: number;
+            }
+          ).updated_at;
+        yield* database.saveCache(environmentId, "shell", "snapshot", 1, "same");
+        yield* database.saveCache(environmentId, "pull-request", "v1:list", 1, "same");
+        sqlite.prepare("UPDATE client_cache SET updated_at = 1").run();
+
+        yield* database.saveCache(environmentId, "shell", "snapshot", 1, "same");
+        yield* database.saveCache(environmentId, "pull-request", "v1:list", 1, "same");
+        expect(updatedAt("shell")).toBe(1);
+        expect(updatedAt("pull-request")).toBeGreaterThan(1);
+
+        yield* database.saveCache(environmentId, "shell", "snapshot", 1, "changed");
+        expect(updatedAt("shell")).toBeGreaterThan(1);
+        expect(yield* database.loadCache(environmentId, "shell", "snapshot")).toEqual(
+          Option.some("changed"),
+        );
+      }),
+    ),
+  );
+
   it.effect(
     "expires old records and bounds count and payload size without evicting other cache kinds",
     () =>
